@@ -1,0 +1,4 @@
+PyQT5>=5.15.10
+ngawari
+spydcmtk
+vtk>=9.3

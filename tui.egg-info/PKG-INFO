@@ -1,0 +1,40 @@
+Metadata-Version: 2.1
+Name: tui
+Version: 0.1.0
+Summary: Basic viewer to load 3D/4D image data with basic markup capabilities.
+Home-page: UNKNOWN
+Author: Fraser M. Callaghan
+Author-email: callaghan.fm@gmail.com
+License: UNKNOWN
+Platform: UNKNOWN
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: GNU GPL V3
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.6
+Description-Content-Type: text/markdown
+License-File: LICENSE
+
+# tui
+
+**TUI** a beautiful NZ native bird - but also a technical user interfacce. 
+
+This is a fairly basic UI designed for medical image analysis. 
+It leverages mostly VTK and ITK for back end algorithms. 
+But also includes a number of unique segmentation routines. 
+
+A major distinction from Slicer3D/MITK etc is simplicity and simple customisation. 
+
+If you have a work flow to apply to your study images, then this application will allow you to quickly set buttons and shortcuts to achieve this. 
+
+
+# TODO
+
+3D window in new thread with update button
+
+Dicom ~~importer~~ / exporter.
+
+4 panel view as well as single
+
+Orthogonal slice aligner
+
+
