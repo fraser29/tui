@@ -131,7 +131,10 @@ class MarkupPoints(list):
         return np.array([i.X for i in self])
 
     def getPolyData(self):
-        return vtkfilters.buildPolydataFromXYZ(self.getPointsNumpy())
+        pp = vtkfilters.buildPolydataFromXYZ(self.getPointsNumpy())
+        nn = np.array([i.norm for i in self])
+        vtkfilters.setArrayFromNumpy(pp, nn, "normal", SET_VECTOR=True)
+        return pp
 
     def getPointsWithinBounds(self, CP, N, delta):
         dists = [abs(vtkfilters.ftk.distanceToPlane(i.X, N, CP)) for i in self]

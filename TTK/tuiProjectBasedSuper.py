@@ -214,14 +214,17 @@ class TUIBasic(TUIProject):
         self.ex.updatePushButtonDict(self.pushButtonDict)
 
     def saveVOI_(self):
-        self.saveVOI()
+        fOut = self.saveVOI()
+        print(fOut)
 
     def savePolyPts_(self):
-        self.savePoints()
+        fOut = self.savePoints()
+        print(fOut)
 
 
     def savePolyLine_(self):
-        self.saveLine(minN=3)
+        fOut = self.saveLine(minN=2)
+        print(fOut)
     
     def alignRandom(self):
         # NOT WORKING
