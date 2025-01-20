@@ -123,8 +123,6 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
         self.timeSlider.setSingleStep(1)
         self.timeSlider.setPageStep(5)
         #
-        self.slabSpinBox.valueChanged.connect(self.changeSlabSpinBox)
-        #
         self.axialButton.clicked.connect(self.__axialButtonAction)
         self.saggitalButton.clicked.connect(self.__saggitalButtonAction)
         self.coronalButton.clicked.connect(self.__coronalButtonAction)
@@ -176,7 +174,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
             }
             self.updatePushButtonDict(newDict)
         """
-        if newPushButtonDict is not None:
+        if type(newPushButtonDict) == dict:
             self.modPushButtonDict = newPushButtonDict
         ### Modifiable push buttons
         for k1 in range(self.nModPushButtons):
@@ -252,11 +250,6 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
             dx = self._getDeltaX()
             self.resliceCursor.SetCenter(cp + nn * dx)
             self.__updateMarkups()
-
-    def changeSlabSpinBox(self, val):
-        pass #TODO
-        self.updateViewAfterSliceChange()
-
 
     # BUTTONS
     def updateParallelScale(self, viewID):

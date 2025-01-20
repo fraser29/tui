@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'tuimarkupui.ui'
-#
+# WAS ORIGINALLY - Form implementation generated from reading ui file 'tuimarkupui.ui'
 # Created by: PyQt5 UI code generator 5.9.2
-#
-# WARNING! All changes made in this file will be lost!
+# 
+# NOW - managed by CURSOR
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 import os
@@ -179,20 +178,11 @@ class Ui_BASEUI(object):
         self.rightPanelLayout.addItem(spacerItem1, 5, 0, 1, 1)
         #
         #
-        # SLAB THICKNESS
-        self.slabControlLayout = QtWidgets.QHBoxLayout()
-        self.slabControlLayout.setObjectName("horizontalLayout_4")
-        self.label = QtWidgets.QLabel(self.centralwidget)
-        self.label.setObjectName("label")
-        self.slabControlLayout.addWidget(self.label)
-        self.slabSpinBox = QtWidgets.QSpinBox(self.centralwidget)
-        self.slabSpinBox.setMinimum(1)
-        self.slabSpinBox.setMaximum(5)
-        self.slabSpinBox.setObjectName("slabSpinBox")
-        self.slabControlLayout.addWidget(self.slabSpinBox)
-        self.rightPanelLayout.addLayout(self.slabControlLayout, 6, 0, 1, 1)
-        #
-        #
+        # Add Customised Buttons Label
+        self.customButtonsLabel = QtWidgets.QLabel(self.centralwidget)
+        self.customButtonsLabel.setObjectName("customButtonsLabel")
+        self.rightPanelLayout.addWidget(self.customButtonsLabel, 6, 0, 1, 1)
+
         # CUSTOMISABLE BUTTONS
         self.pushButtonsLayout = QtWidgets.QGridLayout()
         self.pushButtonsLayout.setObjectName("gridLayout_3")
@@ -310,7 +300,6 @@ class Ui_BASEUI(object):
         self.button11.setText(_translate("BASEUI", "PushButton"))
         self.button6.setText(_translate("BASEUI", "PushButton"))
         self.button12.setText(_translate("BASEUI", "PushButton"))
-        self.label.setText(_translate("BASEUI", "SLAB THICKNESS"))
         self.cursor3DCheck.setText(_translate("BASEUI", "Show 3D Cursor"))
         self.label_5.setText(_translate("BASEUI", "Working directroy"))
         self.workingDirToolButton.setText(_translate("BASEUI", "..."))
@@ -320,4 +309,5 @@ class Ui_BASEUI(object):
         self.actionVTK_Image.setText(_translate("BASEUI", "VTK Image"))
         self.actionQuit.setText(_translate("BASEUI", "Quit"))
         self.actionQuit.setShortcut(_translate("BASEUI", "Q"))
+        self.customButtonsLabel.setText(_translate("BASEUI", "Customised Buttons"))
 
