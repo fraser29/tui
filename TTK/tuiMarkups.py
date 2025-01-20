@@ -21,6 +21,7 @@ from scipy import ndimage
 Points = 'Points'
 Splines = 'Splines'
 Polydata = 'Polydata'
+Masks = 'Masks'
 
 ### ====================================================================================================================
 ### ====================================================================================================================
@@ -35,7 +36,8 @@ class Markups(object):
         self.markupsDict = {} # Dict(k=typestr, v=Dict(k=timeID, v=list_of_markup))
         self.markupsTypesCollections = {Points: MarkupPoints,
                                         Splines: MarkupSplines,
-                                        Polydata: MarkupPolydatas}
+                                        Polydata: MarkupPolydatas,
+                                        Masks: MarkupMasks}
         self.reset()
 
     def initForNewData(self, nTimes):
@@ -393,15 +395,29 @@ class MarkupContour(Markup):
 
 
 ### ====================================================================================================================
+### MARKUP - MASKS - LIST
+class MarkupMasks(list):
+    def __init__(self):
+        super(MarkupMasks, self).__init__([])
+
+### ====================================================================================================================
 class MarkupMask(Markup):
 
-    def __init__(self, timeID, time, binaryArray3D, MANUAL=False, maskLabel='mask', RGB=(0.0,1.0,0.0), alpha=0.3):
+    def __init__(self, timeID, time, baseImage, MANUAL=False, maskLabel='mask', RGB=(0.0,1.0,0.0), alpha=0.3):
         super().__init__(0, timeID, time)
-        self.array = binaryArray3D
-        self.MANUAL = MANUAL
-        self.maskLabel = maskLabel
-        self.RGB = RGB
-        self.alpha = alpha
+        # self.mask = vtk.vtkImageMask()
+        # self.mask.SetImageInput(baseImage)  # Original image
+        # maskImage = vtkfilters.copyImage(baseImage)
+        # self.mask.SetMaskInput(maskImage)    # Mask image (0s and 1s)
+        # self.mask.SetMaskedOutputValue(0)    # Value for masked regions
+        # self.mask.Update()
+        # self.MANUAL = MANUAL
+        # self.maskLabel = maskLabel
+        # self.RGB = RGB
+        # self.alpha = alpha
+
+    # def setMask_upper_lower(self, baseArray, upper, lower):
+    #     self.array = 
 
     def getMaskSlice_Ax(self, sliceID):
         return np.flip(self.array[:,:,sliceID],1).flatten('F').astype(int)

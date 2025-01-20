@@ -205,7 +205,7 @@ class TUIBasic(TUIProject):
         self.pushButtonDict = {0:['Save points', self.savePolyPts_],
                               1:['Save line', self.savePolyLine_],
                               3:['Clear Markups', self.ex.deleteAllMarkups],
-                            #   4:['Align Random', self.alignRandom],
+                              4:['Test mask', self.testMask],
                               5: ['Points to VOI', self.saveVOI_]}
 
         self.ex.updatePushButtonDict(self.pushButtonDict)
@@ -230,6 +230,10 @@ class TUIBasic(TUIProject):
     def changeContour(self, val):
         self.sliderDict[0]["value"] = val
         self.ex.setContourVal(val)
+        
+
+    def testMask(self):
+        self.ex.Markups
 
     # def alignRandom(self):
     #     # NOT WORKING

@@ -577,3 +577,23 @@ class ImageTracerInteractorStyle(vtk.vtkInteractorStyleImage):
 
 ### ====================================================================================================================
 ### ====================================================================================================================
+
+class PaintInteractorStyle(vtk.vtkInteractorStyleImage):
+    def __init__(self, parent=None):
+        self.parent = parent
+        self.AddObserver("LeftButtonPressEvent", self.OnLeftButtonDown)
+        self.AddObserver("LeftButtonReleaseEvent", self.OnLeftButtonUp)
+        self.AddObserver("MouseMoveEvent", self.OnMouseMove)
+        
+    def OnLeftButtonDown(self, obj, event):
+        self.parent.isDrawing = True
+        x, y = self.GetInteractor().GetEventPosition()
+        self.parent.paintLabel(x, y)
+        
+    def OnLeftButtonUp(self, obj, event):
+        self.parent.isDrawing = False
+        
+    def OnMouseMove(self, obj, event):
+        if self.parent.isDrawing:
+            x, y = self.GetInteractor().GetEventPosition()
+            self.parent.paintLabel(x, y)

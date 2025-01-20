@@ -57,10 +57,6 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
         self.contourVal = None
         ##
         self.nModPushButtons = 12
-        self.modPushButtons = [self.button1, self.button2, self.button3,
-                               self.button4, self.button5, self.button6,
-                               self.button7, self.button8, self.button9,
-                               self.button10, self.button11, self.button12]
         self.modPushButtonDict = dict(zip(range(self.nModPushButtons),
                                           [['Mod-Button%d'%(i),dummyModButtonAction] for i in range(1,self.nModPushButtons+1)]))
         self.sliderDict = {}
@@ -430,6 +426,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
 
     #         self.resliceCursor.SetThickMode(False)
     #         self.resliceCursor.SetThickness(0, 0, 0)
+
 
 
     #         self.tracerWidget = vtk.vtkImageTracerWidget()
@@ -944,8 +941,6 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
 # ======================================================================================================================
 
 
-### ====================================================================================================================
-### ====================================================================================================================
 
 ### ====================================================================================================================
 def dummyModButtonAction():
@@ -983,7 +978,6 @@ def getClosestInSortedList(listIn, ref):
             return k1
     return len(listIn) - 1
 
-### ====================================================================================================================
 ### ====================================================================================================================
 ### ====================================================================================================================
 ### ====================================================================================================================
