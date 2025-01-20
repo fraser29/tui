@@ -224,6 +224,42 @@ class Ui_BASEUI(object):
         self.pushButtonsLayout.addWidget(self.button12, 5, 1, 1, 1)
         self.rightPanelLayout.addLayout(self.pushButtonsLayout, 7, 0, 1, 1)
 
+        # Add Customised Sliders Label
+        self.customSlidersLabel = QtWidgets.QLabel(self.centralwidget)
+        self.customSlidersLabel.setObjectName("customSlidersLabel")
+        self.rightPanelLayout.addWidget(self.customSlidersLabel, 8, 0, 1, 1)
+
+        # CUSTOMISABLE SLIDERS
+        self.slidersLayout = QtWidgets.QVBoxLayout()
+        self.slidersLayout.setObjectName("slidersLayout")
+
+        # Create 4 sliders with labels
+        self.sliders = []
+        self.sliderLabels = []
+        for i in range(2):
+            # Create horizontal layout for each slider+label pair
+            sliderHLayout = QtWidgets.QHBoxLayout()
+            
+            # Create and add label
+            label = QtWidgets.QLabel(self.centralwidget)
+            label.setObjectName(f"sliderLabel_{i+1}")
+            sliderHLayout.addWidget(label)
+            self.sliderLabels.append(label)
+            
+            # Create and add slider
+            slider = QtWidgets.QSlider(self.centralwidget)
+            slider.setOrientation(QtCore.Qt.Horizontal)
+            slider.setObjectName(f"slider_{i+1}")
+            slider.setMinimum(0)
+            slider.setMaximum(100)
+            sliderHLayout.addWidget(slider)
+            self.sliders.append(slider)
+            
+            # Add the horizontal layout to the main sliders layout
+            self.slidersLayout.addLayout(sliderHLayout)
+
+        self.rightPanelLayout.addLayout(self.slidersLayout, 9, 0, 1, 1)
+
         # Add the right panel widget to the main layout
         self.mainLayout.addWidget(self.rightPanelWidget, 0, 1, 1, 1)
 
@@ -310,4 +346,7 @@ class Ui_BASEUI(object):
         self.actionQuit.setText(_translate("BASEUI", "Quit"))
         self.actionQuit.setShortcut(_translate("BASEUI", "Q"))
         self.customButtonsLabel.setText(_translate("BASEUI", "Customised Buttons"))
+        self.customSlidersLabel.setText(_translate("BASEUI", "Customised Sliders"))
+        for i, label in enumerate(self.sliderLabels):
+            label.setText(_translate("BASEUI", f"Slider{i+1}"))
 

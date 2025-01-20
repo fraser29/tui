@@ -63,6 +63,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
                                self.button10, self.button11, self.button12]
         self.modPushButtonDict = dict(zip(range(self.nModPushButtons),
                                           [['Mod-Button%d'%(i),dummyModButtonAction] for i in range(1,self.nModPushButtons+1)]))
+        self.sliderDict = {}
         self.USE_FIELD_DATA = False
         self.DEBUG = False
         self.planeBackgroundColors = [[0.3, 0.1, 0.1],
@@ -151,6 +152,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
         self.actionQuit.triggered.connect(self.exit)
         ##
         self.updatePushButtonDict()
+        self.updateSliderDict()
 
     def updatePushButtonDict(self, newPushButtonDict=None):
         """
@@ -191,6 +193,44 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
             self.modPushButtons[k1].setEnabled(True)
             if self.modPushButtonDict[k1][1] == dummyModButtonAction:
                 self.modPushButtons[k1].setEnabled(False)
+
+    def updateSliderDict(self, newSliderDict=None):
+        """
+        Update the slider labels with new labels.
+
+        This method allows customised sliders to be applied for the UI. 
+        It updates the dictionary of sliders with new labels. It then applies these changes to the UI, enabling
+        or disabling buttons as necessary.
+
+        Args:
+            newSliderDict (dict, optional): A dictionary containing new slider configurations. The keys are slider indices (0-3), and the values
+                are dicts as per example below. 
+
+        Example:
+            newDict = {
+                0: {"label": 'Slider 1 label', "action": action_function_A, "min": 0, "max": 100, "value": 50, "singleStep": 1, "pageStep": 5},
+                1: {"label": 'Slider 2 label', "action": action_function_B, "min": 0, "max": 100, "value": 50, "singleStep": 1, "pageStep": 5},
+            }
+            self.updateSliderDict(newDict)
+        """
+        if type(newSliderDict) == dict:
+            self.sliderDict = newSliderDict
+        for k1 in range(2):
+            try:
+                self.sliderLabels[k1].setText(self.sliderDict[k1]["label"])
+                self.sliders[k1].setMinimum(self.sliderDict[k1]["min"])
+                self.sliders[k1].setMaximum(self.sliderDict[k1]["max"])
+                self.sliders[k1].setValue(self.sliderDict[k1]["value"])
+                self.sliders[k1].valueChanged.connect(self.sliderDict[k1]["action"])
+                self.sliders[k1].setSingleStep(self.sliderDict[k1]["singleStep"])
+                self.sliders[k1].setPageStep(self.sliderDict[k1]["pageStep"])
+                self.sliders[k1].setEnabled(True)
+            except KeyError:
+                self._sliderDummySetup(k1)
+    
+    def _sliderDummySetup(self, k1):
+        self.sliderLabels[k1].setText(f'Slider {k1+1}')
+        self.sliders[k1].setEnabled(False)
 
     def setUserDefinedKeyPress(self, newKeyPressDict=None):
         self.interactorStyleDict['Image'].setUserDefinedKeyCallbackDict(newKeyPressDict)
@@ -601,27 +641,6 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
             return None
         return np.array(self.resliceCursorWidgetArray[i].GetResliceCursorRepresentation().GetPlaneSource().GetNormal())
 
-    def __matrix4x4FromFieldData(self):
-        print('NOT WORKING - COL, ROW COUNT ISSUE')
-        ii = self.getCurrentVTIObject()
-        ipp = vtkfilters.getFieldData(ii, 'ImagePositionPatient')
-        iop = vtkfilters.getFieldData(ii, 'ImageOrientationPatient')
-        dxdy = vtkfilters.getFieldData(ii, 'PixelSpacing')
-        ipp = [i/1000.0 for i in ipp]
-        dxdy = [i/1000.0 for i in dxdy]
-        # adjust ipp from 0,0 to center
-        dims = ii.GetDimensions()
-        ipp = [ipp[0]+dxdy[1]*dims[1]/2.0,
-               ipp[1]+dxdy[0]*dims[0]/2.0,
-               ipp[2]]#+dxdy[2]*dims[2]/2.0]
-        M = (iop[0] * dxdy[1], iop[3] * dxdy[0], 0, ipp[0],
-              iop[1] * dxdy[1], iop[4] * dxdy[0], 0, ipp[1],
-              iop[2] * dxdy[1], iop[5] * dxdy[0], 0, ipp[2],
-              0, 0, 0, 1)
-        mat = vtk.vtkMatrix4x4()
-        mat.DeepCopy(M)
-        return mat
-
 
     def _getCurrentReslice(self):
         return self.resliceCursorWidgetArray[self.interactionView].GetRepresentation().GetReslice()
@@ -645,10 +664,6 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
             return iRS
         return ii
 
-    def __initReslicePlaneSizes(self):
-        bb = self.getCurrentVTIObject().GetBounds()
-        for i in range(3):
-            self.resliceCursorWidgetArray[i].GetResliceCursorRepresentation().GetCursorAlgorithm().SetSliceBounds(bb)
 
     def __setupNewImageData(self): # ONLY ON NEW DATA LOAD
         self.__setScalarRangeForCurrentArray()
