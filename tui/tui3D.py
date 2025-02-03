@@ -14,7 +14,7 @@ import os
 import numpy as np
 from ngawari import fIO
 from ngawari import vtkfilters
-from TTK.tuiUtils import renderVolume3D
+from tui.tuiUtils import renderVolume3D
 
 
 

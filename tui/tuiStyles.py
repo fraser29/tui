@@ -18,7 +18,7 @@ import shutil
 from ngawari import fIO
 from ngawari import vtkfilters
 
-from TTK import tuiUtils
+from tui import tuiUtils
 
 
 class ImageInteractor(vtk.vtkInteractorStyleTrackballCamera):

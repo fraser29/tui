@@ -10,7 +10,7 @@ Some general utilities to support tui
 @email: callaghan.fm@gmail.com
 """
 
-from TTK import tuimarkupui
+from tui import tuimarkupui
 
 import numpy as np
 import vtk

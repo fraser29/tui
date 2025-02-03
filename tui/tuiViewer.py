@@ -18,7 +18,7 @@ import numpy as np
 from ngawari import fIO
 from ngawari import vtkfilters
 import spydcmtk
-from TTK import tuiMarkups, tuiStyles, tuiUtils, tuimarkupui
+from tui import tuiMarkups, tuiStyles, tuiUtils, tuimarkupui
 
 from vtk.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor # type: ignore
 
@@ -571,19 +571,24 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
     
 
     def ResliceCursorCallback(self, obj, event):
-        # This tries to prevent rotation when in 3D view, but not really working
-        # print(f"In ResliceCursorCallback: state={self.interactionState}, view={self.interactionView}, {obj.GetInteractor().GetControlKey()}")
-        # obj is resliceCursorWidget
-        obj.GetInteractor().SetControlKey(1) # try to force orthogonal - doesn't work
-        if self.interactionView == 3: # In 3D view
+        if self.interactionView == 3:  # In 3D view
             self.interactionState = None
+
+            print(self.interactionView, " exiting")
             obj.GetInteractor().ExitCallback()
-            return 
+            return
+
+        print(self.interactionView)
+        # Check if interaction is within current renderer's viewport
+        x, y = obj.GetInteractor().GetEventPosition()
+        renderer = obj.GetDefaultRenderer()
+        if not renderer.IsInViewport(x, y):
+            obj.GetInteractor().ExitCallback()
+            return
+        
         if self.interactionState and self.interactionState > 4:
-            x, y = obj.GetInteractor().GetEventPosition() # interactor is vtkGenericRenderWindowInteractor
             obj.GetResliceCursorRepresentation().ComputeInteractionState(x, y, 1)
             self.__updateMarkups()
-        # # obj.SetAbortFlag(1) 
 
     def ResliceCursorEndCallback(self, obj, event):
         self.interactionState = 0
@@ -673,18 +678,36 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
         self.resliceCursor.SetImage(self.getCurrentVTIObject())
         # 2D Reslice cursor widgets
         sR = self.scalarRange[self.currentArray]
+        
+        # Calculate cursor length based on image bounds
+        bounds = self.getCurrentVTIObject().GetBounds()
+        diagonalLength = ((bounds[1]-bounds[0])**2 + 
+                         (bounds[3]-bounds[2])**2 + 
+                         (bounds[5]-bounds[4])**2)**0.5
+        cursorLength = diagonalLength * 0.25  # Adjust this factor to change cursor length
+        
         for i in range(3):
             self.resliceCursorWidgetArray[i] = vtk.vtkResliceCursorWidget()
-            # Hoping this would keep axes orthogonal - doesn't seem to do anything
-            # self.resliceCursorWidgetArray[i].GetRepresentation().SetManipulationMode(2)# 'RotateBothAxes'
             rscRep = vtk.vtkResliceCursorLineRepresentation()
             rscRep.GetResliceCursorActor().GetCursorAlgorithm().SetResliceCursor(self.resliceCursor)
             rscRep.GetResliceCursorActor().GetCursorAlgorithm().SetReslicePlaneNormal(i)
+            
+            # Set cursor properties to control its appearance
             for i2 in range(3):
-                rscRep.GetResliceCursorActor().GetCenterlineProperty(i2).SetRepresentationToWireframe()
+                centerlineProperty = rscRep.GetResliceCursorActor().GetCenterlineProperty(i2)
+                centerlineProperty.SetRepresentationToWireframe()
+                centerlineProperty.SetLineWidth(2)  # Make lines more visible
+                # Try to limit the line length by clipping
+                centerlineProperty.SetPointSize(cursorLength)
+            
             rscRep.SetWindowLevel(sR[1] - sR[0], (sR[0] + sR[1]) / 2.0, 0)
             if i > 0:
                 rscRep.SetLookupTable(self.resliceCursorWidgetArray[0].GetRepresentation().GetLookupTable())
+            
+            # Try to constrain the widget to its renderer
+            rscRep.GetResliceCursorActor().GetCursorAlgorithm().SetReslicePlaneNormal(i)
+            rscRep.RestrictPlaneToVolumeOn()
+            
             self.resliceCursorWidgetArray[i].SetInteractor(self.graphicsViewVTK)
             self.resliceCursorWidgetArray[i].SetRepresentation(rscRep)
             self.resliceCursorWidgetArray[i].SetDefaultRenderer(self.rendererArray[i])
@@ -695,7 +718,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
             self.resliceCursorWidgetArray[i].AddObserver('EndInteractionEvent', self.ResliceCursorEndCallback)
             self.resliceCursorWidgetArray[i].RemoveObservers("KeyPressEvent")
             self.resliceCursorWidgetArray[i].RemoveObservers("CharEvent")
-            rscRep.RestrictPlaneToVolumeOn()
+
         # Background
         for i in range(4):
             self.rendererArray[i].SetBackground(self.planeBackgroundColors[i])

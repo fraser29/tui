@@ -14,9 +14,9 @@ import os
 import argparse
 from ngawari import fIO
 from ngawari import vtkfilters
-from TTK import tuiViewer
-from TTK import tuimarkupui
-from TTK.tuiUtils import dialogGetName
+from tui import tuiViewer
+from tui import tuimarkupui
+from tui.tuiUtils import dialogGetName
 
 
 
