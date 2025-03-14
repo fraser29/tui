@@ -86,6 +86,8 @@ class TUIProject(object):
         return pointsPP
 
     def _save(self, polyData, featureName=None, prefix='', extn='vtp'):
+        if polyData is None:
+            return 
         if featureName is None:
             featureName = dialogGetName(self.ex)
         if len(featureName) == 0:
@@ -122,7 +124,7 @@ class TUIProject(object):
                BUILD_SPHERE=False, BUILD_OUTLINE=False, BUILD_MASK=False, BUILD_LINE=False, LINE_LOOP=True):
         try:
             pointsPP = self.getLMPoints_poly(minN, RETURN_LINE=BUILD_LINE, LINE_LOOP=LINE_LOOP)
-        except ValueError as e:
+        except (AttributeError, ValueError) as e:
             print(e)
             return
         if BUILD_SPHERE:
@@ -187,20 +189,27 @@ class TUIBasic(TUIProject):
         self.pushButtonDict = {}
 
 
-    def setup(self, imageFile=None, dicomDir=None, workDir=None):
-        if imageFile is not None:
-            srcDir = os.path.split(imageFile)[0]
-            self.ex.loadVTI_or_PVD(imageFile)
-        elif dicomDir is not None:
-            srcDir = os.path.split(dicomDir)[0]
-            self.ex.loadDicomDir(dicomDir)
+    def setup(self, inputPath, workDir=None, scalar=None):
+
+        if os.path.isdir(inputPath):
+            srcDir = os.path.split(inputPath)[0]
+            self.ex.loadDicomDir(inputPath)
+        elif inputPath.lower().endswith('.dcm'):
+            srcDir = os.path.split(inputPath)[0]
+            self.ex.loadDicomDir(inputPath)
+        else:
+            srcDir = os.path.split(inputPath)[0]
+            self.ex.loadVTI_or_PVD(inputPath)
+
         if workDir is None:
             if srcDir:
                 workDir = srcDir
             else:
                 workDir = os.getcwd()
+        print("WORK-DIR:", workDir) # DEBUG
         self.ex.workingDirLineEdit.setText(workDir)
-        # self.ex.setCurrentArray('PixelData') # Example to set shown array (else take scalar)
+        if scalar is not None:
+            self.ex.setCurrentArray(scalar) # Example to set shown array (else take scalar)
 
         self.pushButtonDict = {0:['Save points', self.savePolyPts_],
                               1:['Save line', self.savePolyLine_],
@@ -244,16 +253,11 @@ class TUIBasic(TUIProject):
 
 ### ====================================================================================================================
 ### ====================================================================================================================
-def launchBasic(inputPath):
+def launchBasic(inputPath, scalar, workDir):
     app = tuimarkupui.QtWidgets.QApplication(['TUI Image Viewer'])
     OBJ = TUIBasic(app)
 
-    if os.path.isdir(inputPath):
-        OBJ.setup(dicomDir=inputPath)
-    elif inputPath.lower().endswith('.dcm'):
-        OBJ(dicomDir=os.path.split(inputPath)[0])
-    else:
-        OBJ.setup(imageFile=inputPath)
+    OBJ.setup(inputPath=inputPath, workDir=workDir, scalar=scalar)
     sys.exit(app.exec_())
 
 
@@ -266,8 +270,8 @@ def LaunchCustomApp(TUIApp, subjObj):
 
 ### ====================================================================================================================
 ### ====================================================================================================================
-def main(inputFileName, scalar=''):
-    launchBasic(inputFileName)
+def main(inputFileName, scalar=None, workDir=None):
+    launchBasic(inputFileName, scalar, workDir)
 
 
 ### ====================================================================================================================
@@ -277,12 +281,13 @@ if __name__ == '__main__':
     ap = argparse.ArgumentParser(description='Master', formatter_class=argparse.RawTextHelpFormatter)
     groupR = ap.add_argument_group('Run parameters')
     groupR.add_argument('-in', dest='inputFile', help='full filename [.pvd, .vti, .png/jpg, .dcm]', type=str, default=None)
-    groupR.add_argument('-Scalar',dest='Scalar',help='Set scalar', type=str, default='')
+    groupR.add_argument('-Scalar',dest='Scalar',help='Set scalar', type=str, default=None)
+    groupR.add_argument('-workDir',dest='workDir',help='Working directory to save markups', type=str, default=None)
     # groupR.add_argument('-DEV',dest='DEV',help='Run in development mode',action='store_true')
 
     args = ap.parse_args()
     if args.inputFile is not None:
-        main(args.inputFile, args.Scalar)
+        main(args.inputFile, args.Scalar, args.workDir)
     else:
         ap.print_help(sys.stderr)
 

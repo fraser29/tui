@@ -524,6 +524,10 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
             fileName = self._getFileViaDialog()
         if len(fileName) > 0:
             self.vtiDict = fIO.readImageFileToDict(fileName) # will check for vti internally and then return time 0 e.g. {0.0:vti}
+            for iTime in self.vtiDict.keys():
+                for iName in vtkfilters.getArrayNames(self.vtiDict[iTime]):
+                    vtkfilters.setArrayDtype(self.vtiDict[iTime], iName, np.float64)
+                vtkfilters.ensureScalarsSet(self.vtiDict[iTime])
             print('Data loaded...')
             self._setupAfterLoad()
 
@@ -551,7 +555,8 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
         self.boundingDist = max([bounds[1]-bounds[0], bounds[3]-bounds[2], bounds[5]-bounds[4]])
         self.__setupNewImageData() ## MAIN SETUP HERE ##
         ii = list(self.vtiDict.values())[0]
-        dims = ii.GetDimensions()
+        dims = [0,0,0]
+        ii.GetDimensions(dims)
         self.currentSliceID = int(dims[2]/2.0)
         self.moveTimeSlider(self.currentTimeID)
         self.setGrossFrame(4) # Make grid view default
@@ -573,12 +578,9 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
     def ResliceCursorCallback(self, obj, event):
         if self.interactionView == 3:  # In 3D view
             self.interactionState = None
-
-            print(self.interactionView, " exiting")
+            # print(self.interactionView, " exiting")
             obj.GetInteractor().ExitCallback()
             return
-
-        print(self.interactionView)
         # Check if interaction is within current renderer's viewport
         x, y = obj.GetInteractor().GetEventPosition()
         renderer = obj.GetDefaultRenderer()
@@ -723,8 +725,10 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
         for i in range(4):
             self.rendererArray[i].SetBackground(self.planeBackgroundColors[i])
         # 3D
-        if np.prod(self.getCurrentVTIObject().GetDimensions()) < 60e+6: # For very large data - don't want to do this
-            print(self.currentArray)
+        dims = [0,0,0]
+        self.getCurrentVTIObject().GetDimensions(dims)
+        if np.prod(dims) < 60e+6: # For very large data - don't want to do this
+            print(f"Working with current array: {self.currentArray}")
             A = vtkfilters.getArrayAsNumpy(self.getCurrentVTIObject(), self.currentArray)
             A = A[A>1.0]
             contourVal = np.mean(A) * 2.0
