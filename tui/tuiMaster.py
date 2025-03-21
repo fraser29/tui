@@ -14,9 +14,9 @@ import os
 import argparse
 from ngawari import fIO
 from ngawari import vtkfilters
+from tui.tuiUtils import dialogGetName
 from tui import tuiViewer
 from tui import tuimarkupui
-from tui.tuiUtils import dialogGetName
 
 
 
@@ -256,7 +256,6 @@ class TUIBasic(TUIProject):
 def launchBasic(inputPath, scalar, workDir):
     app = tuimarkupui.QtWidgets.QApplication(['TUI Image Viewer'])
     OBJ = TUIBasic(app)
-
     OBJ.setup(inputPath=inputPath, workDir=workDir, scalar=scalar)
     sys.exit(app.exec_())
 
