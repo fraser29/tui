@@ -248,9 +248,9 @@ class ImageInteractor(vtk.vtkInteractorStyleTrackballCamera):
                 self.parentImageViewer.statusBar().showMessage('I: %d, J: %d, K: %d. X: %3.3f, %3.3f, %3.3f. Pixel: %d = %3.2f'%(
                                                                 ijk[0], ijk[1], ijk[2],X[0], X[1], X[2],
                                                                 ptID, pixelVal))
-            except ValueError: # outside image
+            except (ValueError, TypeError): # outside image
                 self.parentImageViewer.statusBar().showMessage('I: %d, J: %d, K: %d. X: %3.3f, %3.3f, %3.3f. %s'%(
-                                                                0,0,0,X[0],X[1],X[2],'Outside Image'))
+                                                                0,0,0,0,0,0,'Outside Image'))
         self.OnMouseMove()
 
     def interactorWindowLevelEndEvent(self, obj, event):

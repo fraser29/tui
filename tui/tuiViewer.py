@@ -633,9 +633,43 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
         return self.getCurrentVTIObject().GetPointData().GetArray(self.currentArray).GetTuple(ptID)
 
     def mouseXYToWorldX(self, mouseX, mouseY):
-        self.worldPicker.Pick(mouseX, mouseY, 0, self.rendererArray[self.interactionView])
-        positionX_ = self.worldPicker.GetPickPosition()
-        return positionX_
+        # Get the current reslice cursor widget
+        if self.interactionView >2:
+            return None
+        widget = self.resliceCursorWidgetArray[self.interactionView]
+        if widget is None:
+            return None
+        
+        # Get the reslice cursor representation
+        rep = widget.GetRepresentation()
+        
+        # Get the plane source
+        planeSource = rep.GetPlaneSource()
+        
+        # Get the plane normal and origin
+        normal = planeSource.GetNormal()
+        origin = planeSource.GetOrigin()
+        
+        # Create a plane implicit function
+        plane = vtk.vtkPlane()
+        plane.SetNormal(normal)
+        plane.SetOrigin(origin)
+        
+        # Create a point picker
+        picker = vtk.vtkPointPicker()
+        picker.SetTolerance(0.005)
+        
+        # Pick the point
+        picker.Pick(mouseX, mouseY, 0, self.rendererArray[self.interactionView])
+        
+        # Get the picked point
+        pickedPoint = picker.GetPickPosition()
+        
+        # Project the picked point onto the plane
+        projectedPoint = [0, 0, 0]
+        plane.ProjectPoint(pickedPoint, origin, normal, projectedPoint)
+        
+        return projectedPoint
 
     def getCurrentViewNormal(self): # uses view under mouse
         return np.array(self.resliceCursorWidgetArray[self.interactionView].GetResliceCursorRepresentation().GetPlaneSource().GetNormal())
