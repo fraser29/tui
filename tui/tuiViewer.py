@@ -515,6 +515,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
     def loadDicomDir(self, dicomDir):
         dcmSeries = spydcmtk.dcmTK.DicomSeries.setFromDirectory(dicomDir)
         self.vtiDict = dcmSeries.buildVTIDict()
+        print(f"Have VTI dict. Times (ms): {[int(i*1000.0) for i in sorted(self.vtiDict.keys())]}")
         # TODO - not saving correct coordinates for markups
         self._setupAfterLoad()
 

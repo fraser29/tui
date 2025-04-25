@@ -269,14 +269,10 @@ def LaunchCustomApp(TUIApp, subjObj):
 
 ### ====================================================================================================================
 ### ====================================================================================================================
-def main(inputFileName, scalar=None, workDir=None):
+def run(inputFileName, scalar=None, workDir=None):
     launchBasic(inputFileName, scalar, workDir)
 
-
-### ====================================================================================================================
-### ====================================================================================================================
-if __name__ == '__main__':
-
+def main():
     ap = argparse.ArgumentParser(description='Master', formatter_class=argparse.RawTextHelpFormatter)
     groupR = ap.add_argument_group('Run parameters')
     groupR.add_argument('-in', dest='inputFile', help='full filename [.pvd, .vti, .png/jpg, .dcm]', type=str, default=None)
@@ -286,11 +282,16 @@ if __name__ == '__main__':
 
     args = ap.parse_args()
     if args.inputFile is not None:
-        main(args.inputFile, args.Scalar, args.workDir)
+        run(args.inputFile, args.Scalar, args.workDir)
     else:
         ap.print_help(sys.stderr)
 
 
+
+### ====================================================================================================================
+### ====================================================================================================================
+if __name__ == '__main__':
+    main()
 
 
 
