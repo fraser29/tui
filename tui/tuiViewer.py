@@ -323,11 +323,10 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
         if self.currentArray not in self.scalarRange.keys():
             self.__setScalarRangeForCurrentArray()
         sR = self.scalarRange.get(self.currentArray, self.scalarRange.get('Default', [0,255]))
-        self.resliceCursorWidgetArray[0].GetRepresentation().SetWindowLevel(sR[1] - sR[0],
-                                                                            (sR[0] + sR[1]) / 2.0, 0)
-        for i in range(1,3):
-            self.resliceCursorWidgetArray[i].GetRepresentation().SetLookupTable(self.resliceCursorWidgetArray[0].GetRepresentation().GetLookupTable())
-        self.renderWindow.Render()
+        if self.DEBUG:
+            print(f"Resetting window level - scalar range: {sR}")
+            print(f"Resetting window level to {sR[1] - sR[0]:.2f}, {(sR[0] + sR[1]) / 2.0:.2f}")
+        self.__updateMarkups(window=sR[1] - sR[0], level=(sR[0] + sR[1]) / 2.0)
 
     def getWindowLevel(self):
         w = self.resliceCursorWidgetArray[self.interactionView].GetRepresentation().GetWindow()
@@ -337,6 +336,9 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
     def setWindowLevel(self, w, l):
         for i in range(1,3):
             self.resliceCursorWidgetArray[i].GetRepresentation().SetWindowLevel(w, l)
+        for i in range(1,3):
+            self.resliceCursorWidgetArray[i].GetRepresentation().SetLookupTable(self.resliceCursorWidgetArray[0].GetRepresentation().GetLookupTable())
+        self.renderWindow.Render()
 
 
 

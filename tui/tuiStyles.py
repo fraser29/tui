@@ -331,6 +331,7 @@ class ImageInteractor(vtk.vtkInteractorStyleTrackballCamera):
         elif key == "R":
             self.parentImageViewer.cameraReset()
             self.parentImageViewer.cameraReset3D()
+            self.parentImageViewer.resetWindowLevel()
         elif key == "r":
             self.parentImageViewer.cameraReset()
 
@@ -452,14 +453,6 @@ class ImageInteractor(vtk.vtkInteractorStyleTrackballCamera):
             self.parentImageViewer.limitContourToOne = not self.parentImageViewer.limitContourToOne
             print('limitContourToOne == %s'%(self.parentImageViewer.limitContourToOne))
 
-        elif key == "L":
-            val = input('Enter contour min length')
-            try:
-                val = float(val)
-                self.parentImageViewer.minContourLength = val
-                print('Change minContourLength to %f'%(self.parentImageViewer.minContourLength))
-            except ValueError:
-                pass
 
         elif key == "l":
             val = input('Enter multipoint factor (current=%5.5f'%(self.parentImageViewer.multiPointFactor))
@@ -470,10 +463,15 @@ class ImageInteractor(vtk.vtkInteractorStyleTrackballCamera):
             except ValueError:
                 pass
 
-        elif key == "b":
+        elif key == "w":
             w,l = self.parentImageViewer.getWindowLevel()
-            print(w,l)
-            self.parentImageViewer.setWindowLevel(w, l)
+            print(f"Old window level: {w}, {l}")
+            self.parentImageViewer.resetWindowLevel()
+            print(f"New window level: {w}, {l}")
+
+        elif key == "D":
+            self.parentImageViewer.DEBUG = not self.parentImageViewer.DEBUG
+            print(f"DEBUG mode is now {self.parentImageViewer.DEBUG}")
 
         else:
             # Pass key to UserDefinedCallback
