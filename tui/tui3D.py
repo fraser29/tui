@@ -54,8 +54,19 @@ colors = vtk.vtkNamedColors()
 #
 #     return ren
 
+HELP_STRING = '''
+    "h" to show help
+    "s" to add actor to picked list A
+    "d" to remove actor from picked list
+    "i" to show info
+    "e or q" to exit
+    
+    "x" to "execute (see below)"
+    
+'''
+
 class FCStyleMaster():
-    def __init__(self, parent, helpStr='\n==== HELP ====\ns: actor to picked list. d: remove actor from list'):
+    def __init__(self, parent, helpStr=HELP_STRING):
         self.__helpStr = helpStr
         self.LastPickedActor = None
         self.LastPickedProperty = vtk.vtkProperty()
@@ -197,13 +208,12 @@ class MouseInteractorHighLightActor(vtk.vtkInteractorStyleTrackballCamera, FCSty
     #
 
 class TUI3DInteractor(object):
-    def __init__(self, pickablePolydataList, unpickablePolydataList=None, TUBE=False):
+    def __init__(self, pickablePolydataList, unpickablePolydataList=None):
         self.pickablePolydataList = pickablePolydataList
         self.unpickablePolydataList = unpickablePolydataList
         self.pickableActors = []
         self.pickedActorsListA = []
         self.pickedActorsListB = []
-        self.TUBE = TUBE
         self.props = {}
         ##
         self.renderer = vtk.vtkRenderer()
@@ -243,7 +253,7 @@ class TUI3DInteractor(object):
             actor.GetProperty().SetRepresentationToSurface()
             # actor.GetProperty().SetLineWidth(self.props.get('LINE_WIDTH',1))
             # actor.GetProperty().SetLineWidth(self.props['LINE_WIDTH'])
-            actor.GetProperty().SetOpacity(self.props.get('OPACITY_PICKABLE',1.0))
+            actor.GetProperty().SetOpacity(self.props.get('OPACITY_PICKABLE',0.7))
             # actor.GetProperty().SetDiffuse(1.0)
             # actor.GetProperty().SetSpecular(0.0)
             self.renderer.AddActor(actor)
@@ -260,7 +270,7 @@ class TUI3DInteractor(object):
             # actor.GetProperty().SetDiffuse(1.0)
             # actor.GetProperty().SetRepresentationToWireframe()
             actor.GetProperty().SetRepresentationToSurface()
-            actor.GetProperty().SetOpacity(self.props.get('OPACITY_UNPICKABLE',0.7))
+            actor.GetProperty().SetOpacity(self.props.get('OPACITY_UNPICKABLE',0.4))
             actor.PickableOff()
             self.renderer.AddActor(actor)
 
@@ -347,6 +357,7 @@ class TUI3DBasic_A(TUI3DInteractor):
         self.style.addToHelpString('1: selected to locked ')
         self.style.addToHelpString('2: del selected ')
         self.style.addToHelpString('4: del unlocked')
+        self.style.addToHelpString('   ')
 
 ### ====================================================================================================================
 ### ====================================================================================================================
