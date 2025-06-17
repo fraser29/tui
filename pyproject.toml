@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tui"
+version = "0.1.0"
+description = "Basic viewer to load 3D/4D image data with basic markup capabilities."
+readme = "README.md"
+requires-python = ">=3.6"
+license = {text = "GNU GPL V3"}
+authors = [
+    {name = "Fraser M. Callaghan", email = "callaghan.fm@gmail.com"}
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU GPL V3",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "vtk>=9.3",
+    "PyQT5>=5.15.10",
+    "spydcmtk",
+    "ngawari",
+]
+
+
+[project.scripts]
+tui = "tui.tuiMaster:main"
+
+[tool.setuptools.packages.find]
+exclude = ["tests", "*.tests", "*.tests.*", "tests.*"]
+
+[tool.setuptools]
+include-package-data = true 
+
+[project.urls]
+Homepage = "https://github.com/fraser29/tui"
+
+# [tool.setuptools.packages.find]
+# # This is equivalent to find_packages() in setup.py 
