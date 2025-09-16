@@ -622,9 +622,6 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
     def getIJKAtX(self, X):
         IJK = self.patientMeta.patientToImageCoordinates(X)
         return IJK
-        # ptID = self.getPointIDAtX(X)
-        # return tuiUtils.imageID_2_IJK(self.getCurrentVTIObject(), ptID)
-
 
     def getIJKAtPtID(self, ptID):
         return tuiUtils.imageID_2_IJK(self.getCurrentVTIObject(), ptID)

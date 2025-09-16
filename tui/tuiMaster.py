@@ -242,7 +242,7 @@ class TUIBasic(TUIProject):
         
 
     def testMask(self):
-        self.ex.Markups
+        print("Does nothing")
 
     # def alignRandom(self):
     #     # NOT WORKING
