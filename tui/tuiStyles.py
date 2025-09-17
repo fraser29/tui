@@ -294,7 +294,7 @@ class ImageInteractor(vtk.vtkInteractorStyleTrackballCamera):
         key = self.GetInteractor().GetKeyCode()
         # print('Got key press', key)
         if key == "h":
-            print(' . = add point')
+            print(' . = add point (or spline point if in spline mode)')
             print(' x = align to primary direction')
             print(' u = remove last point')
             print(' r = reset 3D view')
@@ -310,11 +310,15 @@ class ImageInteractor(vtk.vtkInteractorStyleTrackballCamera):
             print(' o = switch limitContourToOne')
             print(' L = set contour min length - INACTIVE')
             print(' l = set multipoint factor')
+            print(' Use UI controls to switch between Point and Spline modes')
             print('pressed help (%s)'%(key))
         elif key == ".":
             X = self.getXAtMouse()
             norm = self.parentImageViewer.getCurrentViewNormal()
-            self.parentImageViewer.addPoint(X, norm)
+            if self.parentImageViewer.markupMode == 'Point':
+                self.parentImageViewer.addPoint(X, norm)
+            else:  # Spline mode
+                self.parentImageViewer.addSplinePoint(X, norm)
         elif key == "u":
             self.parentImageViewer.removeLastPoint()
         elif key == '1':

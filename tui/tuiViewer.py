@@ -55,6 +55,9 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
         self.boundingDist = 0.0
         self.multiPointFactor = 0.0001
         self.contourVal = None
+        # Markup mode settings
+        self.markupMode = 'Point'  # 'Point' or 'Spline'
+        self.splineClosed = True  # Whether splines should be closed
         ##
         self.nModPushButtons = 12
         self.modPushButtonDict = dict(zip(range(self.nModPushButtons),
@@ -146,6 +149,10 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
         self.actionVTK_Image.triggered.connect(self.loadVTI_or_PVD)
         #
         self.actionQuit.triggered.connect(self.exit)
+        #
+        # Markup mode controls
+        self.markupModeComboBox.currentTextChanged.connect(self.markupModeChanged)
+        self.closedSplineCheck.stateChanged.connect(self.splineClosedChanged)
         ##
         self.updatePushButtonDict()
         self.updateSliderDict()
@@ -479,6 +486,14 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
         else:
             self.__update3DCursor(SHOW=False)
 
+    def markupModeChanged(self, mode):
+        self.markupMode = mode
+        print(f"Markup mode changed to: {mode}")
+
+    def splineClosedChanged(self, state):
+        self.splineClosed = state == 2  # Qt.Checked = 2
+        print(f"Spline closed setting changed to: {self.splineClosed}")
+
     def selectArrayComboBoxActivated(self, selectedText):
         for iTime in self.times:
             self.vtiDict[iTime].GetPointData().SetActiveScalars(selectedText)
@@ -807,8 +822,9 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
         self.clearCurrentMarkups()
         ## POINTS
         pointSize = self.boundingDist * 0.01
-        SHOW_LINES = False
-        LOOP = False # FIXME this and above control by buttons
+        # Show lines when in spline mode, otherwise use the original logic
+        SHOW_LINES = (self.markupMode == 'Spline')
+        LOOP = self.splineClosed  # Use the spline closed setting
         tfA = [i==j for i,j in zip([1,0,0], self.getViewNormal(0))]
         tfB = [i==j for i,j in zip([0,-1,0], self.getViewNormal(1))]
         if (not all(tfA)) or (not all(tfB)):
@@ -820,7 +836,8 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
             self.rendererArray[3].AddActor(ptsActor)
             self.markupActorList.append(ptsActor)
             if SHOW_LINES:
-                lineActor = self.Markups.getAllPointsLineActor(self.currentTimeID, pointSize*0.9)
+                lineWidth = 3 if self.markupMode == 'Spline' else pointSize*0.9
+                lineActor = self.Markups.getAllPointsLineActor(self.currentTimeID, lineWidth, LOOP)
                 self.rendererArray[3].AddActor(lineActor)
                 self.markupActorList.append(lineActor)
             cpX = self.resliceCursor.GetCenter()
@@ -831,7 +848,8 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
                     self.rendererArray[i].AddActor(ptsActor_i)
                     self.markupActorList.append(ptsActor_i)
                     if SHOW_LINES:
-                        lineActor_i = self.Markups.getAllPointsLineActor(self.currentTimeID, 3, LOOP, cpX, nn, pointSize*0.9)
+                        lineWidth = 3 if self.markupMode == 'Spline' else 3
+                        lineActor_i = self.Markups.getAllPointsLineActor(self.currentTimeID, lineWidth, LOOP, cpX, nn, pointSize*0.9)
                         if lineActor_i is not None:
                             self.rendererArray[i].AddActor(lineActor_i)
                             self.markupActorList.append(lineActor_i)
@@ -904,6 +922,12 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
 
     def addPoint(self, X, norm=None):
         self.Markups.addPoint(X, self.currentTimeID, self.getCurrentTime(), norm)
+        self.__updateMarkups()
+
+    def addSplinePoint(self, X, norm=None):
+        """Add a point for spline creation. In spline mode, points are connected by splines."""
+        self.Markups.addPoint(X, self.currentTimeID, self.getCurrentTime(), norm)
+        # Update rendering to show splines
         self.__updateMarkups()
 
     def removeLastPoint(self):

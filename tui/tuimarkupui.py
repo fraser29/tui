@@ -169,6 +169,29 @@ class Ui_BASEUI(object):
         self.imMarkupButton_B = QtWidgets.QPushButton(self.markupGroupBox)
         self.imMarkupButton_B.setObjectName("Does nothing")
         self.imageMarkupButtonsLayout.addWidget(self.imMarkupButton_B)
+        
+        # Add markup mode controls
+        self.markupModeLayout = QtWidgets.QVBoxLayout()
+        self.markupModeLayout.setObjectName("markupModeLayout")
+        
+        # Point/Spline mode toggle
+        self.markupModeLabel = QtWidgets.QLabel(self.markupGroupBox)
+        self.markupModeLabel.setObjectName("markupModeLabel")
+        self.markupModeLayout.addWidget(self.markupModeLabel)
+        
+        self.markupModeComboBox = QtWidgets.QComboBox(self.markupGroupBox)
+        self.markupModeComboBox.setObjectName("markupModeComboBox")
+        self.markupModeComboBox.addItem("Point")
+        self.markupModeComboBox.addItem("Spline")
+        self.markupModeLayout.addWidget(self.markupModeComboBox)
+        
+        # Closed spline checkbox
+        self.closedSplineCheck = QtWidgets.QCheckBox(self.markupGroupBox)
+        self.closedSplineCheck.setObjectName("closedSplineCheck")
+        self.closedSplineCheck.setChecked(True)  # Default to closed
+        self.markupModeLayout.addWidget(self.closedSplineCheck)
+        
+        self.imageMarkupButtonsLayout.addLayout(self.markupModeLayout)
         self.imageMarkupControlLayout.addLayout(self.imageMarkupButtonsLayout, 0, 0, 1, 1)
         self.rightPanelLayout.addWidget(self.markupGroupBox, 4, 0, 1, 1)
         #
@@ -285,6 +308,8 @@ class Ui_BASEUI(object):
         self.markupGroupBox.setTitle(_translate("BASEUI", "Image markup"))
         self.imMarkupButton_A.setText(_translate("BASEUI", "Nothing"))
         self.imMarkupButton_B.setText(_translate("BASEUI", "Nothing"))
+        self.markupModeLabel.setText(_translate("BASEUI", "Markup Mode:"))
+        self.closedSplineCheck.setText(_translate("BASEUI", "Closed Spline"))
         #
         # self.freehandInteractorButton.setText(_translate("BASEUI", "FREEHAND DRAW"))
         # self.label_7.setText(_translate("BASEUI", "Contour"))
