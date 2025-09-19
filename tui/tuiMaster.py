@@ -17,41 +17,19 @@ from ngawari import vtkfilters
 from tui.tuiUtils import dialogGetName
 from tui import tuiViewer
 from tui import tuimarkupui
+from tui import piwakawakamarkupui
+from tui import piwakawakaViewer
 
 
 
 ### ====================================================================================================================
+### ====================================================================================================================
 
-class TUIProject(object):
-    """
-    TUIProject super class.
-    General saving of markups is handled here.
+class _TUIProj(object):
 
-    See TUIBasic as an example. 
-    General idea is to sub-class TUIProject and implement your own functionality and then take advantage of this for outputs. 
-
-    Basic example: 
-    You have a algorithm that takes a couple of landmarks and then performs a segmentation. 
-
-    Subclass TUIProject.
-    - Update setup() to add your own buttons. 
-    - Implement your own actions for these. 
-
-    One function may look something like: 
-    
-    def my_algorithm(self): 
-        landmarks = self.getLMPoints_xyz(minN=2)
-        mask = my_segmentation_from_landmarks(landmarks)
-        self.saveMask(mask) # This will open dialogue to save file. 
-
-    """
-    def __init__(self, app=None):
-        if app is None:
-            app = tuimarkupui.QtWidgets.QApplication(['TUI Image Viewer'])
+    def __init__(self, app):
         self.app = app
-        self.ex = tuiViewer.TUIMarkupViewer()
         self.DEBUG = False
-
 
     def getFullFileName(self, fileName=None, prefix=None, extn=None):
         if fileName is None:
@@ -146,6 +124,38 @@ class TUIProject(object):
         return pointsPP
 
 
+### ====================================================================================================================
+### ====================================================================================================================
+class TUIProject(_TUIProj):
+    """
+    TUIProject super class.
+    General saving of markups is handled here.
+
+    See TUIBasic as an example. 
+    General idea is to sub-class TUIProject and implement your own functionality and then take advantage of this for outputs. 
+
+    Basic example: 
+    You have a algorithm that takes a couple of landmarks and then performs a segmentation. 
+
+    Subclass TUIProject.
+    - Update setup() to add your own buttons. 
+    - Implement your own actions for these. 
+
+    One function may look something like: 
+    
+    def my_algorithm(self): 
+        landmarks = self.getLMPoints_xyz(minN=2)
+        mask = my_segmentation_from_landmarks(landmarks)
+        self.saveMask(mask) # This will open dialogue to save file. 
+
+    """
+    def __init__(self, app=None):
+        if app is None:
+            app = tuimarkupui.QtWidgets.QApplication(['TUI Image Viewer'])
+        super().__init__(app)
+        self.ex = tuiViewer.TUIMarkupViewer()
+
+
     def alignBy_X_Norm(self, X, Norm):
         print(f"This is centering but not aligning. ")
         norm0 = Norm / vtkfilters.np.linalg.norm(Norm)
@@ -170,6 +180,23 @@ class TUIProject(object):
         self.ex.renderWindow.Render()
         print(norm0, norm1, norm2, self.ex.getViewNormal(0))
         print(self.ex.resliceCursor.GetXAxis(), self.ex.resliceCursor.GetYAxis(), self.ex.resliceCursor.GetZAxis())
+
+
+
+### ====================================================================================================================
+### ====================================================================================================================
+class TUI2DProject(_TUIProj):
+    """
+    TUI2DProject super class.
+
+    """
+    def __init__(self, app=None):
+        if app is None:
+            app = piwakawakamarkupui.QtWidgets.QApplication(['PIWAKAWAKA Image Viewer'])
+        super().__init__(app)
+        self.ex = piwakawakaViewer.PIWAKAWAKAMarkupViewer()
+
+
 
 
 
@@ -250,12 +277,88 @@ class TUIBasic(TUIProject):
     #     norm = [np.random.rand() for k in range(3)]
     #     self.alignBy_X_Norm(X=cp, Norm=norm)
 
+### ====================================================================================================================
+### ====================================================================================================================
+class TUI2D(TUI2DProject):
+    """
+    Basic TUI for project based work. 
+    Illustrates basic setup and modification of push buttons.
+    """
+    def __init__(self, app=None):
+        super().__init__(app)
+        self.pushButtonDict = {}
+
+
+    def setup(self, inputPath, workDir=None, scalar=None):
+
+        if os.path.isdir(inputPath):
+            srcDir = os.path.split(inputPath)[0]
+            self.ex.loadDicomDir(inputPath)
+        elif inputPath.lower().endswith('.dcm'):
+            srcDir = os.path.split(inputPath)[0]
+            self.ex.loadDicomDir(inputPath)
+        else:
+            srcDir = os.path.split(inputPath)[0]
+            self.ex.loadVTI_or_PVD(inputPath)
+
+        if workDir is None:
+            if srcDir:
+                workDir = srcDir
+            else:
+                workDir = os.getcwd()
+        print("WORK-DIR:", workDir) # DEBUG
+        self.ex.workingDirLineEdit.setText(workDir)
+        if scalar is not None:
+            self.ex.setCurrentArray(scalar) # Example to set shown array (else take scalar)
+
+        self.pushButtonDict = {0:['Save points', self.savePolyPts_],
+                              1:['Save line', self.savePolyLine_],
+                              3:['Clear Markups', self.ex.deleteAllMarkups],
+                              4:['Test mask', self.testMask],
+                              5: ['Points to VOI', self.saveVOI_]}
+
+        self.ex.updatePushButtonDict(self.pushButtonDict)
+
+        self.sliderDict = {0: {"label": 'Contour', "action": self.changeContour, "min": 0, "max": 1000, "value": 500, "singleStep": 1, "pageStep": 5}}
+        self.ex.updateSliderDict(self.sliderDict)
+
+    def saveVOI_(self):
+        fOut = self.saveVOI()
+        print(fOut)
+
+    def savePolyPts_(self):
+        fOut = self.savePoints()
+        print(fOut)
+
+
+    def savePolyLine_(self):
+        fOut = self.saveLine(minN=2)
+        print(fOut)
+    
+
+    def changeContour(self, val):
+        self.sliderDict[0]["value"] = val
+        self.ex.setContourVal(val)
+        
+
+    def testMask(self):
+        print("Does nothing")
+
+
 
 ### ====================================================================================================================
 ### ====================================================================================================================
 def launchBasic(inputPath, scalar, workDir):
     app = tuimarkupui.QtWidgets.QApplication(['TUI Image Viewer'])
     OBJ = TUIBasic(app)
+    OBJ.setup(inputPath=inputPath, workDir=workDir, scalar=scalar)
+    sys.exit(app.exec_())
+
+
+def launch2D(inputPath, scalar, workDir):
+    app = piwakawakamarkupui.QtWidgets.QApplication(['PIWAKAWAKA Image Viewer'])
+    OBJ = TUI2D(app)
+    print("Launching 2D viewer")
     OBJ.setup(inputPath=inputPath, workDir=workDir, scalar=scalar)
     sys.exit(app.exec_())
 
@@ -269,8 +372,11 @@ def LaunchCustomApp(TUIApp, subjObj):
 
 ### ====================================================================================================================
 ### ====================================================================================================================
-def run(inputFileName, scalar=None, workDir=None):
-    launchBasic(inputFileName, scalar, workDir)
+def run(inputFileName, scalar=None, workDir=None, TwoD=False):
+    if TwoD:
+        launch2D(inputFileName, scalar, workDir)
+    else:
+        launchBasic(inputFileName, scalar, workDir)
 
 def main():
     ap = argparse.ArgumentParser(description='Master', formatter_class=argparse.RawTextHelpFormatter)
@@ -278,11 +384,12 @@ def main():
     groupR.add_argument('-in', dest='inputFile', help='full filename [.pvd, .vti, .png/jpg, .dcm]', type=str, default=None)
     groupR.add_argument('-Scalar',dest='Scalar',help='Set scalar', type=str, default=None)
     groupR.add_argument('-workDir',dest='workDir',help='Working directory to save markups', type=str, default=None)
+    groupR.add_argument('-2D',dest='TwoD',help='Open 2D viewer', action='store_true')
     # groupR.add_argument('-DEV',dest='DEV',help='Run in development mode',action='store_true')
 
     args = ap.parse_args()
     if args.inputFile is not None:
-        run(args.inputFile, args.Scalar, args.workDir)
+        run(args.inputFile, args.Scalar, args.workDir, args.TwoD)
     else:
         ap.print_help(sys.stderr)
 
