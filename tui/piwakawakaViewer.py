@@ -49,12 +49,9 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.currentSliceID = 0
         self.currentArray = ''
         self.times = []
-        self.limitContourToOne = True
-        self.minContourLength = 0.1
         self.scalarRange = {'Default':[0,255]}
         self.boundingDist = 0.0
         self.multiPointFactor = 0.0001
-        self.contourVal = None
         # Markup mode settings
         self.markupMode = 'Point'  # 'Point' or 'Spline'
         self.splineClosed = True  # Whether splines should be closed
@@ -65,10 +62,6 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.sliderDict = {}
         self.USE_FIELD_DATA = False
         self.DEBUG = False
-        self.planeBackgroundColors = [[0.3, 0.1, 0.1],
-                                      [0.1, 0.3, 0.1],
-                                      [0.1, 0.1, 0.3],
-                                      [0.1, 0.1, 0.1]]
         #
         # GRAPHICS VIEW SETUP
         try:
@@ -100,9 +93,8 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         #
         self.connections()
         self.Markups = tuiMarkups.Markups(self)
-        self.threeDContourActor = None
         self.markupActorList = []
-        self.interactorStyleDict = {'Image': tuiStyles.ImageInteractor(self),
+        self.interactorStyleDict = {'Image': tuiStyles.SinglePaneImageInteractor(self),
                                     'ImageTracer': tuiStyles.ImageTracerInteractorStyle(self),
                                     'Trackball': vtk.vtkInteractorStyleTrackballCamera()}
         self.graphicsViewVTK.SetInteractorStyle(self.interactorStyleDict['Image'])
@@ -123,8 +115,6 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         # MARKUP
         # self.pointInteractorButton.clicked.connect(self.pointInteractorAction)
         # self.freehandInteractorButton.clicked.connect(self.freehandInteractorAction)
-        # self.contourSlider.valueChanged.connect(self.moveContourSlider) # Opacity
-        # self.contourLineEdit.returnPressed.connect(self.enterInContourLineEdit)
         #
         #
         self.selectArrayComboBox.activated[str].connect(self.selectArrayComboBoxActivated)
@@ -263,20 +253,28 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         return np.mean(self.getCurrentVTIObject().GetSpacing())#[self.interactionView] # ?? is this best, or mean ??
 
     def scrollForwardCurrentSlice1(self):
-        if self.interactionView < 3: # If in 3D window then do nothing
-            cp = np.array(self.resliceCursor.GetCenter())
-            nn = np.array(self.getCurrentViewNormal())
-            dx = self._getDeltaX()
-            self.resliceCursor.SetCenter(cp + nn * dx)
-            self.__updateMarkups() # will render
+        # For single pane viewer, move camera forward
+        camera = self.renderer.GetActiveCamera()
+        pos = np.array(camera.GetPosition())
+        focal = np.array(camera.GetFocalPoint())
+        direction = focal - pos
+        direction = direction / np.linalg.norm(direction)
+        dx = self._getDeltaX()
+        newPos = pos + direction * dx
+        camera.SetPosition(newPos)
+        self.renderWindow.Render()
 
     def scrollBackwardCurrentSlice1(self):
-        if self.interactionView < 3: # If in 3D window then do nothing
-            cp = np.array(self.resliceCursor.GetCenter())
-            nn = -1.0 * np.array(self.getCurrentViewNormal())
-            dx = self._getDeltaX()
-            self.resliceCursor.SetCenter(cp + nn * dx)
-            self.__updateMarkups()
+        # For single pane viewer, move camera backward
+        camera = self.renderer.GetActiveCamera()
+        pos = np.array(camera.GetPosition())
+        focal = np.array(camera.GetFocalPoint())
+        direction = focal - pos
+        direction = direction / np.linalg.norm(direction)
+        dx = self._getDeltaX()
+        newPos = pos - direction * dx
+        camera.SetPosition(newPos)
+        self.renderWindow.Render()
 
     # BUTTONS
 
@@ -382,25 +380,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
     #         self.graphicsViewVTK.SetInteractorStyle(self.interactorStyleDict['Image'])
     #         self.graphicsViewVTK.GetInteractorStyle().modifyDefaultInteraction_default()
 
-    # def moveContourSlider(self, val=None):
-    #     if self.threeDContourActor is not None:
-    #         if val is not None:
-    #             self.threeDContourActor.GetProperty().SetOpacity(float(val)/100.0)
-    #             self.renderWindow.Render()
 
-    # def enterInContourLineEdit(self):
-    #     self.setContourVal(self.getContourVal())
-
-    # def getContourVal(self):
-    #     try:
-    #         return float(self.contourLineEdit.text())
-    #     except ValueError:
-    #         return None
-
-    def setContourVal(self, val):
-        self.contourVal = val
-        # self.contourLineEdit.setText('%5.0f'%(self.contourVal))
-        self.__update3DSurfaceView()
 
 
     def markupModeChanged(self, mode):
@@ -414,7 +394,8 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
     def selectArrayComboBoxActivated(self, selectedText):
         for iTime in self.times:
             self.vtiDict[iTime].GetPointData().SetActiveScalars(selectedText)
-        self.resliceCursor.SetImage(self.getCurrentVTIObject())
+        # Update the image actor with new data
+        self.updateViewAfterTimeChange()
         self.resetWindowLevel()
         self.statusBar().showMessage(selectedText)
         self.setCurrentArray(selectedText)
@@ -571,16 +552,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         imageActor.SetInputData(self.getCurrentVTIObject())
         self.renderer.AddActor(imageActor)
         
-        # 3D contour if data is not too large
-        dims = [0,0,0]
-        self.getCurrentVTIObject().GetDimensions(dims)
-        if np.prod(dims) < 60e+6: # For very large data - don't want to do this
-            print(f"Working with current array: {self.currentArray}")
-            A = vtkfilters.getArrayAsNumpy(self.getCurrentVTIObject(), self.currentArray)
-            A = A[A>1.0]
-            contourVal = np.mean(A) * 2.0
-            print(f"Made contour at value: {int(contourVal)}")
-            self.setContourVal(contourVal)
+        # Image setup complete
         
         # Render
         self.cameraReset()
@@ -590,6 +562,20 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
     # ======================== RENDERING ===============================================================================
     def updateViewAfterTimeChange(self): # NEED TO TRIGGER ON A TIME CHANGE
         # Update image data for current time
+        # Remove old image actors and add new ones
+        actors = self.renderer.GetActors()
+        actors.InitTraversal()
+        actor = actors.GetNextActor()
+        while actor:
+            if isinstance(actor, vtk.vtkImageActor):
+                self.renderer.RemoveActor(actor)
+            actor = actors.GetNextActor()
+        
+        # Add new image actor
+        imageActor = vtk.vtkImageActor()
+        imageActor.SetInputData(self.getCurrentVTIObject())
+        self.renderer.AddActor(imageActor)
+        
         self.updateViewAfterSliceChange()
 
     def updateViewAfterSliceChange(self):
@@ -648,30 +634,8 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.renderWindow.Render()
 
 
-    def __update3DSurfaceView(self):
-        if self.threeDContourActor:
-            self.renderer.RemoveActor(self.threeDContourActor)
-        if self.contourVal:
-            cc, ccActor = self.__get3DContourActor()
-            self.threeDContourActor = ccActor
-            self.renderer.AddActor(self.threeDContourActor)
-        self.renderWindow.Render()
 
-    def __get3DContourActor(self):
-        cc = self.getCurrentContourPolydata()
-        if cc:
-            mapper = vtk.vtkPolyDataMapper()
-            mapper.SetInputData(cc)
-            mapper.ScalarVisibilityOff()
-            contourActor = vtk.vtkActor()
-            contourActor.GetProperty().SetRepresentationToSurface()
-            contourActor.SetMapper(mapper)
-            return cc, contourActor
 
-    def getCurrentContourPolydata(self):
-        if self.contourVal:
-            contour = vtkfilters.contourFilter(self.getCurrentVTIObject(), self.contourVal)
-            return vtkfilters.getConnectedRegionLargest(contour)
 
     # ======================== Markups =================================================================================
     def deleteAllMarkups(self):

@@ -416,65 +416,6 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
         self.renderWindow.Render()
 
 
-
-    # MARKUPS : TODO
-    # def pointInteractorAction(self):
-    #     if self.pointInteractorButton.isChecked():
-    #         print('Begin point interaction')
-    #         self.graphicsViewVTK.SetInteractorStyle(self.interactorStyleDict['Image'])
-    #         self.freehandInteractorButton.setChecked(0)
-    #         self.graphicsViewVTK.GetInteractorStyle().modifyDefaultInteraction_points()
-    #     else: # this is for if on and click off (so nothing on)
-    #         self.graphicsViewVTK.SetInteractorStyle(self.interactorStyleDict['Image'])
-    #         self.graphicsViewVTK.GetInteractorStyle().modifyDefaultInteraction_default()
-
-    # def freehandInteractorAction(self):
-    #     if self.freehandInteractorButton.isChecked():
-    #         print('Begin point-freehand interaction')
-    #         self.pointInteractorButton.setChecked(0)
-
-    #         self.resliceCursor.SetThickMode(False)
-    #         self.resliceCursor.SetThickness(0, 0, 0)
-
-
-
-    #         self.tracerWidget = vtk.vtkImageTracerWidget()
-    #         self.tracerWidget.SetInteractor(self.graphicsViewVTK)
-    #         # self.tracerWidget.SetViewProp(self.imageActor)  # Assuming you have an imageActor
-    #         self.tracerWidget.ProjectToPlaneOn()
-    #         self.tracerWidget.SetProjectionNormal(2)  # For XY plane (change as needed)
-    #         self.tracerWidget.SetHandleSize(0.005)
-    #         self.tracerWidget.AutoCloseOn()
-
-
-
-    #         self.graphicsViewVTK.SetInteractorStyle(self.interactorStyleDict['ImageTracer'])
-    #         # self.graphicsViewVTK.GetInteractorStyle().modifyDefaultInteraction_points() # change this
-
-    #         # self.renderer.AddActor(self.imageActor)
-    #         self.tracerWidget.SetEnabled(1)
-    #         self.renderWindow.Render()
-
-
-    #     else: # this is for if on and click off (so nothing on)
-    #         self.graphicsViewVTK.SetInteractorStyle(self.interactorStyleDict['Image'])
-    #         self.graphicsViewVTK.GetInteractorStyle().modifyDefaultInteraction_default()
-
-    # def moveContourSlider(self, val=None):
-    #     if self.threeDContourActor is not None:
-    #         if val is not None:
-    #             self.threeDContourActor.GetProperty().SetOpacity(float(val)/100.0)
-    #             self.renderWindow.Render()
-
-    # def enterInContourLineEdit(self):
-    #     self.setContourVal(self.getContourVal())
-
-    # def getContourVal(self):
-    #     try:
-    #         return float(self.contourLineEdit.text())
-    #     except ValueError:
-    #         return None
-
     def setContourVal(self, val):
         self.contourVal = val
         # self.contourLineEdit.setText('%5.0f'%(self.contourVal))
