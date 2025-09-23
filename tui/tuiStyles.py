@@ -639,15 +639,19 @@ class SinglePaneImageInteractor(vtk.vtkInteractorStyleImage):
 
     def mouseScrollForwardCallback(self, obj, event):
         if self.GetInteractor().GetShiftKey():
-            self.parentImageViewer.scrollForwardCurrentSlice1()
-        else:
+            # Shift + scroll = zoom
             self.OnMouseWheelForward()
+        else:
+            # Regular scroll = change slice
+            self.parentImageViewer.scrollForwardCurrentSlice1()
 
     def mouseScrollBackwardCallback(self, obj, event):
         if self.GetInteractor().GetShiftKey():
-            self.parentImageViewer.scrollBackwardCurrentSlice1()
-        else:
+            # Shift + scroll = zoom
             self.OnMouseWheelBackward()
+        else:
+            # Regular scroll = change slice
+            self.parentImageViewer.scrollBackwardCurrentSlice1()
 
     def keyPressCallback(self, obj, event):
         key = self.GetInteractor().GetKeyCode()

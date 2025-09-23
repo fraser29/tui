@@ -190,11 +190,13 @@ class TUI2DProject(_TUIProj):
     TUI2DProject super class.
 
     """
-    def __init__(self, app=None):
+    def __init__(self, app=None, VERBOSE=False):
         if app is None:
             app = piwakawakamarkupui.QtWidgets.QApplication(['PIWAKAWAKA Image Viewer'])
         super().__init__(app)
         self.ex = piwakawakaViewer.PIWAKAWAKAMarkupViewer()
+        self.ex.VERBOSE = VERBOSE
+
 
 
 
@@ -284,8 +286,8 @@ class TUI2D(TUI2DProject):
     Basic TUI for project based work. 
     Illustrates basic setup and modification of push buttons.
     """
-    def __init__(self, app=None):
-        super().__init__(app)
+    def __init__(self, app=None, VERBOSE=False):
+        super().__init__(app, VERBOSE)
         self.pushButtonDict = {}
 
 
@@ -348,35 +350,38 @@ class TUI2D(TUI2DProject):
 
 ### ====================================================================================================================
 ### ====================================================================================================================
-def launchBasic(inputPath, scalar, workDir):
+def launchBasic(inputPath, scalar, workDir, VERBOSE=False):
     app = tuimarkupui.QtWidgets.QApplication(['TUI Image Viewer'])
-    OBJ = TUIBasic(app)
+    OBJ = TUIBasic(app, VERBOSE)
     OBJ.setup(inputPath=inputPath, workDir=workDir, scalar=scalar)
     sys.exit(app.exec_())
 
 
-def launch2D(inputPath, scalar, workDir):
+def launch2D(inputPath, scalar, workDir, VERBOSE=False):
     app = piwakawakamarkupui.QtWidgets.QApplication(['PIWAKAWAKA Image Viewer'])
-    OBJ = TUI2D(app)
+    OBJ = TUI2D(app, VERBOSE)
     print("Launching 2D viewer")
     OBJ.setup(inputPath=inputPath, workDir=workDir, scalar=scalar)
     sys.exit(app.exec_())
 
 
-def LaunchCustomApp(TUIApp, subjObj):
+def LaunchCustomApp(TUIApp, subjObj, VERBOSE=False):
     app = tuimarkupui.QtWidgets.QApplication(['TUI Image Viewer'])
-    OBJ = TUIApp(app)
+    try:
+        OBJ = TUIApp(app, VERBOSE)
+    except TypeError:
+        OBJ = TUIApp(app)
     OBJ.setup(subjObj)
     sys.exit(app.exec_())
 
 
 ### ====================================================================================================================
 ### ====================================================================================================================
-def run(inputFileName, scalar=None, workDir=None, TwoD=False):
+def run(inputFileName, scalar=None, workDir=None, TwoD=False, VERBOSE=False):
     if TwoD:
-        launch2D(inputFileName, scalar, workDir)
+        launch2D(inputFileName, scalar, workDir, VERBOSE)
     else:
-        launchBasic(inputFileName, scalar, workDir)
+        launchBasic(inputFileName, scalar, workDir, VERBOSE)
 
 def main():
     ap = argparse.ArgumentParser(description='Master', formatter_class=argparse.RawTextHelpFormatter)
@@ -385,11 +390,12 @@ def main():
     groupR.add_argument('-Scalar',dest='Scalar',help='Set scalar', type=str, default=None)
     groupR.add_argument('-workDir',dest='workDir',help='Working directory to save markups', type=str, default=None)
     groupR.add_argument('-2D',dest='TwoD',help='Open 2D viewer', action='store_true')
+    groupR.add_argument('-VERBOSE',dest='VERBOSE',help='Run in verbose mode',action='store_true')
     # groupR.add_argument('-DEV',dest='DEV',help='Run in development mode',action='store_true')
 
     args = ap.parse_args()
     if args.inputFile is not None:
-        run(args.inputFile, args.Scalar, args.workDir, args.TwoD)
+        run(args.inputFile, args.Scalar, args.workDir, args.TwoD, args.VERBOSE)
     else:
         ap.print_help(sys.stderr)
 

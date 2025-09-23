@@ -39,7 +39,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
     Displays GUI
     Connects GUI buttons to source
     """
-    def __init__(self):
+    def __init__(self, VERBOSE=False):
         super(PIWAKAWAKAMarkupViewer, self).__init__()
         self.setupUi(self)
         # Defaults
@@ -49,6 +49,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.currentSliceID = 0
         self.currentArray = ''
         self.times = []
+        self.maxSliceID = 0
         self.scalarRange = {'Default':[0,255]}
         self.boundingDist = 0.0
         self.multiPointFactor = 0.0001
@@ -61,7 +62,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
                                           [['Mod-Button%d'%(i),dummyModButtonAction] for i in range(1,self.nModPushButtons+1)]))
         self.sliderDict = {}
         self.USE_FIELD_DATA = False
-        self.DEBUG = False
+        self.VERBOSE = VERBOSE
         #
         # GRAPHICS VIEW SETUP
         try:
@@ -106,6 +107,10 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.timeSlider.valueChanged.connect(self.moveTimeSlider)
         self.timeSlider.setSingleStep(1)
         self.timeSlider.setPageStep(5)
+        #
+        self.sliceSlider.valueChanged.connect(self.moveSliceSlider)
+        self.sliceSlider.setSingleStep(1)
+        self.sliceSlider.setPageStep(5)
         #
         #
         # IMAGE MANIPULATION ## Don't want to do flipping etc - should just rotate other view until as desired
@@ -249,32 +254,44 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.moveTimeSlider(self.currentTimeID)
 
     # SLICE SLIDER
+    def setupSliceSlider(self):
+        self.sliceSlider.setMinimum(0)
+        self.sliceSlider.setMaximum(self.maxSliceID)
+        if self.VERBOSE:
+            print(f"Slice slider range: 0 to {self.maxSliceID}")
+        self.updateSliceLabel()
+
+    def updateSliceLabel(self):
+        try:
+            self.sliceSliderLabel.setText("%d/%d"%(self.currentSliceID+INDEX_OFFSET,
+                                                          self.sliceSlider.maximum()+INDEX_OFFSET))
+        except IndexError:
+            self.sliceSliderLabel.setText("%d/%d"%(self.currentSliceID+INDEX_OFFSET,
+                                                          self.sliceSlider.maximum()))
+
+    def moveSliceSlider(self, val):
+        self.currentSliceID = val
+        self.updateSliceLabel()
+        self.updateImageSlice()
+        self.updateViewAfterSliceChange()
+        self.sliceSlider.setValue(self.currentSliceID)
+        self.__updateMarkups()
+
+    # SLICE SLIDER
     def _getDeltaX(self):
         return np.mean(self.getCurrentVTIObject().GetSpacing())#[self.interactionView] # ?? is this best, or mean ??
 
     def scrollForwardCurrentSlice1(self):
-        # For single pane viewer, move camera forward
-        camera = self.renderer.GetActiveCamera()
-        pos = np.array(camera.GetPosition())
-        focal = np.array(camera.GetFocalPoint())
-        direction = focal - pos
-        direction = direction / np.linalg.norm(direction)
-        dx = self._getDeltaX()
-        newPos = pos + direction * dx
-        camera.SetPosition(newPos)
-        self.renderWindow.Render()
+        # Move to next slice
+        if self.currentSliceID < self.maxSliceID:
+            self.currentSliceID += 1
+            self.moveSliceSlider(self.currentSliceID)
 
     def scrollBackwardCurrentSlice1(self):
-        # For single pane viewer, move camera backward
-        camera = self.renderer.GetActiveCamera()
-        pos = np.array(camera.GetPosition())
-        focal = np.array(camera.GetFocalPoint())
-        direction = focal - pos
-        direction = direction / np.linalg.norm(direction)
-        dx = self._getDeltaX()
-        newPos = pos - direction * dx
-        camera.SetPosition(newPos)
-        self.renderWindow.Render()
+        # Move to previous slice
+        if self.currentSliceID > 0:
+            self.currentSliceID -= 1
+            self.moveSliceSlider(self.currentSliceID)
 
     # BUTTONS
 
@@ -299,7 +316,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         if self.currentArray not in self.scalarRange.keys():
             self.__setScalarRangeForCurrentArray()
         sR = self.scalarRange.get(self.currentArray, self.scalarRange.get('Default', [0,255]))
-        if self.DEBUG:
+        if self.VERBOSE:
             print(f"Resetting window level - scalar range: {sR}")
             print(f"Resetting window level to {sR[1] - sR[0]:.2f}, {(sR[0] + sR[1]) / 2.0:.2f}")
         self.__updateMarkups(window=sR[1] - sR[0], level=(sR[0] + sR[1]) / 2.0)
@@ -385,11 +402,13 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
 
     def markupModeChanged(self, mode):
         self.markupMode = mode
-        print(f"Markup mode changed to: {mode}")
+        if self.VERBOSE:
+            print(f"Markup mode changed to: {mode}")
 
     def splineClosedChanged(self, state):
         self.splineClosed = state == 2  # Qt.Checked = 2
-        print(f"Spline closed setting changed to: {self.splineClosed}")
+        if self.VERBOSE:
+            print(f"Spline closed setting changed to: {self.splineClosed}")
 
     def selectArrayComboBoxActivated(self, selectedText):
         for iTime in self.times:
@@ -412,17 +431,20 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
                                                                 ("Open image data"),
                                                                 str(self.workingDirLineEdit.text()),
                                                                 ("Image data (*.vti);;PVD(, *.pvd)"))[0]
-        print(str(fileName))
+        if self.VERBOSE:
+            print(str(fileName))
         return str(fileName)
     def _getDirectoryViaDialog(self):
         dirName = piwakawakamarkupui.QtWidgets.QFileDialog.getExistingDirectory(self,
                                                                 ("Open dicom directory"),
                                                                 str(self.workingDirLineEdit.text()))
-        print(str(dirName))
+        if self.VERBOSE:
+            print(str(dirName))
         return str(dirName)
 
     def _loadDicom(self):
-        print('Load dicoms')
+        if self.VERBOSE:
+            print('Load dicoms')
         dirName = self._getDirectoryViaDialog()
         self.loadDicomDir(dirName)
 
@@ -430,12 +452,14 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
     def loadDicomDir(self, dicomDir):
         dcmSeries = spydcmtk.dcmTK.DicomSeries.setFromDirectory(dicomDir)
         self.vtiDict = dcmSeries.buildVTIDict()
-        print(f"Have VTI dict. Times (ms): {[int(i*1000.0) for i in sorted(self.vtiDict.keys())]}")
+        if self.VERBOSE:
+            print(f"Have VTI dict. Times (ms): {[int(i*1000.0) for i in sorted(self.vtiDict.keys())]}")
         # TODO - not saving correct coordinates for markups
         self._setupAfterLoad()
 
     def loadVTI_or_PVD(self, fileName=None):
-        print('Load VTI')
+        if self.VERBOSE:
+            print('Load VTI')
         if not fileName:
             fileName = self._getFileViaDialog()
         if len(fileName) > 0:
@@ -444,7 +468,8 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
                 for iName in vtkfilters.getArrayNames(self.vtiDict[iTime]):
                     vtkfilters.setArrayDtype(self.vtiDict[iTime], iName, np.float64)
                 vtkfilters.ensureScalarsSet(self.vtiDict[iTime])
-            print('Data loaded...')
+            if self.VERBOSE:
+                print('Data loaded...')
             self._setupAfterLoad()
 
 
@@ -456,6 +481,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         # Reset Markups
         self.Markups.initForNewData(len(self.times))
         self.setupTimeSlider()
+        self.setupSliceSlider()
         #
         self.selectArrayComboBox.clear()
         arrayName = vtkfilters.getScalarsArrayName(self.vtiDict[self.getCurrentTime()])
@@ -473,8 +499,17 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         ii = list(self.vtiDict.values())[0]
         dims = [0,0,0]
         ii.GetDimensions(dims)
-        self.currentSliceID = int(dims[2]/2.0)
+        self.maxSliceID = dims[2] - 1
+        # Start at slice 0 (first slice)
+        self.currentSliceID = 0
+        
+        if self.VERBOSE:
+            print(f"Image dimensions: {dims}")
+            print(f"Max slice ID: {self.maxSliceID}")
+            print(f"Starting at slice: {self.currentSliceID}")
+        
         self.moveTimeSlider(self.currentTimeID)
+        self.moveSliceSlider(self.currentSliceID)
 
 
     def exit(self):
@@ -547,10 +582,12 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         # Set background color
         self.renderer.SetBackground(0.1, 0.1, 0.1)
         
-        # Add image actor to renderer
-        imageActor = vtk.vtkImageActor()
-        imageActor.SetInputData(self.getCurrentVTIObject())
-        self.renderer.AddActor(imageActor)
+        # Create image actor for slice display
+        self.imageActor = vtk.vtkImageActor()
+        self.renderer.AddActor(self.imageActor)
+        
+        # Update to show current slice
+        self.updateImageSlice()
         
         # Image setup complete
         
@@ -562,24 +599,41 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
     # ======================== RENDERING ===============================================================================
     def updateViewAfterTimeChange(self): # NEED TO TRIGGER ON A TIME CHANGE
         # Update image data for current time
-        # Remove old image actors and add new ones
-        actors = self.renderer.GetActors()
-        actors.InitTraversal()
-        actor = actors.GetNextActor()
-        while actor:
-            if isinstance(actor, vtk.vtkImageActor):
-                self.renderer.RemoveActor(actor)
-            actor = actors.GetNextActor()
-        
-        # Add new image actor
-        imageActor = vtk.vtkImageActor()
-        imageActor.SetInputData(self.getCurrentVTIObject())
-        self.renderer.AddActor(imageActor)
-        
+        self.updateImageSlice()
         self.updateViewAfterSliceChange()
 
     def updateViewAfterSliceChange(self):
         self.renderWindow.Render()
+    
+    def updateImageSlice(self):
+        """Update the image actor to show the current slice"""
+        if hasattr(self, 'imageActor') and self.imageActor:
+            # Extract the current slice from the 3D volume
+            currentVTI = self.getCurrentVTIObject()
+            dims = [0, 0, 0]
+            currentVTI.GetDimensions(dims)
+            
+            # Debug: Print slice information
+            if self.VERBOSE:
+                print(f"Slice {self.currentSliceID} of {self.maxSliceID}, dims: {dims}")
+            
+            # Ensure slice ID is within bounds
+            if self.currentSliceID < 0:
+                self.currentSliceID = 0
+            elif self.currentSliceID >= dims[2]:
+                self.currentSliceID = dims[2] - 1
+            
+            # Create a 2D slice from the 3D volume
+            extractVOI = vtk.vtkExtractVOI()
+            extractVOI.SetInputData(currentVTI)
+            # Extract slice along Z-axis (third dimension)
+            extractVOI.SetVOI(0, dims[0]-1, 0, dims[1]-1, self.currentSliceID, self.currentSliceID)
+            extractVOI.Update()
+            thisImageSlice = extractVOI.GetOutput()
+            # Set the extracted slice to the image actor
+            if self.VERBOSE:
+                print(f"Setting up imageActor at slice {self.currentSliceID} from dims {dims}. {thisImageSlice.GetPointData().GetScalars().GetRange()}")
+            self.imageActor.SetInputData(thisImageSlice)
 
     def updateAllActorsToCurrentSlice(self):
         """
@@ -669,7 +723,8 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
     def addSpline(self, X): #TODO - TESTING -
         nn = self.getCurrentViewNormal()
         pts = vtkfilters.ftk.buildCircle3D(X, nn, 0.03, 25)
-        print('Build circle at X and norm:',str(X), str(nn))
+        if self.VERBOSE:
+            print('Build circle at X and norm:',str(X), str(nn))
         self.Markups.addSpline(pts, self._getCurrentReslice(), self.getCurrentRenderer(), self.graphicsViewVTK, self.currentTimeID, self.getCurrentTime())
         self.__updateMarkups()
 

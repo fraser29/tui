@@ -41,6 +41,26 @@ class Ui_BASEUI(object):
         self.graphicsView.setBackgroundBrush(brush)
         self.graphicsView.setObjectName("graphicsView")
         self.graphicsViewLayout.addWidget(self.graphicsView)
+        
+        # Add vertical slice slider
+        self.sliceSliderLayout = QtWidgets.QVBoxLayout()
+        self.sliceSliderLayout.setObjectName("sliceSliderLayout")
+        self.sliceSliderLabel = QtWidgets.QLabel(self.centralwidget)
+        self.sliceSliderLabel.setObjectName("sliceSliderLabel")
+        self.sliceSliderLabel.setAlignment(QtCore.Qt.AlignCenter)
+        self.sliceSliderLayout.addWidget(self.sliceSliderLabel)
+        
+        self.sliceSlider = QtWidgets.QSlider(self.centralwidget)
+        self.sliceSlider.setOrientation(QtCore.Qt.Vertical)
+        self.sliceSlider.setObjectName("sliceSlider")
+        self.sliceSlider.setMinimum(0)
+        self.sliceSlider.setMaximum(100)
+        self.sliceSlider.setValue(50)
+        self.sliceSliderLayout.addWidget(self.sliceSlider)
+        
+        self.sliceSliderLayout.addStretch()  # Add stretch to center the slider
+        self.graphicsViewLayout.addLayout(self.sliceSliderLayout)
+        
         self.verticalLayout = QtWidgets.QVBoxLayout()
         self.verticalLayout.setObjectName("verticalLayout")
         self.label_4 = QtWidgets.QLabel(self.centralwidget)
@@ -243,9 +263,10 @@ class Ui_BASEUI(object):
 
     def retranslateUi(self, BASEUI):
         _translate = QtCore.QCoreApplication.translate
-        BASEUI.setWindowTitle(_translate("BASEUI", "BASE UI"))
+        BASEUI.setWindowTitle("PIWAKAWAKA")
         self.label_3.setText(_translate("BASEUI", "Time"))
         self.timeLabel.setText(_translate("BASEUI", "0/0 [0.0]"))
+        self.sliceSliderLabel.setText(_translate("BASEUI", "Slice"))
         #
         self.imageManipulationGroupBox.setTitle(_translate("BASEUI", "Image manipulation"))
         self.imManip_A.setText(_translate("BASEUI", "Nothing"))
