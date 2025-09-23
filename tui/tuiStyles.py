@@ -336,7 +336,7 @@ class ImageInteractor(vtk.vtkInteractorStyleTrackballCamera):
 
         elif key == "V":
             self.parentImageViewer.VERBOSE = not self.parentImageViewer.VERBOSE
-            print(f"DEBUG mode is now {self.parentImageViewer.DEBUG}")
+            print(f"VERBOSE mode is now {self.parentImageViewer.VERBOSE}")
 
         else:
             # Pass key to UserDefinedCallback

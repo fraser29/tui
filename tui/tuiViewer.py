@@ -63,8 +63,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
         self.modPushButtonDict = dict(zip(range(self.nModPushButtons),
                                           [['Mod-Button%d'%(i),dummyModButtonAction] for i in range(1,self.nModPushButtons+1)]))
         self.sliderDict = {}
-        self.USE_FIELD_DATA = False
-        self.DEBUG = False
+        self.VERBOSE = False
         self.planeBackgroundColors = [[0.3, 0.1, 0.1],
                                       [0.1, 0.3, 0.1],
                                       [0.1, 0.1, 0.3],
@@ -330,7 +329,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
         if self.currentArray not in self.scalarRange.keys():
             self.__setScalarRangeForCurrentArray()
         sR = self.scalarRange.get(self.currentArray, self.scalarRange.get('Default', [0,255]))
-        if self.DEBUG:
+        if self.VERBOSE:
             print(f"Resetting window level - scalar range: {sR}")
             print(f"Resetting window level to {sR[1] - sR[0]:.2f}, {(sR[0] + sR[1]) / 2.0:.2f}")
         self.__updateMarkups(window=sR[1] - sR[0], level=(sR[0] + sR[1]) / 2.0)
