@@ -136,13 +136,12 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.nModPushButtons = 12
         self.modPushButtonDict = dict(zip(range(self.nModPushButtons),
                                           [['Mod-Button%d'%(i),dummyModButtonAction] for i in range(1,self.nModPushButtons+1)]))
-        self.USE_FIELD_DATA = False
         self.VERBOSE = VERBOSE
         # Animation settings
         self.isAnimating = False
         self.animationTimer = None
         self.animationSpeed = 1  # Default speed (0=slowest, 3=fastest)
-        self.speedIntervals = [1000, 500, 250, 100]  # Milliseconds between frames for each speed
+        self.speedIntervals = [200, 100, 50, 25]  # Milliseconds between frames for each speed
         #
         # GRAPHICS VIEW SETUP
         try:
