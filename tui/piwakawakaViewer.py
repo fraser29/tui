@@ -18,7 +18,7 @@ import numpy as np
 from ngawari import fIO
 from ngawari import vtkfilters, ftk
 import spydcmtk
-from tui import tuiMarkups, tuiStyles, tuiUtils, piwakawakamarkupui
+from tui import tuiMarkups, piwakawakamarkupui, piwakawakaStyles
 
 from vtk.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor # type: ignore
 
@@ -136,7 +136,6 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.nModPushButtons = 12
         self.modPushButtonDict = dict(zip(range(self.nModPushButtons),
                                           [['Mod-Button%d'%(i),dummyModButtonAction] for i in range(1,self.nModPushButtons+1)]))
-        self.sliderDict = {}
         self.USE_FIELD_DATA = False
         self.VERBOSE = VERBOSE
         #
@@ -169,8 +168,8 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.connections()
         self.Markups = tuiMarkups.Markups(self)
         self.markupActorList = []
-        self.interactorStyleDict = {'Image': tuiStyles.SinglePaneImageInteractor(self),
-                                    'ImageTracer': tuiStyles.ImageTracerInteractorStyle(self),
+        self.interactorStyleDict = {'Image': piwakawakaStyles.SinglePaneImageInteractor(self),
+                                    # 'ImageTracer': tuiStyles.ImageTracerInteractorStyle(self),
                                     'Trackball': vtk.vtkInteractorStyleTrackballCamera()}
         self.graphicsViewVTK.SetInteractorStyle(self.interactorStyleDict['Image'])
         self.show()
@@ -208,7 +207,6 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.closedSplineCheck.stateChanged.connect(self.splineClosedChanged)
         ##
         self.updatePushButtonDict()
-        self.updateSliderDict()
 
     def updatePushButtonDict(self, newPushButtonDict=None):
         """
@@ -250,43 +248,6 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
             if self.modPushButtonDict[k1][1] == dummyModButtonAction:
                 self.modPushButtons[k1].setEnabled(False)
 
-    def updateSliderDict(self, newSliderDict=None):
-        """
-        Update the slider labels with new labels.
-
-        This method allows customised sliders to be applied for the UI. 
-        It updates the dictionary of sliders with new labels. It then applies these changes to the UI, enabling
-        or disabling buttons as necessary.
-
-        Args:
-            newSliderDict (dict, optional): A dictionary containing new slider configurations. The keys are slider indices (0-3), and the values
-                are dicts as per example below. 
-
-        Example:
-            newDict = {
-                0: {"label": 'Slider 1 label', "action": action_function_A, "min": 0, "max": 100, "value": 50, "singleStep": 1, "pageStep": 5},
-                1: {"label": 'Slider 2 label', "action": action_function_B, "min": 0, "max": 100, "value": 50, "singleStep": 1, "pageStep": 5},
-            }
-            self.updateSliderDict(newDict)
-        """
-        if type(newSliderDict) == dict:
-            self.sliderDict = newSliderDict
-        for k1 in range(2):
-            try:
-                self.sliderLabels[k1].setText(self.sliderDict[k1]["label"])
-                self.sliders[k1].setMinimum(self.sliderDict[k1]["min"])
-                self.sliders[k1].setMaximum(self.sliderDict[k1]["max"])
-                self.sliders[k1].setValue(self.sliderDict[k1]["value"])
-                self.sliders[k1].valueChanged.connect(self.sliderDict[k1]["action"])
-                self.sliders[k1].setSingleStep(self.sliderDict[k1]["singleStep"])
-                self.sliders[k1].setPageStep(self.sliderDict[k1]["pageStep"])
-                self.sliders[k1].setEnabled(True)
-            except KeyError:
-                self._sliderDummySetup(k1)
-    
-    def _sliderDummySetup(self, k1):
-        self.sliderLabels[k1].setText(f'Slider {k1+1}')
-        self.sliders[k1].setEnabled(False)
 
     def setUserDefinedKeyPress(self, newKeyPressDict=None):
         self.interactorStyleDict['Image'].setUserDefinedKeyCallbackDict(newKeyPressDict)
@@ -317,15 +278,6 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.timeSlider.setValue(self.currentTimeID)
         self.__updateMarkups()
 
-    def timeAdvance1(self):
-        if self.currentTimeID < (self.timeSlider.maximum()):
-            self.currentTimeID += 1
-        self.moveTimeSlider(self.currentTimeID)
-
-    def timeReverse1(self):
-        if self.currentTimeID > (self.timeSlider.minimum()):
-            self.currentTimeID -= 1
-        self.moveTimeSlider(self.currentTimeID)
 
     # SLICE SLIDER
     def setupSliceSlider(self):
@@ -352,9 +304,6 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.__updateMarkups()
 
     # SLICE SLIDER
-    def _getDeltaX(self):
-        return np.mean(self.getCurrentVTIObject().GetSpacing())#[self.interactionView] # ?? is this best, or mean ??
-
     def scrollForwardCurrentSlice1(self):
         # Move to next slice
         if self.currentSliceID < self.maxSliceID:
@@ -385,31 +334,84 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
     def __setScalarRangeForCurrentArray(self):
         sR_t = [self.vtiDict[iT].GetScalarRange() for iT in self.times]
         self.scalarRange[self.currentArray] = [min([i[0] for i in sR_t]), max([i[1] for i in sR_t])]
+    
+    def __calculateOptimalWindowLevel(self, arrayName=None):
+        """Calculate optimal window level using percentile-based approach"""
+        if arrayName is None:
+            arrayName = self.currentArray
+            
+        if arrayName not in self.scalarRange:
+            self.__setScalarRangeForCurrentArray()
+            
+        # Get the current VTI object
+        vtiObj = self.getCurrentVTIObject()
+        
+        try:
+            # Get the array data as numpy array for percentile calculation
+            arrayData = vtkfilters.getArrayAsNumpy(vtiObj, arrayName)
+            
+            if arrayData is not None and arrayData.size > 0:
+                # Calculate 2nd and 98th percentiles to exclude extreme outliers
+                p2 = np.percentile(arrayData, 2)
+                p98 = np.percentile(arrayData, 98)
+                
+                # Use percentile range for window width
+                windowWidth = p98 - p2
+                # Center the window level
+                windowLevel = (p2 + p98) / 2.0
+                
+                if self.VERBOSE:
+                    print(f"Optimal window level (percentile-based): window={windowWidth:.2f}, level={windowLevel:.2f}")
+                    print(f"Data range: {np.min(arrayData):.2f} to {np.max(arrayData):.2f}")
+                    print(f"Percentile range: {p2:.2f} to {p98:.2f}")
+                
+                return windowWidth, windowLevel
+        except Exception as e:
+            if self.VERBOSE:
+                print(f"Error calculating optimal window level: {e}")
+        
+        # Fallback to simple range-based calculation
+        sR = self.scalarRange.get(arrayName, [0, 255])
+        dataMin, dataMax = sR[0], sR[1]
+        dataRange = dataMax - dataMin
+        
+        if dataRange > 0:
+            windowWidth = dataRange * 0.8
+            windowLevel = (dataMin + dataMax) / 2.0
+        else:
+            windowWidth = 255
+            windowLevel = dataMin
+            
+        return windowWidth, windowLevel
 
     def resetWindowLevel(self):
-        if self.currentArray not in self.scalarRange.keys():
-            self.__setScalarRangeForCurrentArray()
-        sR = self.scalarRange.get(self.currentArray, self.scalarRange.get('Default', [0,255]))
+        # Use the optimal window level calculation
+        windowWidth, windowLevel = self.__calculateOptimalWindowLevel()
+        
         if self.VERBOSE:
-            print(f"Resetting window level - scalar range: {sR}")
-            print(f"Resetting window level to {sR[1] - sR[0]:.2f}, {(sR[0] + sR[1]) / 2.0:.2f}")
-        self.__updateMarkups(window=sR[1] - sR[0], level=(sR[0] + sR[1]) / 2.0)
+            print(f"Resetting window level: window={windowWidth:.2f}, level={windowLevel:.2f}")
+        
+        self.__updateMarkups(window=windowWidth, level=windowLevel)
 
     def getWindowLevel(self):
-        # For single pane viewer, return default values
+        # Get current window level from image actor
+        if hasattr(self, 'imageActor') and self.imageActor:
+            prop = self.imageActor.GetProperty()
+            return prop.GetColorWindow(), prop.GetColorLevel()
         return 255, 127.5
 
     def setWindowLevel(self, w, l):
-        # For single pane viewer, this is a placeholder
-        pass
-
-
-
+        # Set window level on image actor
+        if hasattr(self, 'imageActor') and self.imageActor:
+            prop = self.imageActor.GetProperty()
+            prop.SetColorWindow(w)
+            prop.SetColorLevel(l)
+            if self.VERBOSE:
+                print(f"Set window level: window={w:.2f}, level={l:.2f}")
+    
 
     def pushButton1(self):
         print('Button pushed - do something')
-
-
 
     # IMAGE MANIPULATION
     def flipHorAction(self):
@@ -838,6 +840,9 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         # Update to show current slice
         self.updateImageSlice()
         
+        # Set initial window level based on data
+        self.resetWindowLevel()
+        
         # Image setup complete
         
         # Render
@@ -967,14 +972,6 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.Markups.addPolydata(polydata, timeID, iTime, color=color)
         self.__updateMarkups()
 
-    def addSpline(self, X): #TODO - TESTING -
-        nn = self.getCurrentViewNormal()
-        pts = vtkfilters.ftk.buildCircle3D(X, nn, 0.03, 25)
-        if self.VERBOSE:
-            print('Build circle at X and norm:',str(X), str(nn))
-        self.Markups.addSpline(pts, self._getCurrentReslice(), self.getCurrentRenderer(), self.graphicsViewVTK, self.currentTimeID, self.getCurrentTime())
-        self.__updateMarkups()
-
 
     # ======================== OTHER OUTPUTS ===========================================================================
     def saveMontage(self, outputFullFile, startPt, endPt, nImages, viewID):
@@ -1051,36 +1048,6 @@ def dummyModButtonAction():
     print('Nothing implemented')
 
 
-def probeData(vtkObj, probeLocation, arrayName):
-    """
-    Get vtkObj array value at location
-    :param vtkObj:
-    :param probeLocation: coords xyz
-    :param arrayName:
-    :return:
-    """
-    myVtkPoints = vtk.vtkPoints()
-    vertices = vtk.vtkCellArray()
-    ptID = myVtkPoints.InsertNextPoint(probeLocation[0], probeLocation[1], probeLocation[2])
-    vertices.InsertNextCell(1)
-    vertices.InsertCellPoint(ptID)
-    polyData = vtk.vtkPolyData()
-    polyData.SetPoints(myVtkPoints)
-    polyData.SetVerts(vertices)
-    return probeDataWithPt(vtkObj, polyData, arrayName)
-
-def probeDataWithPt(vtkObj, vtkPolyPt, arrayName):
-    probeF = vtk.vtkProbeFilter()
-    probeF.SetInputData(vtkPolyPt)
-    probeF.SetSourceData(vtkObj)
-    probeF.Update()
-    return probeF.GetOutput().GetPointData().GetArray(arrayName).GetTuple(0)
-
-def getClosestInSortedList(listIn, ref):
-    for k1 in range(0, len(listIn)):
-        if listIn[k1] > ref:
-            return k1
-    return len(listIn) - 1
 
 ### ====================================================================================================================
 ### ====================================================================================================================

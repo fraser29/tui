@@ -316,13 +316,10 @@ class TUI2D(TUI2DProject):
         self.pushButtonDict = {0:['Save points', self.savePolyPts_],
                               1:['Save line', self.savePolyLine_],
                               3:['Clear Markups', self.ex.deleteAllMarkups],
-                              4:['Test mask', self.testMask],
                               5: ['Points to VOI', self.saveVOI_]}
 
         self.ex.updatePushButtonDict(self.pushButtonDict)
 
-        self.sliderDict = {0: {"label": 'Contour', "action": self.changeContour, "min": 0, "max": 1000, "value": 500, "singleStep": 1, "pageStep": 5}}
-        self.ex.updateSliderDict(self.sliderDict)
 
     def saveVOI_(self):
         fOut = self.saveVOI()
@@ -337,14 +334,6 @@ class TUI2D(TUI2DProject):
         fOut = self.saveLine(minN=2)
         print(fOut)
     
-
-    def changeContour(self, val):
-        self.sliderDict[0]["value"] = val
-        self.ex.setContourVal(val)
-        
-
-    def testMask(self):
-        print("Does nothing")
 
 
 
