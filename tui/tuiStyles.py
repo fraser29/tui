@@ -619,19 +619,26 @@ class SinglePaneImageInteractor(vtk.vtkInteractorStyleImage):
         return X
 
     def mMoveCallback(self, obj, event):
-        X = self.getXAtMouse()
-        #
         try:
-            ptID = self.parentImageViewer.getPointIDAtX(X)
-            ijk = self.parentImageViewer.getIJKAtPtID(ptID)
-            pixelVal = self.parentImageViewer.getPixelValueAtPtID_tuple(ptID)
-            if len(pixelVal) > 1:
-                pixelVal = tuiUtils.np.linalg.norm(pixelVal)
+            mouseX, mouseY = self.GetInteractor().GetEventPosition()
+            ijk, worldPos, ID = self.parentImageViewer.getReslice_IJK_X_ID_AtMouse(mouseX, mouseY)
+            print("DEBUG:", ijk, worldPos, ID)
+            if ijk is not None:
+                # Get pixel value from reslice
+                pixelVal = self.parentImageViewer.getPixelValueAtPtID_tuple(ID)[0]
+                print("DEBUG 2:", pixelVal)
+                
+                if pixelVal is not None:
+                    self.parentImageViewer.statusBar().showMessage('I: %d, J: %d, K: %d. X: %3.3f, %3.3f, %3.3f. Pixel: %3.2f'%(
+                                                                    ijk[0], ijk[1], ijk[2], worldPos[0], worldPos[1], worldPos[2],
+                                                                    pixelVal))
+                else:
+                    self.parentImageViewer.statusBar().showMessage('I: %d, J: %d, K: %d. X: %3.3f, %3.3f, %3.3f. %s'%(
+                                                                    ijk[0], ijk[1], ijk[2], worldPos[0], worldPos[1], worldPos[2],
+                                                                    'No pixel data'))
             else:
-                pixelVal = pixelVal[0]
-            self.parentImageViewer.statusBar().showMessage('I: %d, J: %d, K: %d. X: %3.3f, %3.3f, %3.3f. Pixel: %d = %3.2f'%(
-                                                                ijk[0], ijk[1], ijk[2],X[0], X[1], X[2],
-                                                                ptID, pixelVal))
+                self.parentImageViewer.statusBar().showMessage('I: %d, J: %d, K: %d. X: %3.3f, %3.3f, %3.3f. %s'%(
+                                                                0,0,0,0,0,0,'Outside Image'))
         except (ValueError, TypeError): # outside image
             self.parentImageViewer.statusBar().showMessage('I: %d, J: %d, K: %d. X: %3.3f, %3.3f, %3.3f. %s'%(
                                                                 0,0,0,0,0,0,'Outside Image'))

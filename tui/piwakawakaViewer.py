@@ -123,6 +123,9 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.times = []
         self.maxSliceID = 0
         self.sliceOrientation = 'AXIAL'  # 'AXIAL', 'CORONAL', 'SAGITTAL'
+        self.resliceDict = {}  # Dictionary: {timestep: [list of reslices]}
+        self.sliceCenters = []  # List of center points for slices
+        self.sliceNormals = []  # List of normal vectors for slices
         self.scalarRange = {'Default':[0,255]}
         self.boundingDist = 0.0
         self.multiPointFactor = 0.0001
@@ -157,13 +160,11 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.renderer = vtk.vtkRenderer()
         self.renderWindow.AddRenderer(self.renderer)
         self.renderWindow.SetMultiSamples(0)
-        self.picker = vtk.vtkPointPicker()
-        self.picker.SetTolerance(0.005)
-        self.worldPicker = vtk.vtkWorldPointPicker()
         #
         self.interactionState = None
         self.graphicsViewVTK.Initialize()
         self.graphicsViewVTK.Start()
+        self.graphicsViewVTK.picker = vtk.vtkPropPicker()
         #
         self.connections()
         self.Markups = tuiMarkups.Markups(self)
@@ -554,7 +555,6 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         # Reset Markups
         self.Markups.initForNewData(len(self.times))
         self.setupTimeSlider()
-        self.setupSliceSlider()
         #
         self.selectArrayComboBox.clear()
         arrayName = vtkfilters.getScalarsArrayName(self.vtiDict[self.getCurrentTime()])
@@ -568,7 +568,8 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         #
         bounds = self.getCurrentVTIObject().GetBounds()
         self.boundingDist = max([bounds[1]-bounds[0], bounds[3]-bounds[2], bounds[5]-bounds[4]])
-        self.__setupNewImageData() ## MAIN SETUP HERE ##
+        
+        # Get image dimensions and build reslice dictionary BEFORE setting up image data
         ii = list(self.vtiDict.values())[0]
         dims = [0,0,0]
         ii.GetDimensions(dims)
@@ -580,6 +581,15 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
             self.maxSliceID = dims[1] - 1
         elif self.sliceOrientation == 'SAGITTAL':
             self.maxSliceID = dims[0] - 1
+        
+        # Build reslice dictionary with default orientation
+        self.buildResliceDictionary(orientation=self.sliceOrientation)
+        
+        # Setup slice slider after reslice dictionary is built
+        self.setupSliceSlider()
+        
+        # Now setup image data (which will call updateImageSlice)
+        self.__setupNewImageData() ## MAIN SETUP HERE ##
         
         # Start at slice 0 (first slice)
         self.currentSliceID = 0
@@ -593,34 +603,136 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.moveTimeSlider(self.currentTimeID)
         self.moveSliceSlider(self.currentSliceID)
     
+    def buildResliceDictionary(self, orientation=None, customCenters=None, customNormals=None):
+        """Build dictionary of reslices for all timesteps
+        
+        Args:
+            orientation: 'AXIAL', 'CORONAL', 'SAGITTAL', or None for custom
+            customCenters: List of center points for custom slices
+            customNormals: List of normal vectors for custom slices
+        """
+        if orientation is None and (customCenters is None or customNormals is None):
+            orientation = self.sliceOrientation
+        
+        self.resliceDict = {}
+        self.sliceCenters = []
+        self.sliceNormals = []
+        
+        if self.VERBOSE:
+            print(f"Building reslice dictionary with orientation: {orientation}")
+        
+        # Get image dimensions for default slice generation
+        ii = list(self.vtiDict.values())[0]
+        dims = [0, 0, 0]
+        ii.GetDimensions(dims)
+        origin = ii.GetOrigin()
+        spacing = ii.GetSpacing()
+        center = ii.GetCenter()
+        
+        # Generate slice centers and normals
+        if customCenters is not None and customNormals is not None:
+            # Use custom centers and normals
+            self.sliceCenters = customCenters
+            self.sliceNormals = customNormals
+            self.maxSliceID = len(customCenters) - 1
+        else:
+            # Generate default slices based on orientation
+            if orientation == 'AXIAL':
+                self.maxSliceID = dims[2] - 1
+                for k in range(dims[2]):
+                    sliceCenter = [center[0], center[1], origin[2] + k * spacing[2]]
+                    self.sliceCenters.append(sliceCenter)
+                    self.sliceNormals.append([0, 0, 1])
+            elif orientation == 'CORONAL':
+                self.maxSliceID = dims[1] - 1
+                for j in range(dims[1]):
+                    sliceCenter = [center[0], origin[1] + j * spacing[1], center[2]]
+                    self.sliceCenters.append(sliceCenter)
+                    self.sliceNormals.append([0, 1, 0])
+            elif orientation == 'SAGITTAL':
+                self.maxSliceID = dims[0] - 1
+                for i in range(dims[0]):
+                    sliceCenter = [origin[0] + i * spacing[0], center[1], center[2]]
+                    self.sliceCenters.append(sliceCenter)
+                    self.sliceNormals.append([1, 0, 0])
+        
+        # Build reslices for each timestep
+        for timeStep in self.times:
+            vtiObj = self.vtiDict[timeStep]
+            resliceList = []
+            
+            for i, (sliceCenter, sliceNormal) in enumerate(zip(self.sliceCenters, self.sliceNormals)):
+                reslice = _defineReslice(vtiObj, orientation, sliceCenter, normalVector=sliceNormal)
+                resliceList.append(reslice)
+            
+            self.resliceDict[timeStep] = resliceList
+            
+            if self.VERBOSE:
+                print(f"Built {len(resliceList)} reslices for timestep {timeStep}")
+        
+        if self.VERBOSE:
+            print(f"Reslice dictionary built with {len(self.sliceCenters)} slices")
+    
     def setSliceOrientation(self, orientation):
-        """Change the slice orientation (AXIAL, CORONAL, SAGITTAL)"""
+        """Change the slice orientation and rebuild reslice dictionary"""
         if orientation in ['AXIAL', 'CORONAL', 'SAGITTAL']:
             self.sliceOrientation = orientation
+            self.buildResliceDictionary(orientation=orientation)
             
-            # Recalculate max slice ID for new orientation
-            if hasattr(self, 'vtiDict') and self.vtiDict:
-                ii = list(self.vtiDict.values())[0]
-                dims = [0,0,0]
-                ii.GetDimensions(dims)
-                
-                if self.sliceOrientation == 'AXIAL':
-                    self.maxSliceID = dims[2] - 1
-                elif self.sliceOrientation == 'CORONAL':
-                    self.maxSliceID = dims[1] - 1
-                elif self.sliceOrientation == 'SAGITTAL':
-                    self.maxSliceID = dims[0] - 1
-                
-                # Reset to middle slice
-                self.currentSliceID = int(self.maxSliceID / 2)
-                
-                # Update slider and display
-                self.setupSliceSlider()
-                self.updateImageSlice()
-                self.updateViewAfterSliceChange()
-                
-                if self.VERBOSE:
-                    print(f"Changed orientation to {orientation}, max slice: {self.maxSliceID}")
+            # Reset to middle slice
+            self.currentSliceID = int(self.maxSliceID / 2)
+            
+            # Update slider and display
+            self.setupSliceSlider()
+            self.updateImageSlice()
+            self.updateViewAfterSliceChange()
+            
+            if self.VERBOSE:
+                print(f"Changed orientation to {orientation}, max slice: {self.maxSliceID}")
+    
+    def setCustomSlices(self, centers, normals):
+        """Set custom slice centers and normals and rebuild reslice dictionary"""
+        if len(centers) != len(normals):
+            raise ValueError("Number of centers must match number of normals")
+        
+        self.buildResliceDictionary(customCenters=centers, customNormals=normals)
+        
+        # Reset to first slice
+        self.currentSliceID = 0
+        
+        # Update slider and display
+        self.setupSliceSlider()
+        self.updateImageSlice()
+        self.updateViewAfterSliceChange()
+        
+        if self.VERBOSE:
+            print(f"Set {len(centers)} custom slices")
+    
+    def getCurrentReslice(self):
+        """Get the current reslice for the current timestep and slice"""
+        if not hasattr(self, 'resliceDict') or not self.resliceDict:
+            if self.VERBOSE:
+                print("Reslice dictionary not initialized")
+            return None
+            
+        if self.currentTimeID >= len(self.times):
+            if self.VERBOSE:
+                print(f"Current time ID {self.currentTimeID} out of range")
+            return None
+            
+        currentTime = self.times[self.currentTimeID]
+        if currentTime not in self.resliceDict:
+            if self.VERBOSE:
+                print(f"Time {currentTime} not found in reslice dictionary")
+            return None
+            
+        resliceList = self.resliceDict[currentTime]
+        if self.currentSliceID >= len(resliceList):
+            if self.VERBOSE:
+                print(f"Current slice ID {self.currentSliceID} out of range")
+            return None
+            
+        return resliceList[self.currentSliceID]
 
 
     def exit(self):
@@ -632,6 +744,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
     #   DATA
     def getCurrentTime(self):
         return self.times[self.currentTimeID]
+
     def getCurrentVTIObject(self, COPY=False):
         ii = self.vtiDict[self.getCurrentTime()]
         if COPY:
@@ -640,136 +753,67 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
             return i2
         return ii
 
-    def getCurrentRenderer(self):
-        return self.renderer
-
-    def getCurrentX(self): # point X under cursor
-        """Get the center point of the current slice in world coordinates"""
-        if hasattr(self, 'vtiDict') and self.vtiDict:
-            currentVTI = self.getCurrentVTIObject()
-            center = currentVTI.GetCenter()
-            origin = currentVTI.GetOrigin()
-            spacing = currentVTI.GetSpacing()
-            
-            # Adjust center to current slice position
-            if self.sliceOrientation == 'AXIAL':
-                slicePosition = origin[2] + (self.currentSliceID * spacing[2])
-                return [center[0], center[1], slicePosition]
-            elif self.sliceOrientation == 'CORONAL':
-                slicePosition = origin[1] + (self.currentSliceID * spacing[1])
-                return [center[0], slicePosition, center[2]]
-            elif self.sliceOrientation == 'SAGITTAL':
-                slicePosition = origin[0] + (self.currentSliceID * spacing[0])
-                return [slicePosition, center[1], center[2]]
-        
-        return [0, 0, 0]  # Default center point
+    def getCurrentResliceMatrix(self):
+        return self.getCurrentReslice().GetResliceAxes()
 
     def getPointIDAtX(self, X):
         """Get point ID from world coordinates, accounting for reslice orientation"""
-        currentVTI = self.getCurrentVTIObject()
-        
-        # Convert world coordinates to image coordinates
-        IJK = self.getIJKAtX(X)
-        
-        # Convert IJK to point ID
-        dims = [0, 0, 0]
-        currentVTI.GetDimensions(dims)
-        
-        # Ensure IJK is within bounds
-        I = max(0, min(int(IJK[0]), dims[0]-1))
-        J = max(0, min(int(IJK[1]), dims[1]-1))
-        K = max(0, min(int(IJK[2]), dims[2]-1))
-        
-        # Convert to point ID
-        pointID = K * dims[0] * dims[1] + J * dims[0] + I
-        
-        if self.VERBOSE:
-            print(f"World {X} -> IJK {IJK} -> PointID {pointID}")
-        
-        return pointID
+        return self.getCurrentVTIObject().FindPoint(X)
 
     def getIJKAtX(self, X):
         """Convert world coordinates to IJK coordinates, accounting for reslice orientation"""
-        currentVTI = self.getCurrentVTIObject()
-        
-        # Get image properties
-        origin = currentVTI.GetOrigin()
-        spacing = currentVTI.GetSpacing()
-        dims = [0, 0, 0]
-        currentVTI.GetDimensions(dims)
-        
-        # Convert world coordinates to IJK
-        # IJK = (World - Origin) / Spacing
-        I = (X[0] - origin[0]) / spacing[0]
-        J = (X[1] - origin[1]) / spacing[1]
-        K = (X[2] - origin[2]) / spacing[2]
-        
-        IJK = [I, J, K]
-        
-        if self.VERBOSE:
-            print(f"World {X} -> IJK {IJK}, origin {origin}, spacing {spacing}")
-        
-        return IJK
+        ijk = [0, 0, 0]
+        pcoords = [0.0, 0.0, 0.0]
+        res = self.getCurrentVTIObject().ComputeStructuredCoordinates(X, ijk, pcoords)
+        if res == 0:
+            return None
+        return ijk
 
     def getIJKAtPtID(self, ptID):
-        return tuiUtils.imageID_2_IJK(self.getCurrentVTIObject(), ptID)
+        X = self.getCurrentVTIObject().GetPoint(ptID)
+        ijk = self.getIJKAtX(X)
+        return ijk
 
-    def getPixelValueAtX_tuple(self, X):
-        ptID = self.getPointIDAtX(X)
+
+    def getPixelValueAtReslicePosition(self, mouseX, mouseY):
+        """Get pixel value at mouse position from the current reslice"""
+        X = self.mouseXYTo_ImageCS_X(mouseX, mouseY)
+        X_ = self.imageCS_To_WorldCS_X(X)
+        ptID = self.getCurrentVTIObject().FindPoint(X_)
         return self.getPixelValueAtPtID_tuple(ptID)
+        
+    
+    def getReslice_IJK_X_ID_AtMouse(self, mouseX, mouseY):
+        """Get IJK coordinates at mouse position for the current reslice"""
+        X = self.mouseXYTo_ImageCS_X(mouseX, mouseY)
+        X_ = self.imageCS_To_WorldCS_X(X)
+        ijk = self.getIJKAtX(X_)
+        return ijk, X_, self.getCurrentVTIObject().FindPoint(X_)
+    
+    
     def getPixelValueAtPtID_tuple(self, ptID):
+        if (ptID < 0) or (ptID >= self.getCurrentVTIObject().GetNumberOfPoints()):
+            return None
         return self.getCurrentVTIObject().GetPointData().GetArray(self.currentArray).GetTuple(ptID)
 
-    def mouseXYToWorldX(self, mouseX, mouseY):
-        """Convert mouse coordinates to world coordinates using the reslice method"""
-        # Create a point picker
-        picker = vtk.vtkPointPicker()
-        picker.SetTolerance(0.005)
+
+    def imageCS_To_WorldCS_X(self, imageCS_X):
+        """Convert image coordinates to world coordinates"""
+        matrix = self.getCurrentResliceMatrix()
+        return matrix.MultiplyPoint([imageCS_X[0], imageCS_X[1], imageCS_X[2], 1])[:3]
+
+    def mouseXYTo_ImageCS_X(self, mouseX, mouseY):
+        """Convert mouse coordinates to world coordinates using vtkPropPicker"""
+        self.graphicsViewVTK.picker.Pick(mouseX, mouseY, 0, self.renderer)
+        pos = self.graphicsViewVTK.picker.GetPickPosition()
+        return pos
         
-        # Pick the point on the 2D slice
-        picker.Pick(mouseX, mouseY, 0, self.renderer)
-        
-        # Get the picked point
-        pickedPoint = picker.GetPickPosition()
-        
-        # Convert 2D slice coordinates back to 3D world coordinates
-        if hasattr(self, 'imageActor') and self.imageActor:
-            # Get the current slice data
-            currentVTI = self.getCurrentVTIObject()
-            spacing = currentVTI.GetSpacing()
-            origin = currentVTI.GetOrigin()
-            
-            # Calculate the slice position in 3D space
-            if self.sliceOrientation == 'AXIAL':
-                slicePosition = origin[2] + (self.currentSliceID * spacing[2])
-                # For axial view, Z is fixed at slice position
-                worldPoint = [pickedPoint[0], pickedPoint[1], slicePosition]
-            elif self.sliceOrientation == 'CORONAL':
-                slicePosition = origin[1] + (self.currentSliceID * spacing[1])
-                # For coronal view, Y is fixed at slice position
-                worldPoint = [pickedPoint[0], slicePosition, pickedPoint[1]]
-            elif self.sliceOrientation == 'SAGITTAL':
-                slicePosition = origin[0] + (self.currentSliceID * spacing[0])
-                # For sagittal view, X is fixed at slice position
-                worldPoint = [slicePosition, pickedPoint[0], pickedPoint[1]]
-            
-            if self.VERBOSE:
-                print(f"Mouse ({mouseX}, {mouseY}) -> World {worldPoint}, slice {self.currentSliceID}")
-            
-            return worldPoint
-        
-        return pickedPoint
 
     def getCurrentViewNormal(self): # uses current view
-        """Get the view normal based on slice orientation"""
-        if self.sliceOrientation == 'AXIAL':
-            return np.array([0, 0, 1])  # Z-axis normal
-        elif self.sliceOrientation == 'CORONAL':
-            return np.array([0, 1, 0])  # Y-axis normal
-        elif self.sliceOrientation == 'SAGITTAL':
-            return np.array([1, 0, 0])  # X-axis normal
-        else:
-            return np.array([0, 0, 1])  # Default Z-axis normal
+        """Get the view normal based on current slice"""
+        if self.currentSliceID < len(self.sliceNormals):
+            return np.array(self.sliceNormals[self.currentSliceID])
+        return np.array([0, 0, 1])  # Default Z-axis normal
 
     def getViewNormal(self, i):
         """Get view normal - for single pane, same as current view normal"""
@@ -811,54 +855,32 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.renderWindow.Render()
     
     def updateImageSlice(self):
-        """Update the image actor to show the current slice"""
-        if hasattr(self, 'imageActor') and self.imageActor:
-            # Extract the current slice from the 3D volume using _defineReslice
-            currentVTI = self.getCurrentVTIObject()
-            dims = [0, 0, 0]
-            currentVTI.GetDimensions(dims)
-            
-            # Debug: Print slice information
+        """Update the image actor to show the current slice using pre-built reslices"""
+        if not hasattr(self, 'imageActor') or not self.imageActor:
             if self.VERBOSE:
-                print(f"Slice {self.currentSliceID} of {self.maxSliceID}, dims: {dims}")
+                print("Image actor not initialized")
+            return
             
-            # Ensure slice ID is within bounds based on orientation
-            maxDim = dims[2] if self.sliceOrientation == 'AXIAL' else (dims[1] if self.sliceOrientation == 'CORONAL' else dims[0])
-            if self.currentSliceID < 0:
-                self.currentSliceID = 0
-            elif self.currentSliceID >= maxDim:
-                self.currentSliceID = maxDim - 1
-            
-            # Calculate the center point for the current slice
-            center = currentVTI.GetCenter()
-            center = [center[0], center[1], center[2]]
-            
-            # Calculate slice position based on current slice ID and orientation
-            spacing = currentVTI.GetSpacing()
-            origin = currentVTI.GetOrigin()
-            
-            # Adjust center based on orientation
-            if self.sliceOrientation == 'AXIAL':
-                slicePosition = origin[2] + (self.currentSliceID * spacing[2])
-                center[2] = slicePosition
-            elif self.sliceOrientation == 'CORONAL':
-                slicePosition = origin[1] + (self.currentSliceID * spacing[1])
-                center[1] = slicePosition
-            elif self.sliceOrientation == 'SAGITTAL':
-                slicePosition = origin[0] + (self.currentSliceID * spacing[0])
-                center[0] = slicePosition
-            
-            if self.VERBOSE:
-                print(f"Slice position: {slicePosition}, center: {center}, orientation: {self.sliceOrientation}")
-            
-            # Use _defineReslice to extract the slice with proper orientation
-            reslice = _defineReslice(currentVTI, self.sliceOrientation, center)
-            thisImageSlice = reslice.GetOutput()
+        # Get the current reslice
+        currentReslice = self.getCurrentReslice()
+        
+        if currentReslice is not None:
+            # Get the output from the reslice
+            thisImageSlice = currentReslice.GetOutput()
             
             # Set the extracted slice to the image actor
             if self.VERBOSE:
-                print(f"Setting up imageActor at slice {self.currentSliceID} from dims {dims}. {thisImageSlice.GetPointData().GetScalars().GetRange()}")
+                print(f"Setting up imageActor at slice {self.currentSliceID} of {self.maxSliceID}")
+                if self.currentSliceID < len(self.sliceCenters):
+                    print(f"Slice center: {self.sliceCenters[self.currentSliceID]}")
+                if self.currentSliceID < len(self.sliceNormals):
+                    print(f"Slice normal: {self.sliceNormals[self.currentSliceID]}")
+                print(f"Image range: {thisImageSlice.GetPointData().GetScalars().GetRange()}")
+            
             self.imageActor.SetInputData(thisImageSlice)
+        else:
+            if self.VERBOSE:
+                print(f"No reslice available for slice {self.currentSliceID}")
 
     def updateAllActorsToCurrentSlice(self):
         """
