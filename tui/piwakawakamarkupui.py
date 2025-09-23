@@ -183,41 +183,43 @@ class Ui_BASEUI(object):
             self.modPushButtons.append(button)
         self.rightPanelLayout.addLayout(self.pushButtonsLayout, 7, 0, 1, 1)
 
-        # Add Customised Sliders Label
-        self.customSlidersLabel = QtWidgets.QLabel(self.centralwidget)
-        self.customSlidersLabel.setObjectName("customSlidersLabel")
-        self.rightPanelLayout.addWidget(self.customSlidersLabel, 8, 0, 1, 1)
+        # Add Animation Controls Label
+        self.animationControlsLabel = QtWidgets.QLabel(self.centralwidget)
+        self.animationControlsLabel.setObjectName("animationControlsLabel")
+        self.rightPanelLayout.addWidget(self.animationControlsLabel, 8, 0, 1, 1)
 
-        # CUSTOMISABLE SLIDERS
-        self.slidersLayout = QtWidgets.QVBoxLayout()
-        self.slidersLayout.setObjectName("slidersLayout")
+        # ANIMATION CONTROLS
+        self.animationLayout = QtWidgets.QVBoxLayout()
+        self.animationLayout.setObjectName("animationLayout")
 
-        # Create 4 sliders with labels
-        self.sliders = []
-        self.sliderLabels = []
-        for i in range(2):
-            # Create horizontal layout for each slider+label pair
-            sliderHLayout = QtWidgets.QHBoxLayout()
-            
-            # Create and add label
-            label = QtWidgets.QLabel(self.centralwidget)
-            label.setObjectName(f"sliderLabel_{i+1}")
-            sliderHLayout.addWidget(label)
-            self.sliderLabels.append(label)
-            
-            # Create and add slider
-            slider = QtWidgets.QSlider(self.centralwidget)
-            slider.setOrientation(QtCore.Qt.Horizontal)
-            slider.setObjectName(f"slider_{i+1}")
-            slider.setMinimum(0)
-            slider.setMaximum(100)
-            sliderHLayout.addWidget(slider)
-            self.sliders.append(slider)
-            
-            # Add the horizontal layout to the main sliders layout
-            self.slidersLayout.addLayout(sliderHLayout)
+        # Play/Pause button
+        self.playPauseButton = QtWidgets.QPushButton(self.centralwidget)
+        self.playPauseButton.setObjectName("playPauseButton")
+        self.playPauseButton.setCheckable(True)  # Make it a toggle button
+        self.animationLayout.addWidget(self.playPauseButton)
 
-        self.rightPanelLayout.addLayout(self.slidersLayout, 9, 0, 1, 1)
+        # Speed control layout
+        self.speedControlLayout = QtWidgets.QHBoxLayout()
+        self.speedControlLayout.setObjectName("speedControlLayout")
+        
+        # Speed label
+        self.speedLabel = QtWidgets.QLabel(self.centralwidget)
+        self.speedLabel.setObjectName("speedLabel")
+        self.speedControlLayout.addWidget(self.speedLabel)
+        
+        # Speed slider (4 settings: 0, 1, 2, 3)
+        self.speedSlider = QtWidgets.QSlider(self.centralwidget)
+        self.speedSlider.setOrientation(QtCore.Qt.Horizontal)
+        self.speedSlider.setObjectName("speedSlider")
+        self.speedSlider.setMinimum(0)
+        self.speedSlider.setMaximum(3)
+        self.speedSlider.setValue(1)  # Default to medium speed
+        self.speedSlider.setTickPosition(QtWidgets.QSlider.TicksBelow)
+        self.speedSlider.setTickInterval(1)
+        self.speedControlLayout.addWidget(self.speedSlider)
+        
+        self.animationLayout.addLayout(self.speedControlLayout)
+        self.rightPanelLayout.addLayout(self.animationLayout, 9, 0, 1, 1)
 
         # Add the right panel widget to the main layout
         self.mainLayout.addWidget(self.rightPanelWidget, 0, 1, 1, 1)
@@ -294,7 +296,7 @@ class Ui_BASEUI(object):
         for iButton in self.modPushButtons:
             iButton.setText(_translate("BASEUI", "PushButton"))
         #
-        self.customSlidersLabel.setText(_translate("BASEUI", "Customised Sliders"))
-        for i, label in enumerate(self.sliderLabels):
-            label.setText(_translate("BASEUI", f"Slider{i+1}"))
+        self.animationControlsLabel.setText(_translate("BASEUI", "Animation Controls"))
+        self.playPauseButton.setText(_translate("BASEUI", "Play"))
+        self.speedLabel.setText(_translate("BASEUI", "Speed:"))
 
