@@ -138,6 +138,11 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
                                           [['Mod-Button%d'%(i),dummyModButtonAction] for i in range(1,self.nModPushButtons+1)]))
         self.USE_FIELD_DATA = False
         self.VERBOSE = VERBOSE
+        # Animation settings
+        self.isAnimating = False
+        self.animationTimer = None
+        self.animationSpeed = 1  # Default speed (0=slowest, 3=fastest)
+        self.speedIntervals = [1000, 500, 250, 100]  # Milliseconds between frames for each speed
         #
         # GRAPHICS VIEW SETUP
         try:
@@ -205,6 +210,10 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         # Markup mode controls
         self.markupModeComboBox.currentTextChanged.connect(self.markupModeChanged)
         self.closedSplineCheck.stateChanged.connect(self.splineClosedChanged)
+        #
+        # Animation controls
+        self.playPauseButton.clicked.connect(self.toggleAnimation)
+        self.speedSlider.valueChanged.connect(self.setAnimationSpeed)
         ##
         self.updatePushButtonDict()
 
@@ -486,6 +495,77 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         if self.VERBOSE:
             print(f"Spline closed setting changed to: {self.splineClosed}")
 
+    def toggleAnimation(self):
+        """Toggle animation play/pause"""
+        if self.isAnimating:
+            self.stopAnimation()
+        else:
+            self.startAnimation()
+
+    def startAnimation(self):
+        """Start the animation loop"""
+        if len(self.times) <= 1:
+            if self.VERBOSE:
+                print("Cannot animate: only one time step available")
+            return
+            
+        self.isAnimating = True
+        self.playPauseButton.setText("Pause")
+        self.playPauseButton.setChecked(True)
+        
+        # Create timer if it doesn't exist
+        if self.animationTimer is None:
+            from PyQt5.QtCore import QTimer
+            self.animationTimer = QTimer()
+            self.animationTimer.timeout.connect(self.animateNextFrame)
+        
+        # Set timer interval based on current speed
+        interval = self.speedIntervals[self.animationSpeed]
+        self.animationTimer.start(interval)
+        
+        if self.VERBOSE:
+            print(f"Animation started at speed {self.animationSpeed} (interval: {interval}ms)")
+
+    def stopAnimation(self):
+        """Stop the animation"""
+        self.isAnimating = False
+        self.playPauseButton.setText("Play")
+        self.playPauseButton.setChecked(False)
+        
+        if self.animationTimer:
+            self.animationTimer.stop()
+        
+        if self.VERBOSE:
+            print("Animation stopped")
+
+    def animateNextFrame(self):
+        """Move to next frame in animation loop"""
+        if not self.isAnimating:
+            return
+            
+        # Move to next time step
+        if self.currentTimeID < len(self.times) - 1:
+            self.currentTimeID += 1
+        else:
+            # Loop back to beginning
+            self.currentTimeID = 0
+        
+        # Update the display
+        self.moveTimeSlider(self.currentTimeID)
+
+    def setAnimationSpeed(self, speed):
+        """Set animation speed (0=slowest, 3=fastest)"""
+        self.animationSpeed = speed
+        
+        # Update timer interval if animation is running
+        if self.isAnimating and self.animationTimer:
+            interval = self.speedIntervals[speed]
+            self.animationTimer.start(interval)
+        
+        if self.VERBOSE:
+            speedNames = ["Slowest", "Slow", "Fast", "Fastest"]
+            print(f"Animation speed set to: {speedNames[speed]} (interval: {self.speedIntervals[speed]}ms)")
+
     def selectArrayComboBoxActivated(self, selectedText):
         for iTime in self.times:
             self.vtiDict[iTime].GetPointData().SetActiveScalars(selectedText)
@@ -552,6 +632,10 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
     ## -------------------------- END UI SETUP -----------------------------------
     # ==================================================================================================================
     def _setupAfterLoad(self):
+        # Stop any running animation
+        if self.isAnimating:
+            self.stopAnimation()
+            
         self.times = sorted(self.vtiDict.keys())
         self.patientMeta.initFromVTI(self.getCurrentVTIObject())
         # Reset Markups
