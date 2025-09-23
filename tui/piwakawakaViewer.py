@@ -644,13 +644,71 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         return self.renderer
 
     def getCurrentX(self): # point X under cursor
+        """Get the center point of the current slice in world coordinates"""
+        if hasattr(self, 'vtiDict') and self.vtiDict:
+            currentVTI = self.getCurrentVTIObject()
+            center = currentVTI.GetCenter()
+            origin = currentVTI.GetOrigin()
+            spacing = currentVTI.GetSpacing()
+            
+            # Adjust center to current slice position
+            if self.sliceOrientation == 'AXIAL':
+                slicePosition = origin[2] + (self.currentSliceID * spacing[2])
+                return [center[0], center[1], slicePosition]
+            elif self.sliceOrientation == 'CORONAL':
+                slicePosition = origin[1] + (self.currentSliceID * spacing[1])
+                return [center[0], slicePosition, center[2]]
+            elif self.sliceOrientation == 'SAGITTAL':
+                slicePosition = origin[0] + (self.currentSliceID * spacing[0])
+                return [slicePosition, center[1], center[2]]
+        
         return [0, 0, 0]  # Default center point
 
     def getPointIDAtX(self, X):
-        return tuiUtils.imageX_2_PointID(self.getCurrentVTIObject(), X)
+        """Get point ID from world coordinates, accounting for reslice orientation"""
+        currentVTI = self.getCurrentVTIObject()
+        
+        # Convert world coordinates to image coordinates
+        IJK = self.getIJKAtX(X)
+        
+        # Convert IJK to point ID
+        dims = [0, 0, 0]
+        currentVTI.GetDimensions(dims)
+        
+        # Ensure IJK is within bounds
+        I = max(0, min(int(IJK[0]), dims[0]-1))
+        J = max(0, min(int(IJK[1]), dims[1]-1))
+        K = max(0, min(int(IJK[2]), dims[2]-1))
+        
+        # Convert to point ID
+        pointID = K * dims[0] * dims[1] + J * dims[0] + I
+        
+        if self.VERBOSE:
+            print(f"World {X} -> IJK {IJK} -> PointID {pointID}")
+        
+        return pointID
 
     def getIJKAtX(self, X):
-        IJK = self.patientMeta.patientToImageCoordinates(X)
+        """Convert world coordinates to IJK coordinates, accounting for reslice orientation"""
+        currentVTI = self.getCurrentVTIObject()
+        
+        # Get image properties
+        origin = currentVTI.GetOrigin()
+        spacing = currentVTI.GetSpacing()
+        dims = [0, 0, 0]
+        currentVTI.GetDimensions(dims)
+        
+        # Convert world coordinates to IJK
+        # IJK = (World - Origin) / Spacing
+        I = (X[0] - origin[0]) / spacing[0]
+        J = (X[1] - origin[1]) / spacing[1]
+        K = (X[2] - origin[2]) / spacing[2]
+        
+        IJK = [I, J, K]
+        
+        if self.VERBOSE:
+            print(f"World {X} -> IJK {IJK}, origin {origin}, spacing {spacing}")
+        
         return IJK
 
     def getIJKAtPtID(self, ptID):
@@ -663,24 +721,60 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         return self.getCurrentVTIObject().GetPointData().GetArray(self.currentArray).GetTuple(ptID)
 
     def mouseXYToWorldX(self, mouseX, mouseY):
+        """Convert mouse coordinates to world coordinates using the reslice method"""
         # Create a point picker
         picker = vtk.vtkPointPicker()
         picker.SetTolerance(0.005)
         
-        # Pick the point
+        # Pick the point on the 2D slice
         picker.Pick(mouseX, mouseY, 0, self.renderer)
         
         # Get the picked point
         pickedPoint = picker.GetPickPosition()
         
+        # Convert 2D slice coordinates back to 3D world coordinates
+        if hasattr(self, 'imageActor') and self.imageActor:
+            # Get the current slice data
+            currentVTI = self.getCurrentVTIObject()
+            spacing = currentVTI.GetSpacing()
+            origin = currentVTI.GetOrigin()
+            
+            # Calculate the slice position in 3D space
+            if self.sliceOrientation == 'AXIAL':
+                slicePosition = origin[2] + (self.currentSliceID * spacing[2])
+                # For axial view, Z is fixed at slice position
+                worldPoint = [pickedPoint[0], pickedPoint[1], slicePosition]
+            elif self.sliceOrientation == 'CORONAL':
+                slicePosition = origin[1] + (self.currentSliceID * spacing[1])
+                # For coronal view, Y is fixed at slice position
+                worldPoint = [pickedPoint[0], slicePosition, pickedPoint[1]]
+            elif self.sliceOrientation == 'SAGITTAL':
+                slicePosition = origin[0] + (self.currentSliceID * spacing[0])
+                # For sagittal view, X is fixed at slice position
+                worldPoint = [slicePosition, pickedPoint[0], pickedPoint[1]]
+            
+            if self.VERBOSE:
+                print(f"Mouse ({mouseX}, {mouseY}) -> World {worldPoint}, slice {self.currentSliceID}")
+            
+            return worldPoint
+        
         return pickedPoint
 
     def getCurrentViewNormal(self): # uses current view
-        return np.array([0, 0, 1])  # Default Z-axis normal
+        """Get the view normal based on slice orientation"""
+        if self.sliceOrientation == 'AXIAL':
+            return np.array([0, 0, 1])  # Z-axis normal
+        elif self.sliceOrientation == 'CORONAL':
+            return np.array([0, 1, 0])  # Y-axis normal
+        elif self.sliceOrientation == 'SAGITTAL':
+            return np.array([1, 0, 0])  # X-axis normal
+        else:
+            return np.array([0, 0, 1])  # Default Z-axis normal
 
     def getViewNormal(self, i):
-        return np.array([0, 0, 1])  # Default Z-axis normal
-
+        """Get view normal - for single pane, same as current view normal"""
+        return self.getCurrentViewNormal()
+    
 
     def getCurrentResliceAsVTI(self, COPY=False):
         # For single pane viewer, return the current VTI object
