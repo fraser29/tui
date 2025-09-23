@@ -297,7 +297,7 @@ class Ui_BASEUI(object):
 
     def retranslateUi(self, BASEUI):
         _translate = QtCore.QCoreApplication.translate
-        BASEUI.setWindowTitle(_translate("BASEUI", "BASE UI"))
+        BASEUI.setWindowTitle("TUI")
         self.label_3.setText(_translate("BASEUI", "Time"))
         self.timeLabel.setText(_translate("BASEUI", "0/0 [0.0]"))
         #
