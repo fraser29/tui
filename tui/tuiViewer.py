@@ -110,7 +110,6 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
         self.markupActorList = []
         self.renderer3D = None
         self.interactorStyleDict = {'Image': tuiStyles.ImageInteractor(self),
-                                    'ImageTracer': tuiStyles.ImageTracerInteractorStyle(self),
                                     'Trackball': vtk.vtkInteractorStyleTrackballCamera()}
         self.graphicsViewVTK.SetInteractorStyle(self.interactorStyleDict['Image'])
         self.show()
@@ -128,16 +127,6 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
         self.threeDButton.clicked.connect(self.__threeDButtonAction)
         self.gridViewButton.clicked.connect(self.__gridButtonAction)
         self.viewButtonList = [self.saggitalButton, self.coronalButton, self.axialButton, self.threeDButton, self.gridViewButton]
-        #
-        # IMAGE MANIPULATION ## Don't want to do flipping etc - should just rotate other view until as desired
-        # self.flipHorButton.clicked.connect(self.flipHorAction)
-        # self.flipVertButton.clicked.connect(self.flipVertAction)
-        #
-        # MARKUP
-        # self.pointInteractorButton.clicked.connect(self.pointInteractorAction)
-        # self.freehandInteractorButton.clicked.connect(self.freehandInteractorAction)
-        # self.contourSlider.valueChanged.connect(self.moveContourSlider) # Opacity
-        # self.contourLineEdit.returnPressed.connect(self.enterInContourLineEdit)
         #
         # 3D
         self.cursor3DCheck.stateChanged.connect(self.cursor3DChange)

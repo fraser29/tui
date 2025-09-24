@@ -162,12 +162,8 @@ class ImageInteractor(vtk.vtkInteractorStyleTrackballCamera):
             print(' R = reset all views')
             print(' m = print patient meta')
             print(' p = save screenshot(s)')
-            print(' T = save threshold threshold.vti')
-            print(' P = save plane plane.vti')
-            # print(' i = write reslice for zBIF classification') # Used by trackball (or something). Not working to override
-            print(' W = write all markups as points_%time.vtp | contours_%time.vtp')
+            print(' P = save plane plane.vtp')
             print(' c = set contour level')
-            print(' C = write contour to Working directory: input name')
             print(' o = switch limitContourToOne')
             print(' L = set contour min length - INACTIVE')
             print(' l = set multipoint factor')
@@ -200,31 +196,19 @@ class ImageInteractor(vtk.vtkInteractorStyleTrackballCamera):
         elif key == "r":
             self.parentImageViewer.cameraReset()
 
-        # elif key == "s":
-        #     X = self.getXAtMouse()
-        #     self.parentImageViewer.addSpline(X)
 
-        elif key == "m":
-            # p, x, i, ii, mx = self.getPixel_XYZ_IJK_ID_MxMy_UnderMouse()
-            # print('Pixel, XYZ, IJK, ID, MxMy = ',p, x, i, ii, mx)
-            # pp = self.parentImageViewer.imageResliceXToRealWorldPolydataPt(x)
-            # print('ppWCS Center =  ',pp.GetCenter())
-            print(self.parentImageViewer.patientMeta)
         elif key == "p": # SCREENSHOT  / HISTOGRAM
-            outDir = "/home/fraser/temp/ss"
-            ffOut = '/home/fraser/temp/out.png'
+            outDir = os.path.join(self.parentImageViewer.workingDirLineEdit.text(), 'TEMP_SCREENSHOT')
+            ffOut = os.path.join(self.parentImageViewer.workingDirLineEdit.text(), 'screenshot.png')
             thisSlice = self.parentImageViewer.currentSliceID
             fileOutList = []
-            os.system('mkdir %s'%(outDir))
+            os.makedirs(outDir, exist_ok=True)
             for id, k1 in enumerate(range(0, 200, 5)):
                 nextSlice = thisSlice + k1
                 self.parentImageViewer.moveSliceSlider(nextSlice)
                 fOut = outDir + '/%d.png'%(id)
                 windowToImageFilter = vtk.vtkWindowToImageFilter()
                 windowToImageFilter.SetInput(self.parentImageViewer.graphicsViewVTK.GetRenderWindow())
-                # windowToImageFilter.SetMagnification(3)  # set the resolution of the output image (3 times the current resolution of vtk render window)
-                # windowToImageFilter.SetInputBufferTypeToRGBA()  # also record the alpha (transparency) channel
-                # windowToImageFilter.ReadFrontBufferOff()  # read from the back buffer
                 windowToImageFilter.Update()
 
                 writer = vtk.vtkPNGWriter()
@@ -237,30 +221,30 @@ class ImageInteractor(vtk.vtkInteractorStyleTrackballCamera):
             print(id, ffOut)
             shutil.rmtree(outDir)
 
-        elif key == "T": # SAVE THRESHOLD MASK
-            print("Save threshold not active")
-            # print(fIO.writeVTKFile(plane, os.path.join(self.parentImageViewer.workingDirLineEdit.text(), "threshold.vti")))
-            pass # currently only point markups
+        # elif key == "T": # SAVE THRESHOLD MASK
+        #     print("Save threshold not active")
+        #     # print(fIO.writeVTKFile(plane, os.path.join(self.parentImageViewer.workingDirLineEdit.text(), "threshold.vti")))
+        #     pass # currently only point markups
 
         elif key == "P": # SAVE PLANE
             plane = self.parentImageViewer.getCurrentResliceAsVTP()
             print(fIO.writeVTKFile(plane, os.path.join(self.parentImageViewer.workingDirLineEdit.text(), "plane.vtp")))
 
 
-        elif key == "W":
-            ## WRITE OUT MARKUPS
-            allMarkupPointsThisTime = self.parentImageViewer.markups3List[
-                self.parentImageViewer.sag_cor_ax_index].getAllPointsForTime(self.parentImageViewer.currentTimeID)
-            if len(allMarkupPointsThisTime) > 0:
-                pointsPP = vtkfilters.buildPolydataFromXYZ([i.xyz for i in allMarkupPointsThisTime])
-                print(fIO.writeVTKFile(pointsPP, '/home/fraser/temp/points_%d.vtp'%(self.parentImageViewer.currentTimeID)))
-            allContoursThisTime = self.parentImageViewer.markups3List[
-                self.parentImageViewer.sag_cor_ax_index].getAllContourPolysForTime(self.parentImageViewer.currentTimeID,
-                                                                                                     LIMIT_TO_ONE=self.parentImageViewer.limitContourToOne)
-            if len(allContoursThisTime) > 0:
-                print(fIO.writeVTKFile(vtkfilters.appendPolyDataList(allContoursThisTime),
-                                       '/home/fraser/temp/contours_%d.vtp'%(self.parentImageViewer.currentTimeID)))
-                # print(fIO.writeVTKFile(transPoly, '/home/fraser/temp/temp2.vtp'))
+        # elif key == "W":
+        #     ## WRITE OUT MARKUPS
+        #     allMarkupPointsThisTime = self.parentImageViewer.markups3List[
+        #         self.parentImageViewer.sag_cor_ax_index].getAllPointsForTime(self.parentImageViewer.currentTimeID)
+        #     if len(allMarkupPointsThisTime) > 0:
+        #         pointsPP = vtkfilters.buildPolydataFromXYZ([i.xyz for i in allMarkupPointsThisTime])
+        #         print(fIO.writeVTKFile(pointsPP, '/home/fraser/temp/points_%d.vtp'%(self.parentImageViewer.currentTimeID)))
+        #     allContoursThisTime = self.parentImageViewer.markups3List[
+        #         self.parentImageViewer.sag_cor_ax_index].getAllContourPolysForTime(self.parentImageViewer.currentTimeID,
+        #                                                                                              LIMIT_TO_ONE=self.parentImageViewer.limitContourToOne)
+        #     if len(allContoursThisTime) > 0:
+        #         print(fIO.writeVTKFile(vtkfilters.appendPolyDataList(allContoursThisTime),
+        #                                '/home/fraser/temp/contours_%d.vtp'%(self.parentImageViewer.currentTimeID)))
+        #         # print(fIO.writeVTKFile(transPoly, '/home/fraser/temp/temp2.vtp'))
 
         elif key == "c":
             val = input("Give the contour level")
@@ -269,40 +253,29 @@ class ImageInteractor(vtk.vtkInteractorStyleTrackballCamera):
                 self.parentImageViewer.setContourVal(val)
             except TypeError:
                 pass
-        elif key == "C":
+        # elif key == "C":
+        #     pass
             ## WRITE OUT CONTOUR - THIS SLICE AND TIME ONLY - TO WORKING DIRECTORY
-            try:
-                Xcs = self.parentImageViewer.markups3List[
-                    self.parentImageViewer.sag_cor_ax_index].markupsDict['Contours'][self.parentImageViewer.currentTimeID][self.parentImageViewer.currentSliceID][0].X
-                X = self.parentImageViewer.imageResliceXToRealWorldPolydataPt(Xcs).GetCenter()
-                # thisContour = self.parentImageViewer.getCurrentContourPolydata()
-                thisContour = self.parentImageViewer.markups3List[
-                    self.parentImageViewer.sag_cor_ax_index].getAllContourPolyForSliceTime(self.parentImageViewer.currentSliceID,
-                                                                                            self.parentImageViewer.currentTimeID,
-                                                                                           closeX=X,
-                                                                                            LIMIT_TO_ONE=self.parentImageViewer.limitContourToOne)
-            except IndexError: # Then no contours - so check points
-                allMarkupPointsThisTime = self.parentImageViewer.markups3List[self.parentImageViewer.sag_cor_ax_index].getAllPointsForSliceAndTime(self.parentImageViewer.currentSliceID,
-                                                                                                                                                   self.parentImageViewer.currentTimeID)
-                thisContour = vtkfilters.buildPolyLineFromXYZ([i.xyz for i in allMarkupPointsThisTime]+[allMarkupPointsThisTime[0].xyz])
+            # try:
+            #     Xcs = self.parentImageViewer.markups3List[
+            #         self.parentImageViewer.sag_cor_ax_index].markupsDict['Contours'][self.parentImageViewer.currentTimeID][self.parentImageViewer.currentSliceID][0].X
+            #     X = self.parentImageViewer.imageResliceXToRealWorldPolydataPt(Xcs).GetCenter()
+            #     # thisContour = self.parentImageViewer.getCurrentContourPolydata()
+            #     thisContour = self.parentImageViewer.markups3List[
+            #         self.parentImageViewer.sag_cor_ax_index].getAllContourPolyForSliceTime(self.parentImageViewer.currentSliceID,
+            #                                                                                 self.parentImageViewer.currentTimeID,
+            #                                                                                closeX=X,
+            #                                                                                 LIMIT_TO_ONE=self.parentImageViewer.limitContourToOne)
+            # except IndexError: # Then no contours - so check points
+            #     allMarkupPointsThisTime = self.parentImageViewer.markups3List[self.parentImageViewer.sag_cor_ax_index].getAllPointsForSliceAndTime(self.parentImageViewer.currentSliceID,
+            #                                                                                                                                        self.parentImageViewer.currentTimeID)
+            #     thisContour = vtkfilters.buildPolyLineFromXYZ([i.xyz for i in allMarkupPointsThisTime]+[allMarkupPointsThisTime[0].xyz])
 
-            featureName = tuiUtils.dialogGetName(self.parentImageViewer)
-            fileName = featureName if featureName.endswith('.vtp') else featureName+'.vtp'
-            fileName = fileName if fileName.startswith('contour') else 'contour'+fileName
-            fullFileOut = os.path.join(str(self.parentImageViewer.workingDirLineEdit.text()), fileName)
-            print(fIO.writeVTKFile(thisContour, fullFileOut))
-
-        elif key == "V":
-            print('Add VelMRA')
-            for kk in self.parentImageViewer.vtiDict.keys():
-                ii = self.parentImageViewer.vtiDict[kk]
-                VelMRA = vtkfilters.getArrayAsNumpy(ii, 'MRA') * vtkfilters.ftk.vectorMagnitudes(vtkfilters.getArrayAsNumpy(ii, 'Vel'))
-                vtkfilters.addNpArray(ii, VelMRA, 'VelMRA')
-            self.parentImageViewer.selectArrayComboBox.addItem('VelMRA')
-            self.parentImageViewer.currentArray = 'VelMRA'
-            self.parentImageViewer.selectArrayComboBox.setCurrentText(self.parentImageViewer.currentArray)
-            print(self.parentImageViewer.currentArray)
-            print(vtkfilters.getArrayAsNumpy(self.parentImageViewer.getCurrentVTIObject(), 'VelMRA').shape)
+            # featureName = tuiUtils.dialogGetName(self.parentImageViewer)
+            # fileName = featureName if featureName.endswith('.vtp') else featureName+'.vtp'
+            # fileName = fileName if fileName.startswith('contour') else 'contour'+fileName
+            # fullFileOut = os.path.join(str(self.parentImageViewer.workingDirLineEdit.text()), fileName)
+            # print(fIO.writeVTKFile(thisContour, fullFileOut))
 
 
         elif key == "L":

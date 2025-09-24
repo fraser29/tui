@@ -142,6 +142,9 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.animationTimer = None
         self.animationSpeed = 1  # Default speed (0=slowest, 3=fastest)
         self.speedIntervals = [200, 100, 50, 25]  # Milliseconds between frames for each speed
+        # Custom slice settings
+        self.customSliceCenters = []
+        self.customSliceNormals = []
         #
         # GRAPHICS VIEW SETUP
         try:
@@ -154,10 +157,6 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         layout = piwakawakamarkupui.QtWidgets.QVBoxLayout(self.graphicsView)
         layout.addWidget(self.graphicsViewVTK)
         self.graphicsView.setLayout(layout)
-        ##
-        # print(self.graphicsViewVTK) # vtkRenderWindowInteractor
-        # print(self.graphicsViewVTK.GetRenderWindow())
-        # print(self.graphicsViewVTK.GetInteractorStyle()) # vtkInteractorStyleSwitch
         ##
         self.renderWindow = self.graphicsViewVTK.GetRenderWindow()
         self.renderer = vtk.vtkRenderer()
@@ -173,7 +172,6 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.Markups = tuiMarkups.Markups(self)
         self.markupActorList = []
         self.interactorStyleDict = {'Image': piwakawakaStyles.SinglePaneImageInteractor(self),
-                                    # 'ImageTracer': tuiStyles.ImageTracerInteractorStyle(self),
                                     'Trackball': vtk.vtkInteractorStyleTrackballCamera()}
         self.graphicsViewVTK.SetInteractorStyle(self.interactorStyleDict['Image'])
         self.show()
@@ -189,16 +187,6 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.sliceSlider.setSingleStep(1)
         self.sliceSlider.setPageStep(5)
         #
-        #
-        # IMAGE MANIPULATION ## Don't want to do flipping etc - should just rotate other view until as desired
-        # self.flipHorButton.clicked.connect(self.flipHorAction)
-        # self.flipVertButton.clicked.connect(self.flipVertAction)
-        #
-        # MARKUP
-        # self.pointInteractorButton.clicked.connect(self.pointInteractorAction)
-        # self.freehandInteractorButton.clicked.connect(self.freehandInteractorAction)
-        #
-        #
         self.selectArrayComboBox.activated[str].connect(self.selectArrayComboBoxActivated)
         #
         self.actionDicom.triggered.connect(self._loadDicom)
@@ -213,6 +201,9 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         # Animation controls
         self.playPauseButton.clicked.connect(self.toggleAnimation)
         self.speedSlider.valueChanged.connect(self.setAnimationSpeed)
+        #
+        # Orientation controls
+        self.orientationComboBox.currentTextChanged.connect(self.orientationChanged)
         ##
         self.updatePushButtonDict()
 
@@ -437,53 +428,6 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.renderWindow.Render()
 
 
-
-    # MARKUPS : TODO
-    # def pointInteractorAction(self):
-    #     if self.pointInteractorButton.isChecked():
-    #         print('Begin point interaction')
-    #         self.graphicsViewVTK.SetInteractorStyle(self.interactorStyleDict['Image'])
-    #         self.freehandInteractorButton.setChecked(0)
-    #         self.graphicsViewVTK.GetInteractorStyle().modifyDefaultInteraction_points()
-    #     else: # this is for if on and click off (so nothing on)
-    #         self.graphicsViewVTK.SetInteractorStyle(self.interactorStyleDict['Image'])
-    #         self.graphicsViewVTK.GetInteractorStyle().modifyDefaultInteraction_default()
-
-    # def freehandInteractorAction(self):
-    #     if self.freehandInteractorButton.isChecked():
-    #         print('Begin point-freehand interaction')
-    #         self.pointInteractorButton.setChecked(0)
-
-    #         self.resliceCursor.SetThickMode(False)
-    #         self.resliceCursor.SetThickness(0, 0, 0)
-
-
-
-    #         self.tracerWidget = vtk.vtkImageTracerWidget()
-    #         self.tracerWidget.SetInteractor(self.graphicsViewVTK)
-    #         # self.tracerWidget.SetViewProp(self.imageActor)  # Assuming you have an imageActor
-    #         self.tracerWidget.ProjectToPlaneOn()
-    #         self.tracerWidget.SetProjectionNormal(2)  # For XY plane (change as needed)
-    #         self.tracerWidget.SetHandleSize(0.005)
-    #         self.tracerWidget.AutoCloseOn()
-
-
-
-    #         self.graphicsViewVTK.SetInteractorStyle(self.interactorStyleDict['ImageTracer'])
-    #         # self.graphicsViewVTK.GetInteractorStyle().modifyDefaultInteraction_points() # change this
-
-    #         # self.renderer.AddActor(self.imageActor)
-    #         self.tracerWidget.SetEnabled(1)
-    #         self.renderWindow.Render()
-
-
-    #     else: # this is for if on and click off (so nothing on)
-    #         self.graphicsViewVTK.SetInteractorStyle(self.interactorStyleDict['Image'])
-    #         self.graphicsViewVTK.GetInteractorStyle().modifyDefaultInteraction_default()
-
-
-
-
     def markupModeChanged(self, mode):
         self.markupMode = mode
         if self.VERBOSE:
@@ -564,6 +508,57 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         if self.VERBOSE:
             speedNames = ["Slowest", "Slow", "Fast", "Fastest"]
             print(f"Animation speed set to: {speedNames[speed]} (interval: {self.speedIntervals[speed]}ms)")
+
+    def orientationChanged(self, orientation):
+        """Handle orientation change from dropdown"""
+        if orientation == "Custom":
+            # For custom, we'll use the current custom slices if they exist, otherwise default to axial
+            if hasattr(self, 'customSliceCenters') and hasattr(self, 'customSliceNormals'):
+                if len(self.customSliceCenters) > 0 and len(self.customSliceNormals) > 0:
+                    self.setCustomSlices(self.customSliceCenters, self.customSliceNormals)
+                    if self.VERBOSE:
+                        print(f"Using custom slices: {len(self.customSliceCenters)} slices")
+                    return
+            # If no custom slices defined, fall back to axial
+            orientation = "Axial"
+            self.orientationComboBox.setCurrentText("Axial")
+        
+        # Convert title case to uppercase for the method
+        orientation_upper = orientation.upper()
+        
+        # Set the orientation and rebuild everything
+        if orientation_upper in ['AXIAL', 'CORONAL', 'SAGITTAL']:
+            self.sliceOrientation = orientation_upper
+            self.buildResliceDictionary(orientation=orientation_upper)
+            
+            # Reset to middle slice
+            self.currentSliceID = int(self.maxSliceID / 2)
+            
+            # Update slider and display
+            self.setupSliceSlider()
+            self.updateImageSlice()
+            self.updateViewAfterSliceChange()
+            
+            if self.VERBOSE:
+                print(f"Changed orientation to {orientation_upper}, max slice: {self.maxSliceID}")
+        else:
+            if self.VERBOSE:
+                print(f"Unknown orientation: {orientation}")
+
+    def setCustomSliceCentersAndNormals(self, centers, normals):
+        """Set custom slice centers and normals for user-defined slicing"""
+        if len(centers) != len(normals):
+            raise ValueError("Number of centers must match number of normals")
+        
+        self.customSliceCenters = centers
+        self.customSliceNormals = normals
+        
+        # If currently in custom mode, update the slices
+        if self.orientationComboBox.currentText() == "Custom":
+            self.setCustomSlices(centers, normals)
+        
+        if self.VERBOSE:
+            print(f"Set custom slice data: {len(centers)} centers and {len(normals)} normals")
 
     def selectArrayComboBoxActivated(self, selectedText):
         for iTime in self.times:
@@ -650,6 +645,9 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         for iArray in vtkfilters.getArrayNames(self.vtiDict[self.getCurrentTime()]):
             self.selectArrayComboBox.addItem(iArray)
         self.selectArrayComboBox.setCurrentText(self.currentArray)
+        #
+        # Set default orientation to Axial
+        self.orientationComboBox.setCurrentText("Axial")
         #
         bounds = self.getCurrentVTIObject().GetBounds()
         self.boundingDist = max([bounds[1]-bounds[0], bounds[3]-bounds[2], bounds[5]-bounds[4]])

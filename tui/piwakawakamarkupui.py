@@ -100,6 +100,20 @@ class Ui_BASEUI(object):
         self.imageManipulationControlLayout.setObjectName("gridLayout_2")
         self.imageManipulationButtonsLayout = QtWidgets.QVBoxLayout()
         self.imageManipulationButtonsLayout.setObjectName("verticalLayout_4")
+        
+        # Orientation selector
+        self.orientationLabel = QtWidgets.QLabel(self.imageManipulationGroupBox)
+        self.orientationLabel.setObjectName("orientationLabel")
+        self.imageManipulationButtonsLayout.addWidget(self.orientationLabel)
+        
+        self.orientationComboBox = QtWidgets.QComboBox(self.imageManipulationGroupBox)
+        self.orientationComboBox.setObjectName("orientationComboBox")
+        self.orientationComboBox.addItem("Axial")
+        self.orientationComboBox.addItem("Sagittal")
+        self.orientationComboBox.addItem("Coronal")
+        self.orientationComboBox.addItem("Custom")
+        self.imageManipulationButtonsLayout.addWidget(self.orientationComboBox)
+        
         self.imManip_A = QtWidgets.QPushButton(self.imageManipulationGroupBox)
         self.imManip_A.setObjectName("Does nothing")
         self.imageManipulationButtonsLayout.addWidget(self.imManip_A)
@@ -271,6 +285,7 @@ class Ui_BASEUI(object):
         self.sliceSliderLabel.setText(_translate("BASEUI", "Slice"))
         #
         self.imageManipulationGroupBox.setTitle(_translate("BASEUI", "Image manipulation"))
+        self.orientationLabel.setText(_translate("BASEUI", "Slice Orientation:"))
         self.imManip_A.setText(_translate("BASEUI", "Nothing"))
         self.imManip_B.setText(_translate("BASEUI", "Nothing"))
         #

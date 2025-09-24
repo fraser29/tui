@@ -149,12 +149,13 @@ class TUIProject(_TUIProj):
         self.saveMask(mask) # This will open dialogue to save file. 
 
     """
-    def __init__(self, app=None):
+    def __init__(self, app=None, VERBOSE=False):
         if app is None:
             app = tuimarkupui.QtWidgets.QApplication(['TUI Image Viewer'])
         super().__init__(app)
         self.ex = tuiViewer.TUIMarkupViewer()
-
+        self.ex.VERBOSE = VERBOSE
+        
 
     def alignBy_X_Norm(self, X, Norm):
         print(f"This is centering but not aligning. ")
@@ -213,8 +214,8 @@ class TUIBasic(TUIProject):
     Basic TUI for project based work. 
     Illustrates basic setup and modification of push buttons.
     """
-    def __init__(self, app=None):
-        TUIProject.__init__(self, app)
+    def __init__(self, app=None, VERBOSE=False):
+        TUIProject.__init__(self, app, VERBOSE)
         self.pushButtonDict = {}
 
 

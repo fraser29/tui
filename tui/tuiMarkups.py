@@ -194,18 +194,6 @@ class MarkupPoints(list):
         lineActor.SetMapper(lineMapper)
         return lineActor
 
-    # def getAllPointsAsPointCloud(self):
-    #     pts, uvw = [], []
-    #     for sliceID in self.markupsDict['Points'][timeID].keys():
-    #         ptsThisTimeSlice = self.markupsDict['Points'][timeID][sliceID]
-    #         polyThisSlice = vtkfilters.buildPolydataFromXYZ(ptsThisTimeSlice)
-    #         cc = np.array(polyThisSlice.GetCenter())
-    #         for k1 in range(len(ptsThisTimeSlice)):
-    #             pts.append(ptsThisTimeSlice[k1])
-    #             nn = ptsThisTimeSlice[k1] - cc
-    #             nn = nn / np.linalg.norm(nn)
-    #             uvw.append(nn)
-    #     return pts, uvw
 
 ### ====================================================================================================================
 
@@ -214,8 +202,17 @@ class MarkupPoints(list):
 class MarkupPoint(Markup):
     def __init__(self, X, norm=None, timeID=0, time=0.0):
         Markup.__init__(self, timeID, time)
-        self.X = X # this is the real world location
+        self._X = X # this is the real world location for TUI, but a ImageCS for PIWAKAWAKA
         self.norm = norm
+
+
+    @property   
+    def X(self):
+        return self._X
+        # if self.parentImageViewer.__class__.__name__ == 'PIWAKAWAKAMarkupViewer':
+        #     return self.parentImageViewer.imageCS_To_WorldCS_X(self._X)
+        # else:
+        #     return self._X
 
     def getSphereSourceViewerCS(self, rad=0.002):
         Sx = vtkfilters.buildSphereSource(self.X, rad, res=16)
