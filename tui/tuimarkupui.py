@@ -182,14 +182,14 @@ class Ui_BASEUI(object):
         self.markupModeComboBox = QtWidgets.QComboBox(self.markupGroupBox)
         self.markupModeComboBox.setObjectName("markupModeComboBox")
         self.markupModeComboBox.addItem("Point")
-        self.markupModeComboBox.addItem("Spline")
+        # self.markupModeComboBox.addItem("Spline")
         self.markupModeLayout.addWidget(self.markupModeComboBox)
         
         # Closed spline checkbox
-        self.closedSplineCheck = QtWidgets.QCheckBox(self.markupGroupBox)
-        self.closedSplineCheck.setObjectName("closedSplineCheck")
-        self.closedSplineCheck.setChecked(True)  # Default to closed
-        self.markupModeLayout.addWidget(self.closedSplineCheck)
+        # self.closedSplineCheck = QtWidgets.QCheckBox(self.markupGroupBox)
+        # self.closedSplineCheck.setObjectName("closedSplineCheck")
+        # self.closedSplineCheck.setChecked(True)  # Default to closed
+        # self.markupModeLayout.addWidget(self.closedSplineCheck)
         
         self.imageMarkupButtonsLayout.addLayout(self.markupModeLayout)
         self.imageMarkupControlLayout.addLayout(self.imageMarkupButtonsLayout, 0, 0, 1, 1)
@@ -217,41 +217,36 @@ class Ui_BASEUI(object):
             self.modPushButtons.append(button)
         self.rightPanelLayout.addLayout(self.pushButtonsLayout, 7, 0, 1, 1)
 
-        # Add Customised Sliders Label
-        self.customSlidersLabel = QtWidgets.QLabel(self.centralwidget)
-        self.customSlidersLabel.setObjectName("customSlidersLabel")
-        self.rightPanelLayout.addWidget(self.customSlidersLabel, 8, 0, 1, 1)
+        # Animation Controls
+        self.animationControlsLabel = QtWidgets.QLabel(self.centralwidget)
+        self.animationControlsLabel.setObjectName("animationControlsLabel")
+        self.rightPanelLayout.addWidget(self.animationControlsLabel, 8, 0, 1, 1)
 
-        # CUSTOMISABLE SLIDERS
-        self.slidersLayout = QtWidgets.QVBoxLayout()
-        self.slidersLayout.setObjectName("slidersLayout")
+        # Animation controls layout
+        self.animationLayout = QtWidgets.QVBoxLayout()
+        self.animationLayout.setObjectName("animationLayout")
 
-        # Create 4 sliders with labels
-        self.sliders = []
-        self.sliderLabels = []
-        for i in range(2):
-            # Create horizontal layout for each slider+label pair
-            sliderHLayout = QtWidgets.QHBoxLayout()
-            
-            # Create and add label
-            label = QtWidgets.QLabel(self.centralwidget)
-            label.setObjectName(f"sliderLabel_{i+1}")
-            sliderHLayout.addWidget(label)
-            self.sliderLabels.append(label)
-            
-            # Create and add slider
-            slider = QtWidgets.QSlider(self.centralwidget)
-            slider.setOrientation(QtCore.Qt.Horizontal)
-            slider.setObjectName(f"slider_{i+1}")
-            slider.setMinimum(0)
-            slider.setMaximum(100)
-            sliderHLayout.addWidget(slider)
-            self.sliders.append(slider)
-            
-            # Add the horizontal layout to the main sliders layout
-            self.slidersLayout.addLayout(sliderHLayout)
+        # Play/Pause button
+        self.playPauseButton = QtWidgets.QPushButton(self.centralwidget)
+        self.playPauseButton.setObjectName("playPauseButton")
+        self.playPauseButton.setCheckable(True)
+        self.animationLayout.addWidget(self.playPauseButton)
 
-        self.rightPanelLayout.addLayout(self.slidersLayout, 9, 0, 1, 1)
+        # Speed control
+        self.speedLabel = QtWidgets.QLabel(self.centralwidget)
+        self.speedLabel.setObjectName("speedLabel")
+        self.animationLayout.addWidget(self.speedLabel)
+
+        self.speedSlider = QtWidgets.QSlider(self.centralwidget)
+        self.speedSlider.setOrientation(QtCore.Qt.Horizontal)
+        self.speedSlider.setObjectName("speedSlider")
+        self.speedSlider.setMinimum(0)
+        self.speedSlider.setMaximum(3)
+        self.speedSlider.setTickInterval(1)
+        self.speedSlider.setTickPosition(QtWidgets.QSlider.TicksBelow)
+        self.animationLayout.addWidget(self.speedSlider)
+
+        self.rightPanelLayout.addLayout(self.animationLayout, 9, 0, 1, 1)
 
         # Add the right panel widget to the main layout
         self.mainLayout.addWidget(self.rightPanelWidget, 0, 1, 1, 1)
@@ -309,7 +304,7 @@ class Ui_BASEUI(object):
         self.imMarkupButton_A.setText(_translate("BASEUI", "Nothing"))
         self.imMarkupButton_B.setText(_translate("BASEUI", "Nothing"))
         self.markupModeLabel.setText(_translate("BASEUI", "Markup Mode:"))
-        self.closedSplineCheck.setText(_translate("BASEUI", "Closed Spline"))
+        # self.closedSplineCheck.setText(_translate("BASEUI", "Closed Spline"))
         #
         # self.freehandInteractorButton.setText(_translate("BASEUI", "FREEHAND DRAW"))
         # self.label_7.setText(_translate("BASEUI", "Contour"))
@@ -333,7 +328,8 @@ class Ui_BASEUI(object):
         for iButton in self.modPushButtons:
             iButton.setText(_translate("BASEUI", "PushButton"))
         #
-        self.customSlidersLabel.setText(_translate("BASEUI", "Customised Sliders"))
-        for i, label in enumerate(self.sliderLabels):
-            label.setText(_translate("BASEUI", f"Slider{i+1}"))
+        # Animation controls
+        self.animationControlsLabel.setText(_translate("BASEUI", "Animation Controls"))
+        self.playPauseButton.setText(_translate("BASEUI", "Play"))
+        self.speedLabel.setText(_translate("BASEUI", "Speed"))
 

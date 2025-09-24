@@ -18,7 +18,7 @@ import numpy as np
 from ngawari import fIO
 from ngawari import vtkfilters, ftk
 import spydcmtk
-from tui import tuiMarkups, piwakawakamarkupui, piwakawakaStyles
+from tui import tuiMarkups, piwakawakamarkupui, piwakawakaStyles, baseMarkupViewer
 
 from vtk.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor # type: ignore
 
@@ -105,7 +105,7 @@ def _getOrientationMatrix(ORIENTATION, center):
 #   -- MAIN CLASS --
 # ======================================================================================================================
 # noinspection PyUnresolvedReferences
-class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawakamarkupui.Ui_BASEUI):
+class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawakamarkupui.Ui_BASEUI, baseMarkupViewer.BaseMarkupViewer):
     """
     UI for control of NMRViewer:
     Displays GUI
@@ -114,34 +114,16 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
     def __init__(self, VERBOSE=False):
         super(PIWAKAWAKAMarkupViewer, self).__init__()
         self.setupUi(self)
-        # Defaults
-        self.vtiDict = None
-        self.patientMeta = spydcmtk.dcmVTKTK.PatientMeta()
-        self.currentTimeID = 0
+        # Initialize base class
+        baseMarkupViewer.BaseMarkupViewer.__init__(self, VERBOSE=VERBOSE)
+        
+        # 2D-specific defaults
         self.currentSliceID = 0
-        self.currentArray = ''
-        self.times = []
         self.maxSliceID = 0
         self.sliceOrientation = 'AXIAL'  # 'AXIAL', 'CORONAL', 'SAGITTAL'
         self.resliceDict = {}  # Dictionary: {timestep: [list of reslices]}
         self.sliceCenters = []  # List of center points for slices
         self.sliceNormals = []  # List of normal vectors for slices
-        self.scalarRange = {'Default':[0,255]}
-        self.boundingDist = 0.0
-        self.multiPointFactor = 0.0001
-        # Markup mode settings
-        self.markupMode = 'Point'  # 'Point' or 'Spline'
-        self.splineClosed = True  # Whether splines should be closed
-        ##
-        self.nModPushButtons = 12
-        self.modPushButtonDict = dict(zip(range(self.nModPushButtons),
-                                          [['Mod-Button%d'%(i),dummyModButtonAction] for i in range(1,self.nModPushButtons+1)]))
-        self.VERBOSE = VERBOSE
-        # Animation settings
-        self.isAnimating = False
-        self.animationTimer = None
-        self.animationSpeed = 1  # Default speed (0=slowest, 3=fastest)
-        self.speedIntervals = [200, 100, 50, 25]  # Milliseconds between frames for each speed
         # Custom slice settings
         self.customSliceCenters = []
         self.customSliceNormals = []
@@ -169,113 +151,34 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.graphicsViewVTK.picker = vtk.vtkPropPicker()
         #
         self.connections()
-        self.Markups = tuiMarkups.Markups(self)
+        # Markups already initialized in base class
         self.markupActorList = []
         self.interactorStyleDict = {'Image': piwakawakaStyles.SinglePaneImageInteractor(self),
                                     'Trackball': vtk.vtkInteractorStyleTrackballCamera()}
         self.graphicsViewVTK.SetInteractorStyle(self.interactorStyleDict['Image'])
+        
+        # Set file dialog reference for base class
+        self.fileDialog = piwakawakamarkupui.QtWidgets.QFileDialog
+        
         self.show()
 
     # ==========================================================
     #   CONNECTIONS
     def connections(self):
-        self.timeSlider.valueChanged.connect(self.moveTimeSlider)
-        self.timeSlider.setSingleStep(1)
-        self.timeSlider.setPageStep(5)
-        #
+        # Setup common connections from base class
+        self._setupCommonConnections()
+        
+        # 2D-specific connections
         self.sliceSlider.valueChanged.connect(self.moveSliceSlider)
         self.sliceSlider.setSingleStep(1)
         self.sliceSlider.setPageStep(5)
-        #
-        self.selectArrayComboBox.activated[str].connect(self.selectArrayComboBoxActivated)
-        #
-        self.actionDicom.triggered.connect(self._loadDicom)
-        self.actionVTK_Image.triggered.connect(self.loadVTI_or_PVD)
-        #
-        self.actionQuit.triggered.connect(self.exit)
-        #
-        # Markup mode controls
-        self.markupModeComboBox.currentTextChanged.connect(self.markupModeChanged)
-        self.closedSplineCheck.stateChanged.connect(self.splineClosedChanged)
-        #
-        # Animation controls
-        self.playPauseButton.clicked.connect(self.toggleAnimation)
-        self.speedSlider.valueChanged.connect(self.setAnimationSpeed)
         #
         # Orientation controls
         self.orientationComboBox.currentTextChanged.connect(self.orientationChanged)
         ##
         self.updatePushButtonDict()
 
-    def updatePushButtonDict(self, newPushButtonDict=None):
-        """
-        Update the modifiable push buttons with new actions and labels.
-
-        This method allows customised buttons to be applied for the UI. 
-        It updates the dictionary of modifiable push buttons with new
-        actions and labels. It then applies these changes to the UI, enabling
-        or disabling buttons as necessary.
-
-        Args:
-            newPushButtonDict (dict, optional): A dictionary containing new button
-                configurations. The keys are button indices (0-11), and the values
-                are lists containing the button label and the action to be performed
-                when clicked. If None, the existing modPushButtonDict is used.
-
-        Example:
-            newDict = {
-                0: ['Do Action A', action_function_A],
-                1: ['Do Action B', action_function_B]
-            }
-            self.updatePushButtonDict(newDict)
-        """
-        if type(newPushButtonDict) == dict:
-            self.modPushButtonDict = newPushButtonDict
-        ### Modifiable push buttons
-        for k1 in range(self.nModPushButtons):
-            try:
-                self.modPushButtons[k1].setText(self.modPushButtonDict[k1][0])
-            except KeyError:
-                self.modPushButtons[k1].setEnabled(False)
-                continue
-            try:
-                self.modPushButtons[k1].clicked.disconnect()
-            except (TypeError, RuntimeError):
-                pass
-            self.modPushButtons[k1].clicked.connect(self.modPushButtonDict[k1][1])
-            self.modPushButtons[k1].setEnabled(True)
-            if self.modPushButtonDict[k1][1] == dummyModButtonAction:
-                self.modPushButtons[k1].setEnabled(False)
-
-
-    def setUserDefinedKeyPress(self, newKeyPressDict=None):
-        self.interactorStyleDict['Image'].setUserDefinedKeyCallbackDict(newKeyPressDict)
-
-    def getCurrentInteractorStyle(self):
-        return self.graphicsViewVTK.GetInteractorStyle()
-
-    #TIME SLIDER
-    def setupTimeSlider(self):
-        self.timeSlider.setMinimum(0)
-        self.timeSlider.setMaximum(len(self.times)-1)
-        self.updateTimeLabel()
-
-    def updateTimeLabel(self):
-        try:
-            self.timeLabel.setText("%d/%d [%3.2f]"%(self.currentTimeID+INDEX_OFFSET,
-                                                          self.timeSlider.maximum()+INDEX_OFFSET,
-                                                          self.getCurrentTime()))
-        except IndexError:
-            self.timeLabel.setText("%d/%d [%3.2f]"%(self.currentTimeID+INDEX_OFFSET,
-                                                          self.timeSlider.maximum(),
-                                                          0.0))
-
-    def moveTimeSlider(self, val):
-        self.currentTimeID = val
-        self.updateTimeLabel()
-        self.updateViewAfterTimeChange()
-        self.timeSlider.setValue(self.currentTimeID)
-        self.__updateMarkups()
+    # Push button and time slider methods inherited from base class
 
 
     # SLICE SLIDER
@@ -300,7 +203,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.updateImageSlice()
         self.updateViewAfterSliceChange()
         self.sliceSlider.setValue(self.currentSliceID)
-        self.__updateMarkups()
+        self._updateMarkups()
 
     # SLICE SLIDER
     def scrollForwardCurrentSlice1(self):
@@ -330,67 +233,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.renderer.ResetCameraClippingRange()
         self.renderWindow.Render()
 
-    def __setScalarRangeForCurrentArray(self):
-        sR_t = [self.vtiDict[iT].GetScalarRange() for iT in self.times]
-        self.scalarRange[self.currentArray] = [min([i[0] for i in sR_t]), max([i[1] for i in sR_t])]
-    
-    def __calculateOptimalWindowLevel(self, arrayName=None):
-        """Calculate optimal window level using percentile-based approach"""
-        if arrayName is None:
-            arrayName = self.currentArray
-            
-        if arrayName not in self.scalarRange:
-            self.__setScalarRangeForCurrentArray()
-            
-        # Get the current VTI object
-        vtiObj = self.getCurrentVTIObject()
-        
-        try:
-            # Get the array data as numpy array for percentile calculation
-            arrayData = vtkfilters.getArrayAsNumpy(vtiObj, arrayName)
-            
-            if arrayData is not None and arrayData.size > 0:
-                # Calculate 2nd and 98th percentiles to exclude extreme outliers
-                p2 = np.percentile(arrayData, 2)
-                p98 = np.percentile(arrayData, 98)
-                
-                # Use percentile range for window width
-                windowWidth = p98 - p2
-                # Center the window level
-                windowLevel = (p2 + p98) / 2.0
-                
-                if self.VERBOSE:
-                    print(f"Optimal window level (percentile-based): window={windowWidth:.2f}, level={windowLevel:.2f}")
-                    print(f"Data range: {np.min(arrayData):.2f} to {np.max(arrayData):.2f}")
-                    print(f"Percentile range: {p2:.2f} to {p98:.2f}")
-                
-                return windowWidth, windowLevel
-        except Exception as e:
-            if self.VERBOSE:
-                print(f"Error calculating optimal window level: {e}")
-        
-        # Fallback to simple range-based calculation
-        sR = self.scalarRange.get(arrayName, [0, 255])
-        dataMin, dataMax = sR[0], sR[1]
-        dataRange = dataMax - dataMin
-        
-        if dataRange > 0:
-            windowWidth = dataRange * 0.8
-            windowLevel = (dataMin + dataMax) / 2.0
-        else:
-            windowWidth = 255
-            windowLevel = dataMin
-            
-        return windowWidth, windowLevel
-
-    def resetWindowLevel(self):
-        # Use the optimal window level calculation
-        windowWidth, windowLevel = self.__calculateOptimalWindowLevel()
-        
-        if self.VERBOSE:
-            print(f"Resetting window level: window={windowWidth:.2f}, level={windowLevel:.2f}")
-        
-        self.__updateMarkups(window=windowWidth, level=windowLevel)
+    # Window level methods inherited from base class
 
     def getWindowLevel(self):
         # Get current window level from image actor
@@ -428,86 +271,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.renderWindow.Render()
 
 
-    def markupModeChanged(self, mode):
-        self.markupMode = mode
-        if self.VERBOSE:
-            print(f"Markup mode changed to: {mode}")
-
-    def splineClosedChanged(self, state):
-        self.splineClosed = state == 2  # Qt.Checked = 2
-        if self.VERBOSE:
-            print(f"Spline closed setting changed to: {self.splineClosed}")
-
-    def toggleAnimation(self):
-        """Toggle animation play/pause"""
-        if self.isAnimating:
-            self.stopAnimation()
-        else:
-            self.startAnimation()
-
-    def startAnimation(self):
-        """Start the animation loop"""
-        if len(self.times) <= 1:
-            if self.VERBOSE:
-                print("Cannot animate: only one time step available")
-            return
-            
-        self.isAnimating = True
-        self.playPauseButton.setText("Pause")
-        self.playPauseButton.setChecked(True)
-        
-        # Create timer if it doesn't exist
-        if self.animationTimer is None:
-            from PyQt5.QtCore import QTimer
-            self.animationTimer = QTimer()
-            self.animationTimer.timeout.connect(self.animateNextFrame)
-        
-        # Set timer interval based on current speed
-        interval = self.speedIntervals[self.animationSpeed]
-        self.animationTimer.start(interval)
-        
-        if self.VERBOSE:
-            print(f"Animation started at speed {self.animationSpeed} (interval: {interval}ms)")
-
-    def stopAnimation(self):
-        """Stop the animation"""
-        self.isAnimating = False
-        self.playPauseButton.setText("Play")
-        self.playPauseButton.setChecked(False)
-        
-        if self.animationTimer:
-            self.animationTimer.stop()
-        
-        if self.VERBOSE:
-            print("Animation stopped")
-
-    def animateNextFrame(self):
-        """Move to next frame in animation loop"""
-        if not self.isAnimating:
-            return
-            
-        # Move to next time step
-        if self.currentTimeID < len(self.times) - 1:
-            self.currentTimeID += 1
-        else:
-            # Loop back to beginning
-            self.currentTimeID = 0
-        
-        # Update the display
-        self.moveTimeSlider(self.currentTimeID)
-
-    def setAnimationSpeed(self, speed):
-        """Set animation speed (0=slowest, 3=fastest)"""
-        self.animationSpeed = speed
-        
-        # Update timer interval if animation is running
-        if self.isAnimating and self.animationTimer:
-            interval = self.speedIntervals[speed]
-            self.animationTimer.start(interval)
-        
-        if self.VERBOSE:
-            speedNames = ["Slowest", "Slow", "Fast", "Fastest"]
-            print(f"Animation speed set to: {speedNames[speed]} (interval: {self.speedIntervals[speed]}ms)")
+    # Animation and markup mode methods inherited from base class
 
     def orientationChanged(self, orientation):
         """Handle orientation change from dropdown"""
@@ -560,97 +324,17 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         if self.VERBOSE:
             print(f"Set custom slice data: {len(centers)} centers and {len(normals)} normals")
 
-    def selectArrayComboBoxActivated(self, selectedText):
-        for iTime in self.times:
-            self.vtiDict[iTime].GetPointData().SetActiveScalars(selectedText)
-        # Update the image actor with new data
-        self.updateViewAfterTimeChange()
-        self.resetWindowLevel()
-        self.statusBar().showMessage(selectedText)
-        self.setCurrentArray(selectedText)
+    # Array selection methods inherited from base class
 
-    def setCurrentArray(self, arrayName):
-        self.currentArray = arrayName
-        self.selectArrayComboBox.setCurrentText(arrayName)
-        self.resetWindowLevel()
-        self.renderWindow.Render()
-
-    # MENU ACTIONS
-    def _getFileViaDialog(self):
-        fileName = piwakawakamarkupui.QtWidgets.QFileDialog.getOpenFileName(self,
-                                                                ("Open image data"),
-                                                                str(self.workingDirLineEdit.text()),
-                                                                ("Image data (*.vti);;PVD(, *.pvd)"))[0]
-        if self.VERBOSE:
-            print(str(fileName))
-        return str(fileName)
-    def _getDirectoryViaDialog(self):
-        dirName = piwakawakamarkupui.QtWidgets.QFileDialog.getExistingDirectory(self,
-                                                                ("Open dicom directory"),
-                                                                str(self.workingDirLineEdit.text()))
-        if self.VERBOSE:
-            print(str(dirName))
-        return str(dirName)
-
-    def _loadDicom(self):
-        if self.VERBOSE:
-            print('Load dicoms')
-        dirName = self._getDirectoryViaDialog()
-        self.loadDicomDir(dirName)
-
-    # LOAD NEW DATA METHODS
-    def loadDicomDir(self, dicomDir):
-        dcmSeries = spydcmtk.dcmTK.DicomSeries.setFromDirectory(dicomDir)
-        self.vtiDict = dcmSeries.buildVTIDict()
-        if self.VERBOSE:
-            print(f"Have VTI dict. Times (ms): {[int(i*1000.0) for i in sorted(self.vtiDict.keys())]}")
-        # TODO - not saving correct coordinates for markups
-        self._setupAfterLoad()
-
-    def loadVTI_or_PVD(self, fileName=None):
-        if self.VERBOSE:
-            print('Load VTI')
-        if not fileName:
-            fileName = self._getFileViaDialog()
-        if len(fileName) > 0:
-            self.vtiDict = fIO.readImageFileToDict(fileName) # will check for vti internally and then return time 0 e.g. {0.0:vti}
-            for iTime in self.vtiDict.keys():
-                for iName in vtkfilters.getArrayNames(self.vtiDict[iTime]):
-                    vtkfilters.setArrayDtype(self.vtiDict[iTime], iName, np.float64)
-                vtkfilters.ensureScalarsSet(self.vtiDict[iTime])
-            if self.VERBOSE:
-                print('Data loaded...')
-            self._setupAfterLoad()
+    # File loading methods inherited from base class
 
 
     ## -------------------------- END UI SETUP -----------------------------------
     # ==================================================================================================================
-    def _setupAfterLoad(self):
-        # Stop any running animation
-        if self.isAnimating:
-            self.stopAnimation()
-            
-        self.times = sorted(self.vtiDict.keys())
-        self.patientMeta.initFromVTI(self.getCurrentVTIObject())
-        # Reset Markups
-        self.Markups.initForNewData(len(self.times))
-        self.setupTimeSlider()
-        #
-        self.selectArrayComboBox.clear()
-        arrayName = vtkfilters.getScalarsArrayName(self.vtiDict[self.getCurrentTime()])
-        if not arrayName:
-            arrayName = vtkfilters.getArrayNames(self.vtiDict[self.getCurrentTime()])[0]
-        self.currentArray = arrayName
-        self.currentTimeID = 0
-        for iArray in vtkfilters.getArrayNames(self.vtiDict[self.getCurrentTime()]):
-            self.selectArrayComboBox.addItem(iArray)
-        self.selectArrayComboBox.setCurrentText(self.currentArray)
-        #
+    def _setupViewerSpecificData(self):
+        """2D-specific setup after data load"""
         # Set default orientation to Axial
         self.orientationComboBox.setCurrentText("Axial")
-        #
-        bounds = self.getCurrentVTIObject().GetBounds()
-        self.boundingDist = max([bounds[1]-bounds[0], bounds[3]-bounds[2], bounds[5]-bounds[4]])
         
         # Get image dimensions and build reslice dictionary BEFORE setting up image data
         ii = list(self.vtiDict.values())[0]
@@ -683,7 +367,6 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
             print(f"Max slice ID: {self.maxSliceID}")
             print(f"Starting at slice: {self.currentSliceID}")
         
-        self.moveTimeSlider(self.currentTimeID)
         self.moveSliceSlider(self.currentSliceID)
     
     def buildResliceDictionary(self, orientation=None, customCenters=None, customNormals=None):
@@ -818,23 +501,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         return resliceList[self.currentSliceID]
 
 
-    def exit(self):
-        self.close()
-        return 0
-
-
-    # ==================================================================================================================
-    #   DATA
-    def getCurrentTime(self):
-        return self.times[self.currentTimeID]
-
-    def getCurrentVTIObject(self, COPY=False):
-        ii = self.vtiDict[self.getCurrentTime()]
-        if COPY:
-            i2 = vtk.vtkImageData()
-            i2.ShallowCopy(ii)
-            return i2
-        return ii
+    # Exit and data access methods inherited from base class
 
     def getCurrentResliceMatrix(self):
         return self.getCurrentReslice().GetResliceAxes()
@@ -909,7 +576,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
 
 
     def __setupNewImageData(self): # ONLY ON NEW DATA LOAD
-        self.__setScalarRangeForCurrentArray()
+        self._BaseMarkupViewer__setScalarRangeForCurrentArray()
         
         # Set background color
         self.renderer.SetBackground(0.1, 0.1, 0.1)
@@ -987,7 +654,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
             self.renderer.RemoveActor(iActor)
         self.markupActorList = []
 
-    def __updateMarkups(self, window=None, level=None):
+    def _updateMarkups(self, window=None, level=None):
         self.clearCurrentMarkups()
         ## POINTS
         pointSize = self.boundingDist * 0.01
@@ -1024,34 +691,16 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
 
 
 
-    # ======================== Markups =================================================================================
-    def deleteAllMarkups(self):
-        self.Markups.reset()
-        self.__updateMarkups()
+    # ======================== Markups - 2D specific implementations ================================================
+    def removeActorFromAllRenderers(self, actor):
+        """Remove actor from 2D renderer"""
+        self.renderer.RemoveActor(actor)
 
-    def addPoint(self, X, norm=None):
-        self.Markups.addPoint(X, self.currentTimeID, self.getCurrentTime(), norm)
-        self.__updateMarkups()
-
-    def addSplinePoint(self, X, norm=None):
-        """Add a point for spline creation. In spline mode, points are connected by splines."""
-        self.Markups.addPoint(X, self.currentTimeID, self.getCurrentTime(), norm)
-        # Update rendering to show splines
-        self.__updateMarkups()
-
-    def removeLastPoint(self):
-        self.Markups.removeLastPoint(self.currentTimeID)
-        self.__updateMarkups()
-
-    def addPolydata(self, polydata, timeID=None, time=None, color=(0,1,1)):
-        if time is not None:
-            timeID = int(np.argmin([abs(i-time) for i in self.times]))
-        else:
-            if timeID is None:
-                timeID = self.currentTimeID
-        iTime = self.times[timeID]
-        self.Markups.addPolydata(polydata, timeID, iTime, color=color)
-        self.__updateMarkups()
+    def updateViewAfterTimeChange(self):
+        """Update view after time change for 2D viewer"""
+        # Update image data for current time
+        self.updateImageSlice()
+        self.updateViewAfterSliceChange()
 
 
     # ======================== OTHER OUTPUTS ===========================================================================
@@ -1081,7 +730,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         for k1, cp in enumerate(allCP):
             # Update camera position for different views
             self.renderer.GetActiveCamera().SetPosition(cp)
-            self.__updateMarkups(w, l)  # will render
+            self._updateMarkups(w, l)  # will render
             fOut = os.path.join(outputDir, f'{outputPrefix}{k1}.png')
             if FULL_VIEW:
                 windowToImageFilter = vtk.vtkWindowToImageFilter()

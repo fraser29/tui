@@ -249,8 +249,6 @@ class TUIBasic(TUIProject):
 
         self.ex.updatePushButtonDict(self.pushButtonDict)
 
-        self.sliderDict = {0: {"label": 'Contour', "action": self.changeContour, "min": 0, "max": 1000, "value": 500, "singleStep": 1, "pageStep": 5}}
-        self.ex.updateSliderDict(self.sliderDict)
 
     def saveVOI_(self):
         fOut = self.saveVOI()
@@ -265,11 +263,6 @@ class TUIBasic(TUIProject):
         fOut = self.saveLine(minN=2)
         print(fOut)
     
-
-    def changeContour(self, val):
-        self.sliderDict[0]["value"] = val
-        self.ex.setContourVal(val)
-        
 
     def testMask(self):
         print("Does nothing")

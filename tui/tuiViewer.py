@@ -18,7 +18,7 @@ import numpy as np
 from ngawari import fIO
 from ngawari import vtkfilters
 import spydcmtk
-from tui import tuiMarkups, tuiStyles, tuiUtils, tuimarkupui
+from tui import tuiMarkups, tuiStyles, tuiUtils, tuimarkupui, baseMarkupViewer
 
 from vtk.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor # type: ignore
 
@@ -33,7 +33,7 @@ vtk.vtkLogger.SetStderrVerbosity(vtk.vtkLogger.VERBOSITY_ERROR)
 #   -- MAIN CLASS --
 # ======================================================================================================================
 # noinspection PyUnresolvedReferences
-class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
+class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, baseMarkupViewer.BaseMarkupViewer):
     """
     UI for control of NMRViewer:
     Displays GUI
@@ -42,28 +42,14 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
     def __init__(self):
         super(TUIMarkupViewer, self).__init__()
         self.setupUi(self)
-        # Defaults
-        self.vtiDict = None
-        self.patientMeta = spydcmtk.dcmVTKTK.PatientMeta()
-        self.currentTimeID = 0
+        # Initialize base class
+        baseMarkupViewer.BaseMarkupViewer.__init__(self, VERBOSE=False)
+        
+        # 3D-specific defaults
         self.currentSliceID = 0
-        self.currentArray = ''
-        self.times = []
         self.limitContourToOne = True
         self.minContourLength = 0.1
-        self.scalarRange = {'Default':[0,255]}
-        self.boundingDist = 0.0
-        self.multiPointFactor = 0.0001
         self.contourVal = None
-        # Markup mode settings
-        self.markupMode = 'Point'  # 'Point' or 'Spline'
-        self.splineClosed = True  # Whether splines should be closed
-        ##
-        self.nModPushButtons = 12
-        self.modPushButtonDict = dict(zip(range(self.nModPushButtons),
-                                          [['Mod-Button%d'%(i),dummyModButtonAction] for i in range(1,self.nModPushButtons+1)]))
-        self.sliderDict = {}
-        self.VERBOSE = False
         self.planeBackgroundColors = [[0.3, 0.1, 0.1],
                                       [0.1, 0.3, 0.1],
                                       [0.1, 0.1, 0.3],
@@ -104,7 +90,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
         #
         self.viewButtonList = [None] * 5
         self.connections()
-        self.Markups = tuiMarkups.Markups(self)
+        # Markups already initialized in base class
         self.threeDContourActor = None
         self.planeActors3 = []
         self.markupActorList = []
@@ -112,15 +98,19 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
         self.interactorStyleDict = {'Image': tuiStyles.ImageInteractor(self),
                                     'Trackball': vtk.vtkInteractorStyleTrackballCamera()}
         self.graphicsViewVTK.SetInteractorStyle(self.interactorStyleDict['Image'])
+        
+        # Set file dialog reference for base class
+        self.fileDialog = tuimarkupui.QtWidgets.QFileDialog
+        
         self.show()
 
     # ==========================================================
     #   CONNECTIONS
     def connections(self):
-        self.timeSlider.valueChanged.connect(self.moveTimeSlider)
-        self.timeSlider.setSingleStep(1)
-        self.timeSlider.setPageStep(5)
-        #
+        # Setup common connections from base class
+        self._setupCommonConnections()
+        
+        # 3D-specific connections
         self.axialButton.clicked.connect(self.__axialButtonAction)
         self.saggitalButton.clicked.connect(self.__saggitalButtonAction)
         self.coronalButton.clicked.connect(self.__coronalButtonAction)
@@ -128,139 +118,16 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
         self.gridViewButton.clicked.connect(self.__gridButtonAction)
         self.viewButtonList = [self.saggitalButton, self.coronalButton, self.axialButton, self.threeDButton, self.gridViewButton]
         #
-        # 3D
+        # 3D-specific connections
         self.cursor3DCheck.stateChanged.connect(self.cursor3DChange)
-        #
-        self.selectArrayComboBox.activated[str].connect(self.selectArrayComboBoxActivated)
-        #
-        self.actionDicom.triggered.connect(self._loadDicom)
-        self.actionVTK_Image.triggered.connect(self.loadVTI_or_PVD)
-        #
-        self.actionQuit.triggered.connect(self.exit)
-        #
-        # Markup mode controls
-        self.markupModeComboBox.currentTextChanged.connect(self.markupModeChanged)
-        self.closedSplineCheck.stateChanged.connect(self.splineClosedChanged)
         ##
         self.updatePushButtonDict()
-        self.updateSliderDict()
 
-    def updatePushButtonDict(self, newPushButtonDict=None):
-        """
-        Update the modifiable push buttons with new actions and labels.
+    # Push button methods inherited from base class
 
-        This method allows customised buttons to be applied for the UI. 
-        It updates the dictionary of modifiable push buttons with new
-        actions and labels. It then applies these changes to the UI, enabling
-        or disabling buttons as necessary.
+    # Custom sliders removed - using animation controls instead
 
-        Args:
-            newPushButtonDict (dict, optional): A dictionary containing new button
-                configurations. The keys are button indices (0-11), and the values
-                are lists containing the button label and the action to be performed
-                when clicked. If None, the existing modPushButtonDict is used.
-
-        Example:
-            newDict = {
-                0: ['Do Action A', action_function_A],
-                1: ['Do Action B', action_function_B]
-            }
-            self.updatePushButtonDict(newDict)
-        """
-        if type(newPushButtonDict) == dict:
-            self.modPushButtonDict = newPushButtonDict
-        ### Modifiable push buttons
-        for k1 in range(self.nModPushButtons):
-            try:
-                self.modPushButtons[k1].setText(self.modPushButtonDict[k1][0])
-            except KeyError:
-                self.modPushButtons[k1].setEnabled(False)
-                continue
-            try:
-                self.modPushButtons[k1].clicked.disconnect()
-            except (TypeError, RuntimeError):
-                pass
-            self.modPushButtons[k1].clicked.connect(self.modPushButtonDict[k1][1])
-            self.modPushButtons[k1].setEnabled(True)
-            if self.modPushButtonDict[k1][1] == dummyModButtonAction:
-                self.modPushButtons[k1].setEnabled(False)
-
-    def updateSliderDict(self, newSliderDict=None):
-        """
-        Update the slider labels with new labels.
-
-        This method allows customised sliders to be applied for the UI. 
-        It updates the dictionary of sliders with new labels. It then applies these changes to the UI, enabling
-        or disabling buttons as necessary.
-
-        Args:
-            newSliderDict (dict, optional): A dictionary containing new slider configurations. The keys are slider indices (0-3), and the values
-                are dicts as per example below. 
-
-        Example:
-            newDict = {
-                0: {"label": 'Slider 1 label', "action": action_function_A, "min": 0, "max": 100, "value": 50, "singleStep": 1, "pageStep": 5},
-                1: {"label": 'Slider 2 label', "action": action_function_B, "min": 0, "max": 100, "value": 50, "singleStep": 1, "pageStep": 5},
-            }
-            self.updateSliderDict(newDict)
-        """
-        if type(newSliderDict) == dict:
-            self.sliderDict = newSliderDict
-        for k1 in range(2):
-            try:
-                self.sliderLabels[k1].setText(self.sliderDict[k1]["label"])
-                self.sliders[k1].setMinimum(self.sliderDict[k1]["min"])
-                self.sliders[k1].setMaximum(self.sliderDict[k1]["max"])
-                self.sliders[k1].setValue(self.sliderDict[k1]["value"])
-                self.sliders[k1].valueChanged.connect(self.sliderDict[k1]["action"])
-                self.sliders[k1].setSingleStep(self.sliderDict[k1]["singleStep"])
-                self.sliders[k1].setPageStep(self.sliderDict[k1]["pageStep"])
-                self.sliders[k1].setEnabled(True)
-            except KeyError:
-                self._sliderDummySetup(k1)
-    
-    def _sliderDummySetup(self, k1):
-        self.sliderLabels[k1].setText(f'Slider {k1+1}')
-        self.sliders[k1].setEnabled(False)
-
-    def setUserDefinedKeyPress(self, newKeyPressDict=None):
-        self.interactorStyleDict['Image'].setUserDefinedKeyCallbackDict(newKeyPressDict)
-
-    def getCurrentInteractorStyle(self):
-        return self.graphicsViewVTK.GetInteractorStyle()
-
-    #TIME SLIDER
-    def setupTimeSlider(self):
-        self.timeSlider.setMinimum(0)
-        self.timeSlider.setMaximum(len(self.times)-1)
-        self.updateTimeLabel()
-
-    def updateTimeLabel(self):
-        try:
-            self.timeLabel.setText("%d/%d [%3.2f]"%(self.currentTimeID+INDEX_OFFSET,
-                                                          self.timeSlider.maximum()+INDEX_OFFSET,
-                                                          self.getCurrentTime()))
-        except IndexError:
-            self.timeLabel.setText("%d/%d [%3.2f]"%(self.currentTimeID+INDEX_OFFSET,
-                                                          self.timeSlider.maximum(),
-                                                          0.0))
-
-    def moveTimeSlider(self, val):
-        self.currentTimeID = val
-        self.updateTimeLabel()
-        self.updateViewAfterTimeChange()
-        self.timeSlider.setValue(self.currentTimeID)
-        self.__updateMarkups()
-
-    def timeAdvance1(self):
-        if self.currentTimeID < (self.timeSlider.maximum()):
-            self.currentTimeID += 1
-        self.moveTimeSlider(self.currentTimeID)
-
-    def timeReverse1(self):
-        if self.currentTimeID > (self.timeSlider.minimum()):
-            self.currentTimeID -= 1
-        self.moveTimeSlider(self.currentTimeID)
+    # Time slider methods inherited from base class
 
     # SLICE SLIDER
     def _getDeltaX(self):
@@ -272,7 +139,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
             nn = np.array(self.getCurrentViewNormal())
             dx = self._getDeltaX()
             self.resliceCursor.SetCenter(cp + nn * dx)
-            self.__updateMarkups() # will render
+            self._updateMarkups() # will render
 
     def scrollBackwardCurrentSlice1(self):
         if self.interactionView < 3: # If in 3D window then do nothing
@@ -280,7 +147,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
             nn = -1.0 * np.array(self.getCurrentViewNormal())
             dx = self._getDeltaX()
             self.resliceCursor.SetCenter(cp + nn * dx)
-            self.__updateMarkups()
+            self._updateMarkups()
 
     # BUTTONS
     def updateParallelScale(self, viewID):
@@ -310,18 +177,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
         self.rendererArray[3].ResetCameraClippingRange()
         self.renderWindow.Render()
 
-    def __setScalarRangeForCurrentArray(self):
-        sR_t = [self.vtiDict[iT].GetScalarRange() for iT in self.times]
-        self.scalarRange[self.currentArray] = [min([i[0] for i in sR_t]), max([i[1] for i in sR_t])]
-
-    def resetWindowLevel(self):
-        if self.currentArray not in self.scalarRange.keys():
-            self.__setScalarRangeForCurrentArray()
-        sR = self.scalarRange.get(self.currentArray, self.scalarRange.get('Default', [0,255]))
-        if self.VERBOSE:
-            print(f"Resetting window level - scalar range: {sR}")
-            print(f"Resetting window level to {sR[1] - sR[0]:.2f}, {(sR[0] + sR[1]) / 2.0:.2f}")
-        self.__updateMarkups(window=sR[1] - sR[0], level=(sR[0] + sR[1]) / 2.0)
+    # Window level methods inherited from base class
 
     def getWindowLevel(self):
         w = self.resliceCursorWidgetArray[self.interactionView].GetRepresentation().GetWindow()
@@ -415,103 +271,26 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
         else:
             self.__update3DCursor(SHOW=False)
 
-    def markupModeChanged(self, mode):
-        self.markupMode = mode
-        print(f"Markup mode changed to: {mode}")
+    # Markup mode methods inherited from base class
 
-    def splineClosedChanged(self, state):
-        self.splineClosed = state == 2  # Qt.Checked = 2
-        print(f"Spline closed setting changed to: {self.splineClosed}")
+    # Array selection methods inherited from base class
 
-    def selectArrayComboBoxActivated(self, selectedText):
-        for iTime in self.times:
-            self.vtiDict[iTime].GetPointData().SetActiveScalars(selectedText)
-        self.resliceCursor.SetImage(self.getCurrentVTIObject())
-        self.resetWindowLevel()
-        self.statusBar().showMessage(selectedText)
-        self.setCurrentArray(selectedText)
-
-    def setCurrentArray(self, arrayName):
-        self.currentArray = arrayName
-        self.selectArrayComboBox.setCurrentText(arrayName)
-        self.resetWindowLevel()
-        self.renderWindow.Render()
-
-    # MENU ACTIONS
-    def _getFileViaDialog(self):
-        fileName = tuimarkupui.QtWidgets.QFileDialog.getOpenFileName(self,
-                                                                ("Open image data"),
-                                                                str(self.workingDirLineEdit.text()),
-                                                                ("Image data (*.vti);;PVD(, *.pvd)"))[0]
-        print(str(fileName))
-        return str(fileName)
-    def _getDirectoryViaDialog(self):
-        dirName = tuimarkupui.QtWidgets.QFileDialog.getExistingDirectory(self,
-                                                                ("Open dicom directory"),
-                                                                str(self.workingDirLineEdit.text()))
-        print(str(dirName))
-        return str(dirName)
-
-    def _loadDicom(self):
-        print('Load dicoms')
-        dirName = self._getDirectoryViaDialog()
-        self.loadDicomDir(dirName)
-
-    # LOAD NEW DATA METHODS
-    def loadDicomDir(self, dicomDir):
-        dcmSeries = spydcmtk.dcmTK.DicomSeries.setFromDirectory(dicomDir)
-        self.vtiDict = dcmSeries.buildVTIDict()
-        print(f"Have VTI dict. Times (ms): {[int(i*1000.0) for i in sorted(self.vtiDict.keys())]}")
-        # TODO - not saving correct coordinates for markups
-        self._setupAfterLoad()
-
-    def loadVTI_or_PVD(self, fileName=None):
-        print('Load VTI')
-        if not fileName:
-            fileName = self._getFileViaDialog()
-        if len(fileName) > 0:
-            self.vtiDict = fIO.readImageFileToDict(fileName) # will check for vti internally and then return time 0 e.g. {0.0:vti}
-            for iTime in self.vtiDict.keys():
-                for iName in vtkfilters.getArrayNames(self.vtiDict[iTime]):
-                    vtkfilters.setArrayDtype(self.vtiDict[iTime], iName, np.float64)
-                vtkfilters.ensureScalarsSet(self.vtiDict[iTime])
-            print('Data loaded...')
-            self._setupAfterLoad()
+    # File loading methods inherited from base class
 
 
     ## -------------------------- END UI SETUP -----------------------------------
     # ==================================================================================================================
-    def _setupAfterLoad(self):
-        self.times = sorted(self.vtiDict.keys())
-        self.patientMeta.initFromVTI(self.getCurrentVTIObject())
-        # Reset Markups
-        self.Markups.initForNewData(len(self.times))
-        self.setupTimeSlider()
-        #
-        self.selectArrayComboBox.clear()
-        arrayName = vtkfilters.getScalarsArrayName(self.vtiDict[self.getCurrentTime()])
-        if not arrayName:
-            arrayName = vtkfilters.getArrayNames(self.vtiDict[self.getCurrentTime()])[0]
-        self.currentArray = arrayName
-        self.currentTimeID = 0
-        for iArray in vtkfilters.getArrayNames(self.vtiDict[self.getCurrentTime()]):
-            self.selectArrayComboBox.addItem(iArray)
-        self.selectArrayComboBox.setCurrentText(self.currentArray)
-        #
-        bounds = self.getCurrentVTIObject().GetBounds()
-        self.boundingDist = max([bounds[1]-bounds[0], bounds[3]-bounds[2], bounds[5]-bounds[4]])
+    def _setupViewerSpecificData(self):
+        """3D-specific setup after data load"""
         self.__setupNewImageData() ## MAIN SETUP HERE ##
         ii = list(self.vtiDict.values())[0]
         dims = [0,0,0]
         ii.GetDimensions(dims)
         self.currentSliceID = int(dims[2]/2.0)
-        self.moveTimeSlider(self.currentTimeID)
         self.setGrossFrame(4) # Make grid view default
 
 
-    def exit(self):
-        self.close()
-        return 0
+    # Exit method inherited from base class
 
     # ==================================================================================================================
     # RESCLIE CURSOR WIDGET CALLBACKS
@@ -537,22 +316,13 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
         
         if self.interactionState and self.interactionState > 4:
             obj.GetResliceCursorRepresentation().ComputeInteractionState(x, y, 1)
-            self.__updateMarkups()
+            self._updateMarkups()
 
     def ResliceCursorEndCallback(self, obj, event):
         self.interactionState = 0
 
     # ==================================================================================================================
-    #   DATA
-    def getCurrentTime(self):
-        return self.times[self.currentTimeID]
-    def getCurrentVTIObject(self, COPY=False):
-        ii = self.vtiDict[self.getCurrentTime()]
-        if COPY:
-            i2 = vtk.vtkImageData()
-            i2.ShallowCopy(ii)
-            return i2
-        return ii
+    #   DATA - 3D specific methods
 
     def getCurrentRenderer(self):
         return self.rendererArray[self.interactionView]
@@ -648,7 +418,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
 
 
     def __setupNewImageData(self): # ONLY ON NEW DATA LOAD
-        self.__setScalarRangeForCurrentArray()
+        self._BaseMarkupViewer__setScalarRangeForCurrentArray()
         ##
         center = self.getCurrentVTIObject().GetCenter()
         self.resliceCursor.SetCenter(center[0], center[1], center[2])
@@ -747,7 +517,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
                 self.rendererArray[i].RemoveActor(iActor)
         self.markupActorList = []
 
-    def __updateMarkups(self, window=None, level=None):
+    def _updateMarkups(self, window=None, level=None):
         self.clearCurrentMarkups()
         ## POINTS
         pointSize = self.boundingDist * 0.01
@@ -844,41 +614,23 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
             contour = vtkfilters.contourFilter(self.getCurrentVTIObject(), self.contourVal)
             return vtkfilters.getConnectedRegionLargest(contour)
 
-    # ======================== Markups =================================================================================
-    def deleteAllMarkups(self):
-        self.Markups.reset()
-        self.__updateMarkups()
+    # ======================== Markups - 3D specific implementations ================================================
+    def removeActorFromAllRenderers(self, actor):
+        """Remove actor from all 3D renderers"""
+        for i in range(4):
+            self.rendererArray[i].RemoveActor(actor)
 
-    def addPoint(self, X, norm=None):
-        self.Markups.addPoint(X, self.currentTimeID, self.getCurrentTime(), norm)
-        self.__updateMarkups()
-
-    def addSplinePoint(self, X, norm=None):
-        """Add a point for spline creation. In spline mode, points are connected by splines."""
-        self.Markups.addPoint(X, self.currentTimeID, self.getCurrentTime(), norm)
-        # Update rendering to show splines
-        self.__updateMarkups()
-
-    def removeLastPoint(self):
-        self.Markups.removeLastPoint(self.currentTimeID)
-        self.__updateMarkups()
-
-    def addPolydata(self, polydata, timeID=None, time=None, color=(0,1,1)):
-        if time is not None:
-            timeID = int(np.argmin([abs(i-time) for i in self.times]))
-        else:
-            if timeID is None:
-                timeID = self.currentTimeID
-        iTime = self.times[timeID]
-        self.Markups.addPolydata(polydata, timeID, iTime, color=color)
-        self.__updateMarkups()
+    def updateViewAfterTimeChange(self):
+        """Update view after time change for 3D viewer"""
+        self.resliceCursor.SetImage(self.getCurrentVTIObject()) # FIXME - check the picker
+        self.updateViewAfterSliceChange()
 
     def addSpline(self, X): #TODO - TESTING -
         nn = self.getCurrentViewNormal()
         pts = vtkfilters.ftk.buildCircle3D(X, nn, 0.03, 25)
         print('Build circle at X and norm:',str(X), str(nn))
         self.Markups.addSpline(pts, self._getCurrentReslice(), self.getCurrentRenderer(), self.graphicsViewVTK, self.currentTimeID, self.getCurrentTime())
-        self.__updateMarkups()
+        self._updateMarkups()
 
 
     # ======================== OTHER OUTPUTS ===========================================================================
@@ -908,7 +660,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI):
         allCP = vtkfilters.getPtsAsNumpy(imageLine)
         for k1, cp in enumerate(allCP):
             self.resliceCursor.SetCenter(cp)
-            self.__updateMarkups(w, l)  # will render
+            self._updateMarkups(w, l)  # will render
             fOut = os.path.join(outputDir, f'{outputPrefix}{k1}.png')
             if FULL_VIEW:
                 windowToImageFilter = vtk.vtkWindowToImageFilter()
