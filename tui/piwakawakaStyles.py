@@ -91,12 +91,13 @@ class SinglePaneImageInteractor(vtk.vtkInteractorStyleImage):
         if key == "h":
             print(' . = add point (or spline point if in spline mode)')
             print(' u = remove last point')
+            print(' f = finish current spline (spline mode only)')
+            print(' x = cancel current spline (spline mode only)')
             print(' r = reset view')
             print(' R = reset view and window level')
             print(' m = print patient meta')
             print(' p = save screenshot')
             print(' W = write all markups as points_%time.vtp')
-            print(' c = set contour level')
             print(' w = reset window level')
             print(' V = toggle verbose mode')
             print(' Use UI controls to switch between Point and Spline modes')
@@ -104,12 +105,15 @@ class SinglePaneImageInteractor(vtk.vtkInteractorStyleImage):
         elif key == ".":
             X = self.getXAtMouse()
             norm = self.parentImageViewer.getCurrentViewNormal()
-            if self.parentImageViewer.markupMode == 'Point':
-                self.parentImageViewer.addPoint(X, norm)
-            else:  # Spline mode
-                self.parentImageViewer.addSplinePoint(X, norm)
+            self.parentImageViewer.addPoint(X, norm)
         elif key == "u":
             self.parentImageViewer.removeLastPoint()
+        elif key == "f":  # Finish current spline
+            if hasattr(self.parentImageViewer, 'finishCurrentSpline'):
+                self.parentImageViewer.finishCurrentSpline()
+        elif key == "x":  # Cancel current spline
+            if hasattr(self.parentImageViewer, 'cancelCurrentSpline'):
+                self.parentImageViewer.cancelCurrentSpline()
         elif key == "R":
             self.parentImageViewer.cameraReset()
             self.parentImageViewer.cameraReset3D()

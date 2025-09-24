@@ -130,6 +130,8 @@ class Markups(object):
         if CollectionClass is not None:
             if CollectionClass == MarkupPoints:
                 return dict(zip(range(self.nTimes), [CollectionClass(self.coordinateSystem) for _ in range(self.nTimes)]))
+            elif CollectionClass == MarkupSplines:
+                return dict(zip(range(self.nTimes), [CollectionClass(self.coordinateSystem) for _ in range(self.nTimes)]))
             else:
                 return dict(zip(range(self.nTimes), [CollectionClass() for _ in range(self.nTimes)]))
         else:
@@ -154,12 +156,39 @@ class Markups(object):
 
     def addPoint(self, X, timeID, time, norm=None):
         self.markupsDict[Points][timeID].addPoint(X, norm, timeID, time)
-
+        if self.parentImageViewer.markupMode == 'Spline':
+            if len(self.markupsDict[Points][timeID]) > 2:
+                self.markupsDict[Splines][timeID].addSpline(self.markupsDict[Points][timeID].getPoints_ImageCS(), 
+                                                            reslice=self.parentImageViewer.getCurrentReslice(), 
+                                                            renderer=self.parentImageViewer.renderer, 
+                                                            interactor=self.parentImageViewer.graphicsViewVTK, 
+                                                            handDrawn=True,
+                                                            LOOP=self.parentImageViewer.splineClosed,
+                                                            timeID=timeID, 
+                                                            time=time)
+                self.markupsDict[Points][timeID] = MarkupPoints(self.coordinateSystem)
+            
     def removeLastPoint(self, timeID):
         try:
             self.markupsDict[Points][timeID].removePoint(-1)
         except IndexError:
             pass
+    # ============ SPLINES =============================================================================================
+    def addSpline(self, pts, reslice, renderer, interactor, timeID, time):
+        self.markupsDict[Splines][timeID].addSpline(pts, reslice, renderer, interactor, handDrawn=True, timeID=timeID, time=time)
+
+    def getAllSplineActors(self, timeID):
+        return self.markupsDict[Splines][timeID].getListOfActors()
+
+    def showSplines_timeID(self, timeID):
+        for iTimeID in self.markupsDict[Splines].keys():
+            for iSpline in self.markupsDict[Splines][iTimeID]:
+                if iTimeID == timeID:
+                    iSpline.SetEnabled(1)
+                    iSpline.On()
+                else:
+                    iSpline.SetEnabled(0)
+                    iSpline.Off()
 
     def getAllPointsActors(self, timeID, pointSize, boundCP=None, boundN=None, bounddx=None):
         return self.markupsDict[Points][timeID].getActorForAllPoints(pointSize, boundCP, boundN, bounddx)
@@ -179,13 +208,6 @@ class Markups(object):
     def getAllPointsForTime(self, timeID):
         """Get all points for a specific time"""
         return self.markupsDict[Points].get(timeID, [])
-
-    # ============ SPLINES =============================================================================================
-    def addSpline(self, pts, reslice, renderer, interactor, timeID, time):
-        self.markupsDict[Splines][timeID].addSpline(pts, reslice, renderer, interactor, handDrawn=True, timeID=timeID, time=time)
-
-    def getAllSplineActors(self, timeID):
-        return self.markupsDict[Splines][timeID].getListOfActors()
 
     # ============ POLYDATA ============================================================================================
     def addPolydata(self, polydata, timeID, time, color=(0,0,1)):
@@ -242,6 +264,9 @@ class MarkupPoints(list):
 
     def removePoint(self, ID=-1):
         self.pop(ID)
+
+    def getPoints_ImageCS(self):
+        return np.array([i.getImageCoordinates() for i in self])
 
     def getPointsNumpy(self):
         return np.array([i.X for i in self])
@@ -372,36 +397,44 @@ class MarkupPoint(Markup):
 ### ====================================================================================================================
 ### MARKUP - SPLINES - LIST
 class MarkupSplines(list):
-    def __init__(self):
+    def __init__(self, coordinateSystem=None):
         super(MarkupSplines, self).__init__([])
+        self.coordinateSystem = coordinateSystem
 
-    def addSpline(self, Xarrary, reslice, renderer, interactor, handDrawn, timeID=0, time=0.0):
-        self.append(MarkupSpline(Xarrary, reslice, renderer, interactor, handDrawn, timeID=timeID, time=time))
+    def addSpline(self, Xarrary, reslice, renderer, interactor, handDrawn, LOOP, timeID=0, time=0.0):
+        self.append(MarkupSpline(Xarrary, reslice, renderer, interactor, handDrawn, LOOP, coordinateSystem=self.coordinateSystem, timeID=timeID, time=time))
 
     def getListOfActors(self):
         return [i.getActor() for i in self]
 ### ====================================================================================================================
 ### MARKUP - SPLINE
 class MarkupSpline(Markup, vtk.vtkSplineWidget):
-    def __init__(self, handlePoints, reslice, renderer, interactor, handDrawn, timeID=0, time=0.0):
-        Markup.__init__(self, timeID, time)
+    def __init__(self, handlePoints, reslice, renderer, interactor, handDrawn, LOOP, coordinateSystem=None, timeID=0, time=0.0):
+        Markup.__init__(self, coordinateSystem, timeID, time)
         vtk.vtkSplineWidget.__init__(self)
 
 
-        bnds = reslice.GetOutput().GetBounds()
-        self.SetCurrentRenderer(renderer)
-        self.SetDefaultRenderer(renderer)
-        self.SetInputConnection(reslice.GetOutputPort())
-        # self.SetInputData(data)
         self.SetInteractor(interactor)
+        self.SetCurrentRenderer(renderer)
+        self.SetInputConnection(reslice.GetOutputPort())
+
+        bnds = reslice.GetOutput().GetBounds()
+        self.SetDefaultRenderer(renderer)
         self.PlaceWidget(bnds[0], bnds[1], bnds[2], bnds[3], bnds[4], bnds[5])
         self.ProjectToPlaneOn()
-        # self.SetProjectionNormalToZAxes()
+        self.SetProjectionNormalToZAxes()
         self.SetProjectionPosition(0.0)
-        self.isHandDrawn = handDrawn
+        self.Off()
+        self.SetEnabled(0)
+
+        self._isHandDrawn = handDrawn
         self.GetLineProperty().SetColor(1,0,1)
         ##
+        self.SetEnabled(1)
+        self.On()
         self.setPoints(handlePoints)
+        if LOOP:
+            self.ClosedOn()
         ##
         self.AddObserver("EndInteractionEvent", self.splineUpdated)
 
@@ -433,20 +466,14 @@ class MarkupSpline(Markup, vtk.vtkSplineWidget):
             pt = pts[pID]
             self.SetHandlePosition(k0, pt[0], pt[1], pt[2])
 
-    def getSplinePolyData(self):
+    def getSplinePolyData_ImageCS(self):
         poly = vtk.vtkPolyData()
         self.GetPolyData(poly)
         return poly
 
     def getActor(self):
-        pdMapper = vtk.vtkPolyDataMapper()
-        pdMapper.SetInputData(self.getSplinePolyData())
-        pdActor = vtk.vtkActor()
-        pdActor.GetProperty().SetColor([0,1,0])
-        pdActor.GetProperty().SetLineWidth(4)
-        pdActor.PickableOff()
-        pdActor.SetMapper(pdMapper)
-        return pdActor
+        pass
+        return None
 
 ### ====================================================================================================================
 ### MARKUP - POLYDATAS - LIST

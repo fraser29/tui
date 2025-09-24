@@ -250,7 +250,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
             prop.SetColorLevel(l)
             if self.VERBOSE:
                 print(f"Set window level: window={w:.2f}, level={l:.2f}")
-    
+
 
     def pushButton1(self):
         print('Button pushed - do something')
@@ -270,8 +270,18 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
             actor.SetUserTransform(transform)
         self.renderWindow.Render()
 
-
-    # Animation and markup mode methods inherited from base class
+    
+    def addSplinePoint(self, X, norm=None):
+        """Add a point for spline creation - delegates to markup system"""
+        currentReslice = self.getCurrentReslice()
+        if currentReslice is None:
+            if self.VERBOSE:
+                print("No current reslice available for spline widget")
+            return
+        
+        self.Markups.addSplinePoint(X, currentReslice, self.renderer, self.graphicsViewVTK, self.currentTimeID, self.getCurrentTime())
+        self._updateMarkups()
+    
 
     def orientationChanged(self, orientation):
         """Handle orientation change from dropdown"""
@@ -302,6 +312,8 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
             self.setupSliceSlider()
             self.updateImageSlice()
             self.updateViewAfterSliceChange()
+            # Update spline projections when orientation changes
+            self.Markups.updateAllSplineProjections(self.currentTimeID)
             
             if self.VERBOSE:
                 print(f"Changed orientation to {orientation_upper}, max slice: {self.maxSliceID}")
@@ -613,15 +625,9 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
             if self.VERBOSE:
                 print("Image actor not initialized")
             return
-            
-        # Get the current reslice
         currentReslice = self.getCurrentReslice()
-        
         if currentReslice is not None:
-            # Get the output from the reslice
             thisImageSlice = currentReslice.GetOutput()
-            
-            # Set the extracted slice to the image actor
             if self.VERBOSE:
                 print(f"Setting up imageActor at slice {self.currentSliceID} of {self.maxSliceID}")
                 if self.currentSliceID < len(self.sliceCenters):
@@ -629,11 +635,11 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
                 if self.currentSliceID < len(self.sliceNormals):
                     print(f"Slice normal: {self.sliceNormals[self.currentSliceID]}")
                 print(f"Image range: {thisImageSlice.GetPointData().GetScalars().GetRange()}")
-            
             self.imageActor.SetInputData(thisImageSlice)
         else:
             if self.VERBOSE:
                 print(f"No reslice available for slice {self.currentSliceID}")
+
 
     def updateAllActorsToCurrentSlice(self):
         """
@@ -648,6 +654,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
                 self.imageResliceList[k1].SetResliceAxesOrigin(self.sliceCenters[self.currentSliceID])
             except IndexError:
                 pass # no data loaded
+
 
     def clearCurrentMarkups(self):
         for iActor in self.markupActorList:
@@ -678,16 +685,15 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
                 self.renderer.AddActor(ipdActor)
                 self.markupActorList.append(ipdActor)
         ## SPLINE
-        splineActors = self.Markups.getAllSplineActors(self.currentTimeID)
-        if len(splineActors) > 0:
-            for isplActor in splineActors:
-                self.renderer.AddActor(isplActor)
-                self.markupActorList.append(isplActor)
+        self.Markups.showSplines_timeID(self.currentTimeID)
+        # splineActors = self.Markups.getAllSplineActors(self.currentTimeID)
+        # if len(splineActors) > 0:
+        #     for isplActor in splineActors:
+        #         self.renderer.AddActor(isplActor)
+        #         self.markupActorList.append(isplActor)
         if (window is not None) and (level is not None):
             self.setWindowLevel(window, level)
         self.renderWindow.Render()
-
-
 
 
 

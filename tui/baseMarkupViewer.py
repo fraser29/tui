@@ -485,9 +485,7 @@ class BaseMarkupViewer:
         self._updateMarkups()
 
     def addSplinePoint(self, X, norm=None):
-        """Add a point for spline creation"""
-        self.Markups.addPoint(X, self.currentTimeID, self.getCurrentTime(), norm)
-        self._updateMarkups()
+        self.addPoint(X, norm)
 
     def removeLastPoint(self):
         """Remove last point"""
