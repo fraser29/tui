@@ -449,8 +449,8 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
                 centerlineProperty.SetLineWidth(2)  # Make lines more visible
                 # Try to limit the line length by clipping
                 centerlineProperty.SetPointSize(cursorLength)
-            
-            rscRep.SetWindowLevel(sR[1] - sR[0], (sR[0] + sR[1]) / 2.0, 0)
+            w, l = self._BaseMarkupViewer__calculateOptimalWindowLevel()
+            rscRep.SetWindowLevel(w, l, 0)
             if i > 0:
                 rscRep.SetLookupTable(self.resliceCursorWidgetArray[0].GetRepresentation().GetLookupTable())
             
