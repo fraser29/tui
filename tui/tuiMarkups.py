@@ -17,6 +17,76 @@ from scipy import ndimage
 
 
 ### ====================================================================================================================
+### COORDINATE SYSTEM ABSTRACTION
+### ====================================================================================================================
+
+class CoordinateSystem:
+    """Abstract base for coordinate transformations"""
+    def __init__(self, parentImageViewer):
+        self.parentImageViewer = parentImageViewer
+    
+    def imageToWorld(self, imageCoords):
+        """Transform image coordinates to world coordinates"""
+        raise NotImplementedError("Subclasses must implement imageToWorld")
+    
+    def worldToImage(self, worldCoords):
+        """Transform world coordinates to image coordinates"""
+        raise NotImplementedError("Subclasses must implement worldToImage")
+    
+    def getTransformMatrix(self):
+        """Get the current transform matrix"""
+        raise NotImplementedError("Subclasses must implement getTransformMatrix")
+
+class Viewer2DCoordinateSystem(CoordinateSystem):
+    """2D viewer coordinate system (piwakawaka)"""
+    
+    def imageToWorld(self, imageCoords):
+        """Transform image coordinates to world coordinates using reslice matrix"""
+        if hasattr(self.parentImageViewer, 'imageCS_To_WorldCS_X'):
+            return self.parentImageViewer.imageCS_To_WorldCS_X(imageCoords)
+        else:
+            # Fallback for compatibility
+            return imageCoords
+    
+    def worldToImage(self, worldCoords):
+        """Transform world coordinates to image coordinates"""
+        # For 2D viewers, this is more complex - may need inverse transformation
+        # For now, return as-is (this might need refinement based on your specific needs)
+        return worldCoords
+    
+    def getTransformMatrix(self):
+        """Get the current reslice matrix"""
+        if hasattr(self.parentImageViewer, 'getCurrentResliceMatrix'):
+            return self.parentImageViewer.getCurrentResliceMatrix()
+        else:
+            return None
+
+class Viewer3DCoordinateSystem(CoordinateSystem):
+    """3D viewer coordinate system (tui)"""
+    
+    def imageToWorld(self, imageCoords):
+        """Transform image coordinates to world coordinates"""
+        # In 3D viewers, image and world coordinates are typically the same
+        # But we can apply transformation if needed
+        if hasattr(self.parentImageViewer, 'imageResliceXToRealWorldPolydataPt'):
+            return self.parentImageViewer.imageResliceXToRealWorldPolydataPt(imageCoords).GetCenter()
+        else:
+            # For 3D viewers, image and world coordinates are usually the same
+            return imageCoords
+    
+    def worldToImage(self, worldCoords):
+        """Transform world coordinates to image coordinates"""
+        # In 3D viewers, image and world coordinates are typically the same
+        return worldCoords
+    
+    def getTransformMatrix(self):
+        """Get the current reslice matrix"""
+        if hasattr(self.parentImageViewer, 'getCurrentResliceMatrix'):
+            return self.parentImageViewer.getCurrentResliceMatrix()
+        else:
+            return None
+
+### ====================================================================================================================
 ### ====================================================================================================================
 Points = 'Points'
 Splines = 'Splines'
@@ -33,12 +103,24 @@ class Markups(object):
     def __init__(self, parent, nTimes=0):
         self.parentImageViewer = parent
         self.nTimes = nTimes
+        self.coordinateSystem = self._createCoordinateSystem()
         self.markupsDict = {} # Dict(k=typestr, v=Dict(k=timeID, v=list_of_markup))
         self.markupsTypesCollections = {Points: MarkupPoints,
                                         Splines: MarkupSplines,
                                         Polydata: MarkupPolydatas,
                                         Masks: MarkupMasks}
         self.reset()
+    
+    def _createCoordinateSystem(self):
+        """Factory method to create appropriate coordinate system"""
+        viewerType = type(self.parentImageViewer).__name__
+        if 'piwakawaka' in viewerType.lower():
+            return Viewer2DCoordinateSystem(self.parentImageViewer)
+        elif 'tui' in viewerType.lower():
+            return Viewer3DCoordinateSystem(self.parentImageViewer)
+        else:
+            # Default to 2D coordinate system for backward compatibility
+            return Viewer2DCoordinateSystem(self.parentImageViewer)
 
     def initForNewData(self, nTimes):
         self.nTimes = nTimes
@@ -46,7 +128,10 @@ class Markups(object):
 
     def __genEmptyDict(self, CollectionClass):
         if CollectionClass is not None:
-            return dict(zip(range(self.nTimes), [CollectionClass() for _ in range(self.nTimes)]))
+            if CollectionClass == MarkupPoints:
+                return dict(zip(range(self.nTimes), [CollectionClass(self.coordinateSystem) for _ in range(self.nTimes)]))
+            else:
+                return dict(zip(range(self.nTimes), [CollectionClass() for _ in range(self.nTimes)]))
         else:
             return dict(zip(range(self.nTimes), [[] for _ in range(self.nTimes)]))
 
@@ -90,6 +175,10 @@ class Markups(object):
 
     def getXNumpyFromPoints(self, timeID):
         return self.markupsDict[Points][timeID].getPointsNumpy()
+    
+    def getAllPointsForTime(self, timeID):
+        """Get all points for a specific time"""
+        return self.markupsDict[Points].get(timeID, [])
 
     # ============ SPLINES =============================================================================================
     def addSpline(self, pts, reslice, renderer, interactor, timeID, time):
@@ -109,22 +198,47 @@ class Markups(object):
 ### MARKUP - PARENT
 class Markup(object):
     """
-    Parent class for Markup
+    Parent class for Markup with coordinate system awareness
     """
-    def __init__(self, timeID, time):
-        self.time = time
+    def __init__(self, coordinateSystem, timeID=0, time=0.0):
+        self.coordinateSystem = coordinateSystem
         self.timeID = timeID
+        self.time = time
+        self.parentImageViewer = coordinateSystem.parentImageViewer
+    
+    def getWorldCoordinates(self):
+        """Get world coordinates - implemented by subclasses"""
+        raise NotImplementedError("Subclasses must implement getWorldCoordinates")
+    
+    def getImageCoordinates(self):
+        """Get image coordinates - implemented by subclasses"""
+        raise NotImplementedError("Subclasses must implement getImageCoordinates")
+    
+    def transformToWorld(self, imageCoords):
+        """Transform image coordinates to world"""
+        return self.coordinateSystem.imageToWorld(imageCoords)
+    
+    def transformToImage(self, worldCoords):
+        """Transform world coordinates to image"""
+        return self.coordinateSystem.worldToImage(worldCoords)
+    
+    def getTransformMatrix(self):
+        """Get the current transform matrix"""
+        return self.coordinateSystem.getTransformMatrix()
 
 ### ====================================================================================================================
 ### MARKUP - POINTS-LIST
 class MarkupPoints(list):
-    def __init__(self):
+    def __init__(self, coordinateSystem=None):
         super(MarkupPoints, self).__init__([])
         self.pointRGB = [1, 0, 0]
         self.lineRGB = [1, 0.5, 0.7]
+        self.coordinateSystem = coordinateSystem
 
     def addPoint(self, X, norm=None, timeID=0, time=0.0):
-        self.append(MarkupPoint(X, norm=norm, timeID=timeID, time=time))
+        # X is expected to be in image coordinates
+        point = MarkupPoint(X, self.coordinateSystem, norm=norm, timeID=timeID, time=time)
+        self.append(point)
 
     def removePoint(self, ID=-1):
         self.pop(ID)
@@ -200,22 +314,50 @@ class MarkupPoints(list):
 ### ====================================================================================================================
 ### MARKUP - POINT
 class MarkupPoint(Markup):
-    def __init__(self, X, norm=None, timeID=0, time=0.0):
-        Markup.__init__(self, timeID, time)
-        self._X = X # this is the real world location for TUI, but a ImageCS for PIWAKAWAKA
+    def __init__(self, X, coordinateSystem, norm=None, timeID=0, time=0.0):
+        super().__init__(coordinateSystem, timeID, time)
+        self._imageCoords = X  # Image coordinates (primary storage)
         self.norm = norm
-
-
+        self._worldCoords = None  # Cached world coordinates
+    
     @property   
     def X(self):
-        return self._X
-        # if self.parentImageViewer.__class__.__name__ == 'PIWAKAWAKAMarkupViewer':
-        #     return self.parentImageViewer.imageCS_To_WorldCS_X(self._X)
-        # else:
-        #     return self._X
+        """Get world coordinates (transformed from image coordinates)"""
+        return self.getWorldCoordinates()
+    
+    @X.setter
+    def X(self, value):
+        """Set image coordinates and invalidate cached world coordinates"""
+        self._imageCoords = value
+        self._worldCoords = None
+    
+    @property
+    def xyz(self):
+        """Compatibility property for world coordinates (legacy support)"""
+        return self.getWorldCoordinates()
+    
+    def getWorldCoordinates(self):
+        """Get world coordinates (transformed from image coordinates)"""
+        if self._worldCoords is None:
+            self._worldCoords = self.transformToWorld(self._imageCoords)
+        return self._worldCoords
+    
+    def getImageCoordinates(self):
+        """Get image coordinates (primary storage)"""
+        return self._imageCoords
+    
+    def updateFromImageCoords(self, imageCoords):
+        """Update image coordinates and invalidate cached world coordinates"""
+        self._imageCoords = imageCoords
+        self._worldCoords = None
+    
+    def updateFromWorldCoords(self, worldCoords):
+        """Update image coordinates from world coordinates"""
+        self._imageCoords = self.transformToImage(worldCoords)
+        self._worldCoords = None
 
     def getSphereSourceViewerCS(self, rad=0.002):
-        Sx = vtkfilters.buildSphereSource(self.X, rad, res=16)
+        Sx = vtkfilters.buildSphereSource(self.getImageCoordinates(), rad, res=16)
         return Sx
 
     def getPtActor(self, pointSize):
