@@ -629,7 +629,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
         nn = self.getCurrentViewNormal()
         pts = vtkfilters.ftk.buildCircle3D(X, nn, 0.03, 25)
         print('Build circle at X and norm:',str(X), str(nn))
-        self.Markups.addSpline(pts, self._getCurrentReslice(), self.getCurrentRenderer(), self.graphicsViewVTK, self.currentTimeID, self.getCurrentTime())
+        self.Markups.addSpline(pts, self._getCurrentReslice(), self.getCurrentRenderer(), self.graphicsViewVTK, self.currentTimeID, self.getCurrentSliceID())
         self._updateMarkups()
 
 

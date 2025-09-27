@@ -313,6 +313,10 @@ class BaseMarkupViewer:
     def getCurrentTime(self):
         """Get current time value"""
         return self.times[self.currentTimeID]
+    
+    def getCurrentSliceID(self):
+        """Get current slice ID - to be overridden by subclasses"""
+        return 0  # Default for 3D viewer
 
     def getCurrentVTIObject(self, COPY=False):
         """Get current VTI object"""
@@ -481,7 +485,7 @@ class BaseMarkupViewer:
 
     def addPoint(self, X, norm=None):
         """Add a point markup"""
-        self.Markups.addPoint(X, self.currentTimeID, self.getCurrentTime(), norm)
+        self.Markups.addPoint(X, self.currentTimeID, self.getCurrentSliceID(), norm)
         self._updateMarkups()
 
     def addSplinePoint(self, X, norm=None):

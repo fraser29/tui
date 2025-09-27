@@ -154,8 +154,8 @@ class Markups(object):
     def getNumberOfPoints(self, timeID):
         return len(self.markupsDict[Points][timeID])
 
-    def addPoint(self, X, timeID, time, norm=None):
-        self.markupsDict[Points][timeID].addPoint(X, norm, timeID, time)
+    def addPoint(self, X, timeID, sliceID, norm=None):
+        self.markupsDict[Points][timeID].addPoint(X, norm, timeID, sliceID)
         if self.parentImageViewer.markupMode == 'Spline':
             if len(self.markupsDict[Points][timeID]) > 2:
                 self.markupsDict[Splines][timeID].addSpline(self.markupsDict[Points][timeID].getPoints_ImageCS(), 
@@ -165,7 +165,7 @@ class Markups(object):
                                                             handDrawn=True,
                                                             LOOP=self.parentImageViewer.splineClosed,
                                                             timeID=timeID, 
-                                                            time=time)
+                                                            sliceID=sliceID)
                 self.markupsDict[Points][timeID] = MarkupPoints(self.coordinateSystem)
             
     def removeLastPoint(self, timeID):
@@ -174,16 +174,16 @@ class Markups(object):
         except IndexError:
             pass
     # ============ SPLINES =============================================================================================
-    def addSpline(self, pts, reslice, renderer, interactor, timeID, time):
-        self.markupsDict[Splines][timeID].addSpline(pts, reslice, renderer, interactor, handDrawn=True, timeID=timeID, time=time)
+    def addSpline(self, pts, reslice, renderer, interactor, timeID, sliceID, LOOP):
+        self.markupsDict[Splines][timeID].addSpline(pts, reslice, renderer, interactor, handDrawn=True, LOOP=LOOP, timeID=timeID, sliceID=sliceID)
 
     def getAllSplineActors(self, timeID):
         return self.markupsDict[Splines][timeID].getListOfActors()
 
-    def showSplines_timeID(self, timeID):
+    def showSplines_timeID_sliceID(self, timeID, sliceID):
         for iTimeID in self.markupsDict[Splines].keys():
             for iSpline in self.markupsDict[Splines][iTimeID]:
-                if iTimeID == timeID:
+                if iTimeID == timeID and iSpline.sliceID == sliceID:
                     iSpline.SetEnabled(1)
                     iSpline.On()
                 else:
@@ -210,8 +210,8 @@ class Markups(object):
         return self.markupsDict[Points].get(timeID, [])
 
     # ============ POLYDATA ============================================================================================
-    def addPolydata(self, polydata, timeID, time, color=(0,0,1)):
-        self.markupsDict[Polydata][timeID].addPolydata(polydata, timeID=timeID, time=time, color=color)
+    def addPolydata(self, polydata, timeID, sliceID, color=(0,0,1)):
+        self.markupsDict[Polydata][timeID].addPolydata(polydata, timeID=timeID, sliceID=sliceID, color=color)
 
     def getAllPolydataActors(self, timeID):
         return self.markupsDict[Polydata][timeID].getListOfActors()
@@ -222,10 +222,10 @@ class Markup(object):
     """
     Parent class for Markup with coordinate system awareness
     """
-    def __init__(self, coordinateSystem, timeID=0, time=0.0):
+    def __init__(self, coordinateSystem, timeID=0, sliceID=0):
         self.coordinateSystem = coordinateSystem
         self.timeID = timeID
-        self.time = time
+        self.sliceID = sliceID
         self.parentImageViewer = coordinateSystem.parentImageViewer
     
     def getWorldCoordinates(self):
@@ -257,9 +257,9 @@ class MarkupPoints(list):
         self.lineRGB = [1, 0.5, 0.7]
         self.coordinateSystem = coordinateSystem
 
-    def addPoint(self, X, norm=None, timeID=0, time=0.0):
+    def addPoint(self, X, norm=None, timeID=0, sliceID=0):
         # X is expected to be in image coordinates
-        point = MarkupPoint(X, self.coordinateSystem, norm=norm, timeID=timeID, time=time)
+        point = MarkupPoint(X, self.coordinateSystem, norm=norm, timeID=timeID, sliceID=sliceID)
         self.append(point)
 
     def removePoint(self, ID=-1):
@@ -339,8 +339,8 @@ class MarkupPoints(list):
 ### ====================================================================================================================
 ### MARKUP - POINT
 class MarkupPoint(Markup):
-    def __init__(self, X, coordinateSystem, norm=None, timeID=0, time=0.0):
-        super().__init__(coordinateSystem, timeID, time)
+    def __init__(self, X, coordinateSystem, norm=None, timeID=0, sliceID=0):
+        super().__init__(coordinateSystem, timeID, sliceID)
         self._imageCoords = X  # Image coordinates (primary storage)
         self.norm = norm
         self._worldCoords = None  # Cached world coordinates
@@ -401,16 +401,16 @@ class MarkupSplines(list):
         super(MarkupSplines, self).__init__([])
         self.coordinateSystem = coordinateSystem
 
-    def addSpline(self, Xarrary, reslice, renderer, interactor, handDrawn, LOOP, timeID=0, time=0.0):
-        self.append(MarkupSpline(Xarrary, reslice, renderer, interactor, handDrawn, LOOP, coordinateSystem=self.coordinateSystem, timeID=timeID, time=time))
+    def addSpline(self, Xarrary, reslice, renderer, interactor, handDrawn, LOOP, timeID=0, sliceID=0):
+        self.append(MarkupSpline(Xarrary, reslice, renderer, interactor, handDrawn, LOOP, coordinateSystem=self.coordinateSystem, timeID=timeID, sliceID=sliceID))
 
     def getListOfActors(self):
         return [i.getActor() for i in self]
 ### ====================================================================================================================
 ### MARKUP - SPLINE
 class MarkupSpline(Markup, vtk.vtkSplineWidget):
-    def __init__(self, handlePoints, reslice, renderer, interactor, handDrawn, LOOP, coordinateSystem=None, timeID=0, time=0.0):
-        Markup.__init__(self, coordinateSystem, timeID, time)
+    def __init__(self, handlePoints, reslice, renderer, interactor, handDrawn, LOOP, coordinateSystem=None, timeID=0, sliceID=0):
+        Markup.__init__(self, coordinateSystem, timeID, sliceID)
         vtk.vtkSplineWidget.__init__(self)
 
 
@@ -481,16 +481,16 @@ class MarkupPolydatas(list):
     def __init__(self):
         super(MarkupPolydatas, self).__init__([])
 
-    def addPolydata(self, X, timeID=0, time=0.0, color=(0,0,1)):
-        self.append(MarkupPolydata(X, timeID=timeID, time=time, color=color))
+    def addPolydata(self, X, timeID=0, sliceID=0, color=(0,0,1)):
+        self.append(MarkupPolydata(X, timeID=timeID, sliceID=sliceID, color=color))
 
     def getListOfActors(self):
         return [i.getActor() for i in self]
 ### ====================================================================================================================
 ### MARKUP - POLYDATA
 class MarkupPolydata(Markup):
-    def __init__(self, polydata, timeID=0, time=0.0, color=(0, 0, 1)):
-        super().__init__(timeID, time)
+    def __init__(self, polydata, timeID=0, sliceID=0, color=(0, 0, 1)):
+        super().__init__(None, timeID, sliceID)  # No coordinate system for polydata
         self.polydata = polydata
         self.color = color
 

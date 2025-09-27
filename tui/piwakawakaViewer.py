@@ -271,6 +271,10 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.renderWindow.Render()
 
     
+    def getCurrentSliceID(self):
+        """Get current slice ID for 2D viewer"""
+        return self.currentSliceID
+    
     def addSplinePoint(self, X, norm=None):
         """Add a point for spline creation - delegates to markup system"""
         currentReslice = self.getCurrentReslice()
@@ -279,7 +283,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
                 print("No current reslice available for spline widget")
             return
         
-        self.Markups.addSplinePoint(X, currentReslice, self.renderer, self.graphicsViewVTK, self.currentTimeID, self.getCurrentTime())
+        self.Markups.addSplinePoint(X, currentReslice, self.renderer, self.graphicsViewVTK, self.currentTimeID, self.getCurrentSliceID())
         self._updateMarkups()
     
 
@@ -685,7 +689,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
                 self.renderer.AddActor(ipdActor)
                 self.markupActorList.append(ipdActor)
         ## SPLINE
-        self.Markups.showSplines_timeID(self.currentTimeID)
+        self.Markups.showSplines_timeID_sliceID(self.currentTimeID, self.getCurrentSliceID())
         # splineActors = self.Markups.getAllSplineActors(self.currentTimeID)
         # if len(splineActors) > 0:
         #     for isplActor in splineActors:
