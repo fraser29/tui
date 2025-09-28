@@ -157,7 +157,7 @@ class Markups(object):
     def addPoint(self, X, timeID, sliceID, norm=None):
         self.markupsDict[Points][timeID].addPoint(X, norm, timeID, sliceID)
         if self.parentImageViewer.markupMode == 'Spline':
-            if len(self.markupsDict[Points][timeID]) > 2:
+            if len(self.markupsDict[Points][timeID]) == 3:
                 self.markupsDict[Splines][timeID].addSpline(self.markupsDict[Points][timeID].getPoints_ImageCS(), 
                                                             reslice=self.parentImageViewer.getCurrentReslice(), 
                                                             renderer=self.parentImageViewer.renderer, 
@@ -167,6 +167,9 @@ class Markups(object):
                                                             timeID=timeID, 
                                                             sliceID=sliceID)
                 self.markupsDict[Points][timeID] = MarkupPoints(self.coordinateSystem)
+            elif len(self.markupsDict[Splines][timeID]) == 1:
+                self.markupsDict[Splines][timeID][0].addPoint(X)
+                self.removeLastPoint(timeID)
             
     def removeLastPoint(self, timeID):
         try:
@@ -174,14 +177,15 @@ class Markups(object):
         except IndexError:
             pass
     # ============ SPLINES =============================================================================================
-    def addSpline(self, pts, reslice, renderer, interactor, timeID, sliceID, LOOP):
-        self.markupsDict[Splines][timeID].addSpline(pts, reslice, renderer, interactor, handDrawn=True, LOOP=LOOP, timeID=timeID, sliceID=sliceID)
+    def addSpline(self, pts, reslice, renderer, interactor, timeID, sliceID, LOOP, isHandDrawn=True):
+        self.markupsDict[Splines][timeID].addSpline(pts, reslice, renderer, interactor, handDrawn=isHandDrawn, LOOP=LOOP, timeID=timeID, sliceID=sliceID)
 
     def getAllSplineActors(self, timeID):
         return self.markupsDict[Splines][timeID].getListOfActors()
 
     def showSplines_timeID_sliceID(self, timeID, sliceID):
         for iTimeID in self.markupsDict[Splines].keys():
+            print(f"DEBUG: showing splines for timeID={iTimeID} and sliceID={sliceID} -- {len(self.markupsDict[Splines][iTimeID])} splines")
             for iSpline in self.markupsDict[Splines][iTimeID]:
                 if iTimeID == timeID and iSpline.sliceID == sliceID:
                     iSpline.SetEnabled(1)
@@ -189,6 +193,12 @@ class Markups(object):
                 else:
                     iSpline.SetEnabled(0)
                     iSpline.Off()
+
+ 
+    def getSplinesTimeIDList(self):
+        """Get splines list for each time"""
+        return [self.markupsDict[Splines].get(iTimeID, []) for iTimeID in range(self.nTimes)]
+
 
     def getAllPointsActors(self, timeID, pointSize, boundCP=None, boundN=None, bounddx=None):
         return self.markupsDict[Points][timeID].getActorForAllPoints(pointSize, boundCP, boundN, bounddx)
@@ -406,14 +416,15 @@ class MarkupSplines(list):
 
     def getListOfActors(self):
         return [i.getActor() for i in self]
+
 ### ====================================================================================================================
 ### MARKUP - SPLINE
 class MarkupSpline(Markup, vtk.vtkSplineWidget):
     def __init__(self, handlePoints, reslice, renderer, interactor, handDrawn, LOOP, coordinateSystem=None, timeID=0, sliceID=0):
         Markup.__init__(self, coordinateSystem, timeID, sliceID)
         vtk.vtkSplineWidget.__init__(self)
-
-
+        self.LOOP = LOOP
+        
         self.SetInteractor(interactor)
         self.SetCurrentRenderer(renderer)
         self.SetInputConnection(reslice.GetOutputPort())
@@ -433,7 +444,7 @@ class MarkupSpline(Markup, vtk.vtkSplineWidget):
         self.SetEnabled(1)
         self.On()
         self.setPoints(handlePoints)
-        if LOOP:
+        if self.LOOP:
             self.ClosedOn()
         ##
         self.AddObserver("EndInteractionEvent", self.splineUpdated)
@@ -470,6 +481,24 @@ class MarkupSpline(Markup, vtk.vtkSplineWidget):
         poly = vtk.vtkPolyData()
         self.GetPolyData(poly)
         return poly
+
+    def getPoints(self, nSplinePts=None):
+        pts = []
+        for k0 in range(self.GetNumberOfHandles()):
+            ixyz = [0.0,0.0,0.0]
+            pt = self.GetHandlePosition(k0, ixyz)
+            pts.append(pt)
+        if nSplinePts is not None:
+            pts = vtkfilters.ftk.splinePoints(pts, nSplinePts, periodic=self.LOOP, RETURN_NUMPY=False)
+        return np.array(pts)
+
+    def addPoint(self, X):
+        self.SetHandlePosition(self.GetNumberOfHandles(), X[0], X[1], X[2])
+        self.SetNumberOfHandles(self.GetNumberOfHandles() + 1)
+        self.SetEnabled(1)
+        self.On()
+        self.GetLineProperty().SetColor(1,0,0)
+
 
     def getActor(self):
         pass

@@ -15,10 +15,9 @@ Basic viewer for advanced image processing:
 import vtk
 import os
 import numpy as np
-from ngawari import fIO
 from ngawari import vtkfilters, ftk
-import spydcmtk
-from tui import tuiMarkups, piwakawakamarkupui, piwakawakaStyles, baseMarkupViewer
+from tui import piwakawakamarkupui, piwakawakaStyles, baseMarkupViewer
+import scipy.interpolate as interpolate
 
 from vtk.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor # type: ignore
 
@@ -780,6 +779,77 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
 # ======================================================================================================================
 # ======================================================================================================================
 # ======================================================================================================================
+def interpolateSplinesOverTime(piwakawakaViewer): 
+    """
+    Takes care of interpolation between all ROIs to permit tracking
+    
+    """
+    # TODO - might need ot fix so same start point - just use ROI 0 and then all others start at closest pt
+    # this will be needed once change npts in ROIs etc
+    nSplinePts_i = 50
+    splinesList = piwakawakaViewer.Markups.getSplinesTimeIDList()
+    times = piwakawakaViewer.times
+    counts = [len(splinesList[timeID]) for timeID in range(len(times))]
+    countstf = [i>1 for i in counts]
+    if any(countstf):
+        raise ValueError("Must have one (or no) splines per time step")
+    if sum(counts) < 2:
+        raise ValueError("Must have splines at at least two time steps")
+    ID_FIRST_SPLINE = countstf.index(True)
+    XY = np.nan * np.ones((nSplinePts_i, len(times)+1, 2))
+    handDrawntf = [False] * len(times)
+    for iTimeID in range(len(times)):
+        if counts[iTimeID] > 0:
+            handDrawntf[iTimeID] = splinesList[iTimeID][0].isHandDrawn
+    handDrawntf = handDrawntf[ID_FIRST_SPLINE:] + handDrawntf[:ID_FIRST_SPLINE]
+    # Build XY matrix of spline points to interpolate between
+    for iTimeID in range(len(times)):
+        if handDrawntf[iTimeID]:
+            pts = splinesList[iTimeID][0].getPoints(nSplinePts=nSplinePts_i)
+            XY[:, iTimeID, :] = [i[:2] for i in pts]
+    if piwakawakaViewer.TIME_PERIODIC:
+        XY[:, -1, :] = XY[:, 0, :]
+    u = [i - ID_FIRST_SPLINE for i in range(len(times)) if handDrawntf[i]] + [len(times) + 1]
+    XY2 = splineRoisOverTime(XY, [float(i) / u[-1] for i in u])
+    for iTimeID in range(len(times)):
+        if not handDrawntf[iTimeID]:
+            colID = iTimeID - ID_FIRST_SPLINE
+            if ID_FIRST_SPLINE > iTimeID: colID -= 1
+            newPts = np.squeeze(XY2[:, colID, :])
+            newPts = [[i[0],i[1],0.0] for i in newPts]
+            piwakawakaViewer.Markups.addSpline(newPts, 
+                                                piwakawakaViewer.resliceDict[times[iTimeID]], 
+                                                piwakawakaViewer.renderer, 
+                                                piwakawakaViewer.graphicsViewVTK, 
+                                                timeID=iTimeID,
+                                                sliceID=piwakawakaViewer.getCurrentSliceID(),
+                                                LOOP=piwakawakaViewer.splineClosed, 
+                                                isHandDrawn=False)
+
+
+def interpolateSplinesOverSlices(self):
+    pass
+
+def splineRoisOverTime(XYmat, u):
+    """
+
+    :param XYmat: should be shape nPts_per_ROI x nTimeSteps+1 x 2
+        nans where not known. timeStep 0 must be known. timeStep -1 == 0
+                                XY[:, -1, :] = XY[:, 0, :]
+    :param u:
+    :return:
+    """
+    XYmat = XYmat * 10000.0
+    m, n, TWO = XYmat.shape
+    XYout = np.zeros((m, n, TWO))
+    newParams = np.linspace(0, 1, n)
+    for k1 in range(m):
+        xy = XYmat[k1, ~np.isnan(XYmat[k1, :, 0]), :].T
+        tck, _ = interpolate.splprep(xy, u=u, k=1, per=1)
+        newPts = interpolate.splev(newParams, tck)
+        XYout[k1, :, 0] = newPts[0]
+        XYout[k1, :, 1] = newPts[1]
+    return XYout / 10000.0
 
 
 
