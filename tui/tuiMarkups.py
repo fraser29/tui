@@ -140,6 +140,11 @@ class Markups(object):
     def reset(self, timeID=None, markupType_list=()):
         if len(markupType_list) == 0:
             markupType_list = self.markupsTypesCollections.keys()
+        
+        # Clean up spline widgets before resetting
+        if Splines in markupType_list or len(markupType_list) == 0:
+            self._cleanupSplineWidgets(timeID)
+        
         if timeID is None:
             for iType in markupType_list:
                 self.markupsDict[iType] = self.__genEmptyDict(self.markupsTypesCollections.get(iType, None))
@@ -149,6 +154,45 @@ class Markups(object):
 
     def resetMarkup(self, markupType):
         self.reset(markupType_list=[markupType])
+    
+    def _cleanupSplineWidgets(self, timeID=None):
+        """Clean up spline widgets by properly disabling and removing them from interactor"""
+        if Splines not in self.markupsDict:
+            return
+            
+        if timeID is None:
+            # Clean up all spline widgets
+            for tID in self.markupsDict[Splines].keys():
+                for spline in self.markupsDict[Splines][tID]:
+                    self._disableSplineWidget(spline)
+        else:
+            # Clean up spline widgets for specific timeID
+            if timeID in self.markupsDict[Splines]:
+                for spline in self.markupsDict[Splines][timeID]:
+                    self._disableSplineWidget(spline)
+    
+    def _disableSplineWidget(self, spline):
+        """Properly disable a spline widget and remove it from interactor"""
+        try:
+            # Disable the widget
+            spline.SetEnabled(0)
+            spline.Off()
+            
+            # Try to remove observers to prevent memory leaks
+            try:
+                spline.RemoveAllObservers()
+            except:
+                pass
+                
+            # Force render update to ensure widget is visually removed
+            if hasattr(self.parentImageViewer, 'renderWindow'):
+                self.parentImageViewer.renderWindow.Render()
+                
+        except Exception as e:
+            # If there's an error disabling the widget, just continue
+            # This prevents crashes if the widget is already destroyed
+            if hasattr(self.parentImageViewer, 'VERBOSE') and self.parentImageViewer.VERBOSE:
+                print(f"Warning: Error disabling spline widget: {e}")
 
     # ============ POINTS ==============================================================================================
     def getNumberOfPoints(self, timeID):
@@ -503,6 +547,15 @@ class MarkupSpline(Markup, vtk.vtkSplineWidget):
     def getActor(self):
         pass
         return None
+    
+    def __del__(self):
+        """Destructor to ensure proper cleanup of VTK widget"""
+        try:
+            self.SetEnabled(0)
+            self.Off()
+        except:
+            # Ignore errors during destruction
+            pass
 
 ### ====================================================================================================================
 ### MARKUP - POLYDATAS - LIST
