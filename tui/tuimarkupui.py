@@ -184,14 +184,14 @@ class Ui_BASEUI(object):
         self.markupModeComboBox = QtWidgets.QComboBox(self.markupGroupBox)
         self.markupModeComboBox.setObjectName("markupModeComboBox")
         self.markupModeComboBox.addItem("Point")
-        # self.markupModeComboBox.addItem("Spline")
+        self.markupModeComboBox.addItem("Spline")
         self.markupModeLayout.addWidget(self.markupModeComboBox)
         
         # Closed spline checkbox
-        # self.closedSplineCheck = QtWidgets.QCheckBox(self.markupGroupBox)
-        # self.closedSplineCheck.setObjectName("closedSplineCheck")
-        # self.closedSplineCheck.setChecked(True)  # Default to closed
-        # self.markupModeLayout.addWidget(self.closedSplineCheck)
+        self.closedSplineCheck = QtWidgets.QCheckBox(self.markupGroupBox)
+        self.closedSplineCheck.setObjectName("closedSplineCheck")
+        self.closedSplineCheck.setChecked(True)  # Default to closed
+        self.markupModeLayout.addWidget(self.closedSplineCheck)
         
         self.imageMarkupButtonsLayout.addLayout(self.markupModeLayout)
         self.imageMarkupControlLayout.addLayout(self.imageMarkupButtonsLayout, 0, 0, 1, 1)
@@ -306,7 +306,7 @@ class Ui_BASEUI(object):
         self.imMarkupButton_A.setText(_translate("BASEUI", "Nothing"))
         self.imMarkupButton_B.setText(_translate("BASEUI", "Nothing"))
         self.markupModeLabel.setText(_translate("BASEUI", "Markup Mode:"))
-        # self.closedSplineCheck.setText(_translate("BASEUI", "Closed Spline"))
+        self.closedSplineCheck.setText(_translate("BASEUI", "Closed Spline"))
         #
         # self.freehandInteractorButton.setText(_translate("BASEUI", "FREEHAND DRAW"))
         # self.label_7.setText(_translate("BASEUI", "Contour"))

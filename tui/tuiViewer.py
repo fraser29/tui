@@ -632,6 +632,33 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
             return vtkfilters.getConnectedRegionLargest(contour)
 
     # ======================== Markups - 3D specific implementations ================================================
+    def markupModeChanged(self, mode):
+        """Override base class to handle cursor widget enabling/disabling"""
+        # Call parent method first
+        super().markupModeChanged(mode)
+        
+        # Enable/disable cursor interaction based on markup mode
+        if mode == 'Spline':
+            # Disable cursor interaction to allow spline widget to get LMB events
+            # Keep the image display but disable the cursor interaction
+            for i in range(3):
+                if self.resliceCursorWidgetArray[i] is not None:
+                    iActor = self.resliceCursorWidgetArray[i].GetRepresentation().GetResliceCursorActor()
+                    self.rendererArray[i].RemoveActor(iActor)
+        else:
+            # Re-enable cursor interaction for other modes
+            for i in range(3):
+                if self.resliceCursorWidgetArray[i] is not None:
+                    # Restore normal priority
+                    self.resliceCursorWidgetArray[i].SetPriority(1.0)
+                    # Re-add interaction observers
+                    self.resliceCursorWidgetArray[i].AddObserver('StartInteractionEvent', self.ResliceCursorStartCallback)
+                    self.resliceCursorWidgetArray[i].AddObserver('InteractionEvent', self.ResliceCursorCallback)
+                    self.resliceCursorWidgetArray[i].AddObserver('EndInteractionEvent', self.ResliceCursorEndCallback)
+        
+        # Force render update
+        self.renderWindow.Render()
+
     def removeActorFromAllRenderers(self, actor):
         """Remove actor from all 3D renderers"""
         for i in range(4):
