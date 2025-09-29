@@ -200,20 +200,20 @@ class Markups(object):
 
     def addPoint(self, X, timeID, sliceID, norm=None):
         self.markupsDict[Points][timeID].addPoint(X, norm, timeID, sliceID)
-        if self.parentImageViewer.markupMode == 'Spline':
-            if len(self.markupsDict[Points][timeID]) == 3:
-                self.markupsDict[Splines][timeID].addSpline(self.markupsDict[Points][timeID].getPoints_ImageCS(), 
-                                                            reslice=self.parentImageViewer.getCurrentReslice(), 
-                                                            renderer=self.parentImageViewer.renderer, 
-                                                            interactor=self.parentImageViewer.graphicsViewVTK, 
-                                                            handDrawn=True,
-                                                            LOOP=self.parentImageViewer.splineClosed,
-                                                            timeID=timeID, 
-                                                            sliceID=sliceID)
-                self.markupsDict[Points][timeID] = MarkupPoints(self.coordinateSystem)
-            elif len(self.markupsDict[Splines][timeID]) == 1:
-                self.markupsDict[Splines][timeID][0].addPoint(X)
-                self.removeLastPoint(timeID)
+        # if self.parentImageViewer.markupMode == 'Spline':
+        if len(self.markupsDict[Points][timeID]) == 3:
+            self.markupsDict[Splines][timeID].addSpline(self.markupsDict[Points][timeID].getPoints_ImageCS(), 
+                                                        reslice=self.parentImageViewer.getCurrentReslice(), 
+                                                        renderer=self.parentImageViewer.getCurrentRenderer(), 
+                                                        interactor=self.parentImageViewer.graphicsViewVTK, 
+                                                        handDrawn=True,
+                                                        LOOP=self.parentImageViewer.splineClosed,
+                                                        timeID=timeID, 
+                                                        sliceID=sliceID)
+            self.markupsDict[Points][timeID] = MarkupPoints(self.coordinateSystem)
+        elif len(self.markupsDict[Splines][timeID]) == 1:
+            self.markupsDict[Splines][timeID][0].addPoint(X)
+            self.removeLastPoint(timeID)
             
     def removeLastPoint(self, timeID):
         try:

@@ -161,6 +161,10 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         
         self.show()
 
+
+    def getCurrentRenderer(self):
+        return self.renderer
+    
     # ==========================================================
     #   CONNECTIONS
     def connections(self):
@@ -369,22 +373,16 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         
         # Build reslice dictionary with default orientation
         self.buildResliceDictionary(orientation=self.sliceOrientation)
-        
-        # Setup slice slider after reslice dictionary is built
         self.setupSliceSlider()
-        
         # Now setup image data (which will call updateImageSlice)
         self.__setupNewImageData() ## MAIN SETUP HERE ##
-        
-        # Start at slice 0 (first slice)
-        self.currentSliceID = 0
+        self.currentSliceID = int(self.maxSliceID / 2)
         
         if self.VERBOSE:
             print(f"Image dimensions: {dims}")
             print(f"Orientation: {self.sliceOrientation}")
             print(f"Max slice ID: {self.maxSliceID}")
             print(f"Starting at slice: {self.currentSliceID}")
-        
         self.moveSliceSlider(self.currentSliceID)
     
     def buildResliceDictionary(self, orientation=None, customCenters=None, customNormals=None):
@@ -568,6 +566,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
     def imageCS_To_WorldCS_X(self, imageCS_X):
         """Convert image coordinates to world coordinates"""
         matrix = self.getCurrentResliceMatrix()
+        # print(f"DEBUG: imageCS_To_WorldCS_X: {imageCS_X} -> {matrix.MultiplyPoint([imageCS_X[0], imageCS_X[1], imageCS_X[2], 1])[:3]}")
         return matrix.MultiplyPoint([imageCS_X[0], imageCS_X[1], imageCS_X[2], 1])[:3]
 
     def mouseXYTo_ImageCS_X(self, mouseX, mouseY):
@@ -671,19 +670,11 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.clearCurrentMarkups()
         ## POINTS
         pointSize = self.boundingDist * 0.01
-        # Show lines when in spline mode
-        SHOW_LINES = (self.markupMode == 'Spline')
-        LOOP = self.splineClosed  # Use the spline closed setting
 
         ptsActor = self.Markups.getAllPointsActors(self.currentTimeID, pointSize)
         if ptsActor is not None:
             self.renderer.AddActor(ptsActor)
             self.markupActorList.append(ptsActor)
-            if SHOW_LINES:
-                lineWidth = 3 if self.markupMode == 'Spline' else pointSize*0.9
-                lineActor = self.Markups.getAllPointsLineActor(self.currentTimeID, lineWidth, LOOP)
-                self.renderer.AddActor(lineActor)
-                self.markupActorList.append(lineActor)
         ## POLYDATA
         pdActors = self.Markups.getAllPolydataActors(self.currentTimeID)
         if len(pdActors) > 0:
@@ -692,11 +683,6 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
                 self.markupActorList.append(ipdActor)
         ## SPLINE
         self.Markups.showSplines_timeID_sliceID(self.currentTimeID, self.getCurrentSliceID())
-        # splineActors = self.Markups.getAllSplineActors(self.currentTimeID)
-        # if len(splineActors) > 0:
-        #     for isplActor in splineActors:
-        #         self.renderer.AddActor(isplActor)
-        #         self.markupActorList.append(isplActor)
         if (window is not None) and (level is not None):
             self.setWindowLevel(window, level)
         self.renderWindow.Render()

@@ -411,7 +411,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
         return np.array(self.resliceCursorWidgetArray[i].GetResliceCursorRepresentation().GetPlaneSource().GetNormal())
 
 
-    def _getCurrentReslice(self):
+    def getCurrentReslice(self):
         return self.resliceCursorWidgetArray[self.interactionView].GetRepresentation().GetReslice()
 
 
@@ -426,7 +426,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
     
 
     def getCurrentResliceAsVTI(self, COPY=False):
-        ii = self._getCurrentReslice().GetOutput()
+        ii = self.getCurrentReslice().GetOutput()
         if COPY:
             iRS = vtk.vtkImageData()
             iRS.ShallowCopy(ii)
@@ -646,7 +646,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
         nn = self.getCurrentViewNormal()
         pts = vtkfilters.ftk.buildCircle3D(X, nn, 0.03, 25)
         print('Build circle at X and norm:',str(X), str(nn))
-        self.Markups.addSpline(pts, self._getCurrentReslice(), self.getCurrentRenderer(), self.graphicsViewVTK, self.currentTimeID, self.getCurrentSliceID())
+        self.Markups.addSpline(pts, self.getCurrentReslice(), self.getCurrentRenderer(), self.graphicsViewVTK, self.currentTimeID, self.getCurrentSliceID())
         self._updateMarkups()
 
 
