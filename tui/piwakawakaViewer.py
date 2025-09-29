@@ -168,7 +168,6 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
     def _getHelpFileName(self):
         """Override to specify PIWAKAWAKA-specific help file"""
         return "help_piwakawaka.txt"
-    
     # ==========================================================
     #   CONNECTIONS
     def connections(self):

@@ -88,6 +88,8 @@ class SinglePaneImageInteractor(vtk.vtkInteractorStyleImage):
 
     def keyPressCallback(self, obj, event):
         key = self.GetInteractor().GetKeyCode()
+        keySym = self.GetInteractor().GetKeySym()
+        print('Got key press - KeyCode:', key, 'KeySym:', keySym)
         if key == "h":
             print(' . = add point (or spline point if in spline mode)')
             print(' u = remove last point')
@@ -157,8 +159,28 @@ class SinglePaneImageInteractor(vtk.vtkInteractorStyleImage):
         elif key == "V":
             self.parentImageViewer.VERBOSE = not self.parentImageViewer.VERBOSE
             print(f"VERBOSE mode is now {self.parentImageViewer.VERBOSE}")
+
+        elif keySym == 'Left':
+            # Previous time step
+            if self.parentImageViewer.currentTimeID > 0:
+                self.parentImageViewer.currentTimeID -= 1
+                self.parentImageViewer.moveTimeSlider(self.parentImageViewer.currentTimeID)
+        elif keySym == 'Right':
+            # Next time step
+            if self.parentImageViewer.currentTimeID < len(self.parentImageViewer.times) - 1:
+                self.parentImageViewer.currentTimeID += 1
+                self.parentImageViewer.moveTimeSlider(self.parentImageViewer.currentTimeID)
+        elif keySym == 'Up':
+            # Forward slice
+            self.parentImageViewer.scrollForwardCurrentSlice1()
+        elif keySym == 'Down':
+            # Backward slice
+            self.parentImageViewer.scrollBackwardCurrentSlice1()
+    
+
         else:
             # Pass key to UserDefinedCallback
+            print('Pass %s to userDefined'%(key))
             self.userDefinedCallBack(key)
 
     def userDefinedCallBack(self, key):

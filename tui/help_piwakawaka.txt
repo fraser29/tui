@@ -15,6 +15,12 @@ KEYBOARD SHORTCUTS:
 • w - Reset window level
 • V - Toggle verbose mode
 
+ARROW KEY NAVIGATION:
+• Left Arrow - Previous time step
+• Right Arrow - Next time step
+• Up Arrow - Forward slice
+• Down Arrow - Backward slice
+
 SPLINE WIDGET INTERACTIONS:
 Once created (3 points in spline mode):
 • LMB: Move a spline handle
