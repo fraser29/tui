@@ -120,6 +120,10 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
         #
         # 3D-specific connections
         self.cursor3DCheck.stateChanged.connect(self.cursor3DChange)
+        
+        # Image manipulation buttons
+        self.imManip_A.clicked.connect(self.flipCamera)
+        self.imManip_B.clicked.connect(self.rotateCamera90)
         ##
         self.updatePushButtonDict()
 
@@ -176,6 +180,39 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
     def cameraReset3D(self):
         self.rendererArray[3].ResetCameraClippingRange()
         self.renderWindow.Render()
+
+    def flipCamera(self):
+        """Flip the camera view horizontally"""
+        if self.interactionView < 3:  # Only for 2D views
+            camera = self.rendererArray[self.interactionView].GetActiveCamera()
+            # Get current position and focal point
+            pos = camera.GetPosition()
+            focal = camera.GetFocalPoint()
+            viewUp = camera.GetViewUp()
+            
+            # Flip horizontally by negating the x-component of position relative to focal point
+            new_pos = [2 * focal[0] - pos[0], pos[1], pos[2]]
+            camera.SetPosition(new_pos)
+            self.renderWindow.Render()
+
+    def rotateCamera90(self):
+        """Rotate the camera view 90 degrees clockwise"""
+        if self.interactionView < 3:  # Only for 2D views
+            camera = self.rendererArray[self.interactionView].GetActiveCamera()
+            # Get current position and focal point
+            pos = camera.GetPosition()
+            focal = camera.GetFocalPoint()
+            viewUp = camera.GetViewUp()
+            
+            # Rotate 90 degrees clockwise around the view normal
+            # Calculate the view normal (from position to focal point)
+            view_normal = [focal[0] - pos[0], focal[1] - pos[1], focal[2] - pos[2]]
+            
+            # Rotate the viewUp vector 90 degrees around the view normal
+            # For a 90-degree rotation around Z-axis: (x, y) -> (-y, x)
+            new_viewUp = [-viewUp[1], viewUp[0], viewUp[2]]
+            camera.SetViewUp(new_viewUp)
+            self.renderWindow.Render()
 
     # Window level methods inherited from base class
 
@@ -238,26 +275,6 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
     def __gridButtonAction(self):
         if self.gridButton.isChecked():
             self.setGrossFrame(4)
-
-    def pushButton1(self):
-        print('Button pushed - do something')
-
-
-
-    # IMAGE MANIPULATION
-    def flipHorAction(self):
-        transform = vtk.vtkTransform()
-        transform.Scale(-1, 1, 1)  # Flip along X-axis
-        for actor in self.renderer.GetActors():
-            actor.SetUserTransform(transform)
-        self.renderWindow.Render()
-
-    def flipVertAction(self):
-        transform = vtk.vtkTransform()
-        transform.Scale(1, -1, 1)  # Flip along Y-axis
-        for actor in self.renderer.GetActors():
-            actor.SetUserTransform(transform)
-        self.renderWindow.Render()
 
 
     def setContourVal(self, val):

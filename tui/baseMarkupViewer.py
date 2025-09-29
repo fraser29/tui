@@ -488,9 +488,6 @@ class BaseMarkupViewer:
         self.Markups.addPoint(X, self.currentTimeID, self.getCurrentSliceID(), norm)
         self._updateMarkups()
 
-    def addSplinePoint(self, X, norm=None):
-        self.addPoint(X, norm)
-
     def removeLastPoint(self):
         """Remove last point"""
         self.Markups.removeLastPoint(self.currentTimeID)

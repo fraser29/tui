@@ -174,6 +174,10 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         #
         # Orientation controls
         self.orientationComboBox.currentTextChanged.connect(self.orientationChanged)
+        
+        # Image manipulation buttons
+        self.imManip_A.clicked.connect(self.flipCamera)
+        self.imManip_B.clicked.connect(self.rotateCamera90)
         ##
         self.updatePushButtonDict()
 
@@ -232,6 +236,37 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.renderer.ResetCameraClippingRange()
         self.renderWindow.Render()
 
+    def flipCamera(self):
+        """Flip the camera view horizontally"""
+        camera = self.renderer.GetActiveCamera()
+        # Get current position and focal point
+        pos = camera.GetPosition()
+        focal = camera.GetFocalPoint()
+        viewUp = camera.GetViewUp()
+        
+        # Flip horizontally by negating the x-component of position relative to focal point
+        new_pos = [2 * focal[0] - pos[0], pos[1], pos[2]]
+        camera.SetPosition(new_pos)
+        self.renderWindow.Render()
+
+    def rotateCamera90(self):
+        """Rotate the camera view 90 degrees clockwise"""
+        camera = self.renderer.GetActiveCamera()
+        # Get current position and focal point
+        pos = camera.GetPosition()
+        focal = camera.GetFocalPoint()
+        viewUp = camera.GetViewUp()
+        
+        # Rotate 90 degrees clockwise around the view normal
+        # Calculate the view normal (from position to focal point)
+        view_normal = [focal[0] - pos[0], focal[1] - pos[1], focal[2] - pos[2]]
+        
+        # Rotate the viewUp vector 90 degrees around the view normal
+        # For a 90-degree rotation around Z-axis: (x, y) -> (-y, x)
+        new_viewUp = [-viewUp[1], viewUp[0], viewUp[2]]
+        camera.SetViewUp(new_viewUp)
+        self.renderWindow.Render()
+
     # Window level methods inherited from base class
 
     def getWindowLevel(self):
@@ -251,39 +286,9 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
                 print(f"Set window level: window={w:.2f}, level={l:.2f}")
 
 
-    def pushButton1(self):
-        print('Button pushed - do something')
-
-    # IMAGE MANIPULATION
-    def flipHorAction(self):
-        transform = vtk.vtkTransform()
-        transform.Scale(-1, 1, 1)  # Flip along X-axis
-        for actor in self.renderer.GetActors():
-            actor.SetUserTransform(transform)
-        self.renderWindow.Render()
-
-    def flipVertAction(self):
-        transform = vtk.vtkTransform()
-        transform.Scale(1, -1, 1)  # Flip along Y-axis
-        for actor in self.renderer.GetActors():
-            actor.SetUserTransform(transform)
-        self.renderWindow.Render()
-
-    
     def getCurrentSliceID(self):
         """Get current slice ID for 2D viewer"""
         return self.currentSliceID
-    
-    def addSplinePoint(self, X, norm=None):
-        """Add a point for spline creation - delegates to markup system"""
-        currentReslice = self.getCurrentReslice()
-        if currentReslice is None:
-            if self.VERBOSE:
-                print("No current reslice available for spline widget")
-            return
-        
-        self.Markups.addSplinePoint(X, currentReslice, self.renderer, self.graphicsViewVTK, self.currentTimeID, self.getCurrentSliceID())
-        self._updateMarkups()
     
 
     def orientationChanged(self, orientation):
@@ -315,8 +320,6 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
             self.setupSliceSlider()
             self.updateImageSlice()
             self.updateViewAfterSliceChange()
-            # Update spline projections when orientation changes
-            self.Markups.updateAllSplineProjections(self.currentTimeID)
             
             if self.VERBOSE:
                 print(f"Changed orientation to {orientation_upper}, max slice: {self.maxSliceID}")

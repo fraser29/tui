@@ -229,7 +229,6 @@ class Markups(object):
 
     def showSplines_timeID_sliceID(self, timeID, sliceID):
         for iTimeID in self.markupsDict[Splines].keys():
-            print(f"DEBUG: showing splines for timeID={iTimeID} and sliceID={sliceID} -- {len(self.markupsDict[Splines][iTimeID])} splines")
             for iSpline in self.markupsDict[Splines][iTimeID]:
                 if iTimeID == timeID and iSpline.sliceID == sliceID:
                     iSpline.SetEnabled(1)

@@ -29,7 +29,31 @@ class _TUIProj(object):
 
     def __init__(self, app):
         self.app = app
-        self.DEBUG = False
+
+    
+    def setup(self, inputPath, workDir=None, scalar=None):
+        if os.path.isdir(inputPath): # DICOM directory
+            srcDir = os.path.split(inputPath)[0]
+            self.ex.loadDicomDir(inputPath)
+        elif inputPath.lower().endswith('.dcm'): # DICOM file
+            srcDir = os.path.split(inputPath)[0]
+            self.ex.loadDicomDir(inputPath)
+        else: # VTI or PVD file
+            srcDir = os.path.split(inputPath)[0]
+            self.ex.loadVTI_or_PVD(inputPath)
+
+        if workDir is None:
+            if srcDir:
+                workDir = srcDir
+            else:
+                workDir = os.getcwd()
+        
+        self.ex.workingDirLineEdit.setText(workDir)
+        if self.ex.VERBOSE:
+            print("WORK-DIR set to :", workDir)
+        if scalar is not None:
+            self.ex.setCurrentArray(scalar) # Example to set shown array (else take scalar)
+
 
     def getFullFileName(self, fileName=None, prefix=None, extn=None):
         if fileName is None:
@@ -59,7 +83,9 @@ class _TUIProj(object):
             pointsPP = self.ex.Markups.getPolylineFromPoints(self.ex.currentTimeID, LOOP=LINE_LOOP)
         else:
             pointsPP = self.ex.Markups.getPolyPointsFromPoints(self.ex.currentTimeID)
-        if pointsPP.GetNumberOfPoints() < minN:
+        if pointsPP is None:
+            pointsPP = vtkfilters.vtk.vtkPolyData()
+        if (pointsPP.GetNumberOfPoints() < minN):
             raise ValueError('Not enough points for requested: Need %d, have %d'%(minN, pointsPP.GetNumberOfPoints()))
         return pointsPP
 
@@ -220,26 +246,7 @@ class TUIBasic(TUIProject):
 
 
     def setup(self, inputPath, workDir=None, scalar=None):
-
-        if os.path.isdir(inputPath):
-            srcDir = os.path.split(inputPath)[0]
-            self.ex.loadDicomDir(inputPath)
-        elif inputPath.lower().endswith('.dcm'):
-            srcDir = os.path.split(inputPath)[0]
-            self.ex.loadDicomDir(inputPath)
-        else:
-            srcDir = os.path.split(inputPath)[0]
-            self.ex.loadVTI_or_PVD(inputPath)
-
-        if workDir is None:
-            if srcDir:
-                workDir = srcDir
-            else:
-                workDir = os.getcwd()
-        print("WORK-DIR:", workDir) # DEBUG
-        self.ex.workingDirLineEdit.setText(workDir)
-        if scalar is not None:
-            self.ex.setCurrentArray(scalar) # Example to set shown array (else take scalar)
+        super().setup(inputPath, workDir, scalar)
 
         self.pushButtonDict = {0:['Save points', self.savePolyPts_],
                               1:['Save line', self.savePolyLine_],
@@ -252,16 +259,19 @@ class TUIBasic(TUIProject):
 
     def saveVOI_(self):
         fOut = self.saveVOI()
-        print(fOut)
+        if (fOut is not None) and self.ex.VERBOSE:
+            print(f"Written VOI to {fOut}")
 
     def savePolyPts_(self):
         fOut = self.savePoints()
-        print(fOut)
+        if (fOut is not None) and self.ex.VERBOSE:
+            print(f"Written points to {fOut}")
 
 
     def savePolyLine_(self):
         fOut = self.saveLine(minN=2)
-        print(fOut)
+        if (fOut is not None) and self.ex.VERBOSE:
+            print(f"Written line to {fOut}")
     
 
     def testMask(self):
@@ -286,26 +296,7 @@ class TUI2D(TUI2DProject):
 
 
     def setup(self, inputPath, workDir=None, scalar=None):
-
-        if os.path.isdir(inputPath):
-            srcDir = os.path.split(inputPath)[0]
-            self.ex.loadDicomDir(inputPath)
-        elif inputPath.lower().endswith('.dcm'):
-            srcDir = os.path.split(inputPath)[0]
-            self.ex.loadDicomDir(inputPath)
-        else:
-            srcDir = os.path.split(inputPath)[0]
-            self.ex.loadVTI_or_PVD(inputPath)
-
-        if workDir is None:
-            if srcDir:
-                workDir = srcDir
-            else:
-                workDir = os.getcwd()
-        print("WORK-DIR:", workDir) # DEBUG
-        self.ex.workingDirLineEdit.setText(workDir)
-        if scalar is not None:
-            self.ex.setCurrentArray(scalar) # Example to set shown array (else take scalar)
+        super().setup(inputPath, workDir, scalar)
 
         self.pushButtonDict = {0:['Save points', self.savePolyPts_],
                               1:['Save line', self.savePolyLine_],
@@ -317,16 +308,19 @@ class TUI2D(TUI2DProject):
 
     def saveVOI_(self):
         fOut = self.saveVOI()
-        print(fOut)
+        if (fOut is not None) and self.ex.VERBOSE:
+            print(f"Written VOI to {fOut}")
 
     def savePolyPts_(self):
         fOut = self.savePoints()
-        print(fOut)
+        if (fOut is not None) and self.ex.VERBOSE:
+            print(f"Written points to {fOut}")
 
 
     def savePolyLine_(self):
         fOut = self.saveLine(minN=2)
-        print(fOut)
+        if (fOut is not None) and self.ex.VERBOSE:
+            print(f"Written line to {fOut}")
     
 
 

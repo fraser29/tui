@@ -172,10 +172,7 @@ class ImageInteractor(vtk.vtkInteractorStyleTrackballCamera):
         elif key == ".":
             X = self.getXAtMouse()
             norm = self.parentImageViewer.getCurrentViewNormal()
-            if self.parentImageViewer.markupMode == 'Point':
-                self.parentImageViewer.addPoint(X, norm)
-            else:  # Spline mode
-                self.parentImageViewer.addSplinePoint(X, norm)
+            self.parentImageViewer.addPoint(X, norm)
         elif key == "u":
             self.parentImageViewer.removeLastPoint()
         elif key == '1':

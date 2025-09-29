@@ -115,11 +115,12 @@ class Ui_BASEUI(object):
         self.imageManipulationButtonsLayout.addWidget(self.orientationComboBox)
         
         self.imManip_A = QtWidgets.QPushButton(self.imageManipulationGroupBox)
-        self.imManip_A.setObjectName("Does nothing")
+        self.imManip_A.setObjectName("imManip_A")
+        self.imManip_A.setEnabled(False)
         self.imageManipulationButtonsLayout.addWidget(self.imManip_A)
         #
-        self.imManip_B = QtWidgets.QPushButton(self.imageManipulationGroupBox)
-        self.imManip_B.setObjectName("Does nothing")
+        self.imManip_B = QtWidgets.QPushButton(self.imageManipulationGroupBox) # rotate 90
+        self.imManip_B.setObjectName("imManip_B")
         self.imageManipulationButtonsLayout.addWidget(self.imManip_B)
         self.imageManipulationControlLayout.addLayout(self.imageManipulationButtonsLayout, 0, 0, 1, 1)
         self.rightPanelLayout.addWidget(self.imageManipulationGroupBox, 0, 0, 1, 1)
@@ -143,11 +144,11 @@ class Ui_BASEUI(object):
         self.imageMarkupButtonsLayout = QtWidgets.QVBoxLayout()
         self.imageMarkupButtonsLayout.setObjectName("verticalLayout_4")
         self.imMarkupButton_A = QtWidgets.QPushButton(self.markupGroupBox)
-        self.imMarkupButton_A.setObjectName("Does nothing")
+        self.imMarkupButton_A.setObjectName("imMarkupButton_A")
         self.imageMarkupButtonsLayout.addWidget(self.imMarkupButton_A)
         #
         self.imMarkupButton_B = QtWidgets.QPushButton(self.markupGroupBox)
-        self.imMarkupButton_B.setObjectName("Does nothing")
+        self.imMarkupButton_B.setObjectName("imMarkupButton_B")
         self.imageMarkupButtonsLayout.addWidget(self.imMarkupButton_B)
         
         # Add markup mode controls
@@ -286,8 +287,8 @@ class Ui_BASEUI(object):
         #
         self.imageManipulationGroupBox.setTitle(_translate("BASEUI", "Image manipulation"))
         self.orientationLabel.setText(_translate("BASEUI", "Slice Orientation:"))
-        self.imManip_A.setText(_translate("BASEUI", "Nothing"))
-        self.imManip_B.setText(_translate("BASEUI", "Nothing"))
+        self.imManip_A.setText(_translate("BASEUI", "Flip Camera"))
+        self.imManip_B.setText(_translate("BASEUI", "Rotate 90°"))
         #
         self.markupGroupBox.setTitle(_translate("BASEUI", "Image markup"))
         self.imMarkupButton_A.setText(_translate("BASEUI", "Nothing"))
