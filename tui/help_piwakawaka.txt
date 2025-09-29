@@ -1,0 +1,42 @@
+TUI Viewer Help
+
+MOUSE INTERACTIONS:
+• LMB: Window level adjustment + interact with cross hairs
+• Interact with center of cross hairs to translate
+• CTRL+LMB: Keep cross hairs orthogonal
+• MMB: Translate scene
+• RMB: Scale scene
+• SHIFT+RMB or mouse wheel: Scale scene
+
+KEYBOARD SHORTCUTS:
+• h - Show this help window
+• . - Add point/spline point
+• u - Remove last point
+• r - Reset 3D view
+• R - Reset all views
+• 1-5 - Switch views (Sagittal, Coronal, Axial, 3D, Grid)
+• p - Save screenshot
+• m - Print patient metadata
+• c - Set contour level
+• o - Toggle limitContourToOne
+• l - Set multipoint factor
+• w - Reset window level
+• V - Toggle verbose mode
+
+SPLINE WIDGET INTERACTIONS:
+Once created (3 points in spline mode):
+• Shift+LMB: Move a spline handle
+• Shift+RMB: Add a new spline handle
+• CTRL+RMB: Remove a spline handle
+• MMB: Translate spline
+• RMB: Scale spline
+
+MARKUP MODES:
+• Point Mode: Add individual points
+• Spline Mode: Create spline curves from points
+• Closed Spline: Create closed spline curves
+
+VIEW CONTROLS:
+• Use view buttons (Ax, Cor, Sag, 3D, Grid) to switch between views
+• Grid view shows all views simultaneously
+• Individual view buttons show one view large with others small

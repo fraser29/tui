@@ -82,7 +82,8 @@ class Ui_BASEUI(object):
         self.imageManipulationButtonsLayout.setObjectName("verticalLayout_4")
         self.imManip_A = QtWidgets.QPushButton(self.imageManipulationGroupBox)
         self.imManip_A.setObjectName("imManip_A")
-        self.imManip_A.setEnabled(False)
+        self.imManip_A.setEnabled(True)
+        self.imManip_A.setCheckable(True)
         self.imageManipulationButtonsLayout.addWidget(self.imManip_A)
         #
         self.imManip_B = QtWidgets.QPushButton(self.imageManipulationGroupBox)
@@ -184,7 +185,7 @@ class Ui_BASEUI(object):
         self.markupModeComboBox = QtWidgets.QComboBox(self.markupGroupBox)
         self.markupModeComboBox.setObjectName("markupModeComboBox")
         self.markupModeComboBox.addItem("Point")
-        self.markupModeComboBox.addItem("Spline")
+        # self.markupModeComboBox.addItem("Spline")
         self.markupModeLayout.addWidget(self.markupModeComboBox)
         
         # Closed spline checkbox
@@ -198,15 +199,21 @@ class Ui_BASEUI(object):
         self.rightPanelLayout.addWidget(self.markupGroupBox, 4, 0, 1, 1)
         #
         #
+        # Help Button
+        self.helpButton = QtWidgets.QPushButton(self.centralwidget)
+        self.helpButton.setObjectName("helpButton")
+        self.rightPanelLayout.addWidget(self.helpButton, 5, 0, 1, 1)
+        #
+        #
         # 
         spacerItem1 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
-        self.rightPanelLayout.addItem(spacerItem1, 5, 0, 1, 1)
+        self.rightPanelLayout.addItem(spacerItem1, 6, 0, 1, 1)
         #
         #
         # Add Customised Buttons Label
         self.customButtonsLabel = QtWidgets.QLabel(self.centralwidget)
         self.customButtonsLabel.setObjectName("customButtonsLabel")
-        self.rightPanelLayout.addWidget(self.customButtonsLabel, 6, 0, 1, 1)
+        self.rightPanelLayout.addWidget(self.customButtonsLabel, 7, 0, 1, 1)
 
         # CUSTOMISABLE BUTTONS
         self.pushButtonsLayout = QtWidgets.QGridLayout()
@@ -217,12 +224,12 @@ class Ui_BASEUI(object):
             button.setObjectName(f"button{i+1}")
             self.pushButtonsLayout.addWidget(button, i//2, i%2, 1, 1)
             self.modPushButtons.append(button)
-        self.rightPanelLayout.addLayout(self.pushButtonsLayout, 7, 0, 1, 1)
+        self.rightPanelLayout.addLayout(self.pushButtonsLayout, 8, 0, 1, 1)
 
         # Animation Controls
         self.animationControlsLabel = QtWidgets.QLabel(self.centralwidget)
         self.animationControlsLabel.setObjectName("animationControlsLabel")
-        self.rightPanelLayout.addWidget(self.animationControlsLabel, 8, 0, 1, 1)
+        self.rightPanelLayout.addWidget(self.animationControlsLabel, 9, 0, 1, 1)
 
         # Animation controls layout
         self.animationLayout = QtWidgets.QVBoxLayout()
@@ -248,7 +255,7 @@ class Ui_BASEUI(object):
         self.speedSlider.setTickPosition(QtWidgets.QSlider.TicksBelow)
         self.animationLayout.addWidget(self.speedSlider)
 
-        self.rightPanelLayout.addLayout(self.animationLayout, 9, 0, 1, 1)
+        self.rightPanelLayout.addLayout(self.animationLayout, 10, 0, 1, 1)
 
         # Add the right panel widget to the main layout
         self.mainLayout.addWidget(self.rightPanelWidget, 0, 1, 1, 1)
@@ -299,14 +306,16 @@ class Ui_BASEUI(object):
         self.timeLabel.setText(_translate("BASEUI", "0/0 [0.0]"))
         #
         self.imageManipulationGroupBox.setTitle(_translate("BASEUI", "Image manipulation"))
-        self.imManip_A.setText(_translate("BASEUI", "Flip Camera"))
+        self.imManip_A.setText(_translate("BASEUI", "Toggle crosshairs"))
         self.imManip_B.setText(_translate("BASEUI", "Rotate 90°"))
         #
         self.markupGroupBox.setTitle(_translate("BASEUI", "Image markup"))
-        self.imMarkupButton_A.setText(_translate("BASEUI", "Nothing"))
-        self.imMarkupButton_B.setText(_translate("BASEUI", "Nothing"))
+        self.imMarkupButton_A.setText(_translate("BASEUI", "Spline markup"))
+        self.imMarkupButton_B.setText(_translate("BASEUI", "Nothing")) # TODO
         self.markupModeLabel.setText(_translate("BASEUI", "Markup Mode:"))
-        self.closedSplineCheck.setText(_translate("BASEUI", "Closed Spline"))
+        self.closedSplineCheck.setText(_translate("BASEUI", "Closed loop"))
+        #
+        self.helpButton.setText(_translate("BASEUI", "Help"))
         #
         # self.freehandInteractorButton.setText(_translate("BASEUI", "FREEHAND DRAW"))
         # self.label_7.setText(_translate("BASEUI", "Contour"))

@@ -244,10 +244,29 @@ class Markups(object):
     def addSpline(self, pts, reslice, renderer, interactor, timeID, sliceID, LOOP, isHandDrawn=True):
         self.markupsDict[Splines][timeID].addSpline(pts, reslice, renderer, interactor, handDrawn=isHandDrawn, LOOP=LOOP, timeID=timeID, sliceID=sliceID)
 
-    def getAllSplineActors(self, timeID):
-        return self.markupsDict[Splines][timeID].getListOfActors()
 
-    def showSplines_timeID_sliceID(self, timeID, sliceID):
+    def showSplines_timeID_CP(self, timeID, CP, N, dx): # Used by TUI
+        for iTimeID in self.markupsDict[Splines].keys():
+            for iSpline in self.markupsDict[Splines][timeID]:
+                if iTimeID == timeID:
+                    ABCD = iSpline.getPlane()
+                    print(f"DEBUG: {ABCD}, {iSpline.getPoints()}")
+                    print(f"DEBUG: CP: {CP}")
+                    print(f"DEBUG: N: {N}")
+                    print(f"DEBUG: dx: {dx}")
+                    # if planes_within_tol(ABCD, CP, N, dx):
+                    if True:
+                        iSpline.SetEnabled(1)
+                        iSpline.On()
+                    else:
+                        iSpline.SetEnabled(0)
+                        iSpline.Off()
+                else:
+                    iSpline.SetEnabled(0)
+                    iSpline.Off()
+
+
+    def showSplines_timeID_sliceID(self, timeID, sliceID): # Used by PIWAKAWAKA
         for iTimeID in self.markupsDict[Splines].keys():
             for iSpline in self.markupsDict[Splines][iTimeID]:
                 if iTimeID == timeID and iSpline.sliceID == sliceID:
@@ -477,8 +496,6 @@ class MarkupSplines(list):
     def addSpline(self, Xarrary, reslice, renderer, interactor, handDrawn, LOOP, timeID=0, sliceID=0):
         self.append(MarkupSpline(Xarrary, reslice, renderer, interactor, handDrawn, LOOP, coordinateSystem=self.coordinateSystem, timeID=timeID, sliceID=sliceID))
 
-    def getListOfActors(self):
-        return [i.getActor() for i in self]
 
 ### ====================================================================================================================
 ### MARKUP - SPLINE
@@ -545,15 +562,19 @@ class MarkupSpline(Markup, vtk.vtkSplineWidget):
         self.GetPolyData(poly)
         return poly
 
+
     def getPoints(self, nSplinePts=None):
         pts = []
         for k0 in range(self.GetNumberOfHandles()):
             ixyz = [0.0,0.0,0.0]
-            pt = self.GetHandlePosition(k0, ixyz)
-            pts.append(pt)
+            self.GetHandlePosition(k0, ixyz)
+            pts.append(ixyz)
         if nSplinePts is not None:
             pts = vtkfilters.ftk.splinePoints(pts, nSplinePts, periodic=self.LOOP, RETURN_NUMPY=False)
         return np.array(pts)
+
+    def getPlane(self):
+        return vtkfilters.ftk.fitPlaneToPoints(self.getPoints())
 
     def addPoint(self, X):
         self.SetHandlePosition(self.GetNumberOfHandles(), X[0], X[1], X[2])
@@ -782,4 +803,44 @@ def binaryArrayFromImage_andThresholdList(imageObj, arrayName, thresholdLowerLis
         binaryA[sliceTF,k1] = 1.0
     return binaryA
 
+
+def planes_within_tol(plane1_ABC_D, X, n2, dX, angle_tol_rad=1e-2):
+    # plane1_ABC_D: iterable (A,B,C,D)
+    # X: iterable (x,y,z)
+    # n2: iterable normal of second plane
+    # dX: distance tolerance (same units as coordinates)
+    # angle_tol_rad: maximum allowed angle between normals in radians (default ~0.57°)
+
+    A, B, C, D = map(float, plane1_ABC_D)
+    n1 = np.array([A, B, C], dtype=float)
+    n2 = np.array(n2, dtype=float)
+    X = np.array(X, dtype=float)
+
+    n1_norm = np.linalg.norm(n1)
+    n2_norm = np.linalg.norm(n2)
+    if n1_norm == 0 or n2_norm == 0:
+        raise ValueError("zero-length normal provided")
+
+    u1 = n1 / n1_norm
+    u2 = n2 / n2_norm
+
+    # make directions consistent (so D signs match)
+    if np.dot(u1, u2) < 0:
+        u2 = -u2
+
+    # angle between normals
+    cosang = np.clip(np.dot(u1, u2), -1.0, 1.0)
+    angle = np.arccos(cosang)
+
+    if angle > angle_tol_rad:
+        return False
+
+    # plane constants with unit normals
+    D1p = D / n1_norm           # plane1: u1·p + D1p = 0
+    D2p = -np.dot(u2, X)        # plane2 through point X: u2·p + D2p = 0
+
+    dist = abs(D2p - D1p)       # perpendicular distance between parallel planes
+
+    IS_OK = dist <= float(dX)
+    return IS_OK
 

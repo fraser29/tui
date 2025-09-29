@@ -122,8 +122,11 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
         self.cursor3DCheck.stateChanged.connect(self.cursor3DChange)
         
         # Image manipulation buttons
-        self.imManip_A.clicked.connect(self.flipCamera)
-        self.imManip_B.clicked.connect(self.rotateCamera90)
+        self.imManip_A.clicked.connect(self.toggleCrosshairs)
+        # self.imManip_B.clicked.connect(self.rotateCamera90)
+        ##
+        # Help button
+        self.helpButton.clicked.connect(self.showHelpWindow)
         ##
         self.updatePushButtonDict()
 
@@ -181,38 +184,180 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
         self.rendererArray[3].ResetCameraClippingRange()
         self.renderWindow.Render()
 
-    def flipCamera(self):
-        """Flip the camera view horizontally"""
-        if self.interactionView < 3:  # Only for 2D views
-            camera = self.rendererArray[self.interactionView].GetActiveCamera()
-            # Get current position and focal point
-            pos = camera.GetPosition()
-            focal = camera.GetFocalPoint()
-            viewUp = camera.GetViewUp()
-            
-            # Flip horizontally by negating the x-component of position relative to focal point
-            new_pos = [2 * focal[0] - pos[0], pos[1], pos[2]]
-            camera.SetPosition(new_pos)
-            self.renderWindow.Render()
+    def toggleCrosshairs(self): 
+        if self.imManip_A.isChecked():
+            self.__updateCrosshairs(True)
+        else:
+            self.__updateCrosshairs(False)
+        self.renderWindow.Render()
 
-    def rotateCamera90(self):
-        """Rotate the camera view 90 degrees clockwise"""
-        if self.interactionView < 3:  # Only for 2D views
-            camera = self.rendererArray[self.interactionView].GetActiveCamera()
-            # Get current position and focal point
-            pos = camera.GetPosition()
-            focal = camera.GetFocalPoint()
-            viewUp = camera.GetViewUp()
+    def showHelpWindow(self):
+        """Show help window with keyboard shortcuts and interaction guide"""
+        help_window = tuimarkupui.QtWidgets.QDialog(self)
+        help_window.setWindowTitle("TUI Help")
+        help_window.setModal(False)
+        help_window.resize(500, 600)
+        
+        layout = tuimarkupui.QtWidgets.QVBoxLayout(help_window)
+        
+        # Help text
+        help_text = tuimarkupui.QtWidgets.QTextEdit()
+        help_text.setReadOnly(True)
+        
+        # Read base help content from file
+        help_content = self._loadHelpContent()
+        
+        # Allow subclasses to append custom help
+        custom_help = self._getCustomHelp()
+        if custom_help:
+            help_content += "\n\n" + custom_help
+        
+        # Convert to HTML for nicer formatting
+        html_content = self._formatHelpAsHTML(help_content)
+        help_text.setHtml(html_content)
+        layout.addWidget(help_text)
+        
+        # Close button
+        close_button = tuimarkupui.QtWidgets.QPushButton("Close")
+        close_button.clicked.connect(help_window.accept)
+        layout.addWidget(close_button)
+        
+        help_window.show()
+
+    def _loadHelpContent(self):
+        """Load help content from help.txt file"""
+        import os
+        help_file = os.path.join(os.path.dirname(__file__), 'help_tui.txt')
+        try:
+            with open(help_file, 'r', encoding='utf-8') as f:
+                return f.read()
+        except FileNotFoundError:
+            return "Help file not found. Please ensure help.txt exists in the tui directory."
+        except Exception as e:
+            return f"Error loading help file: {str(e)}"
+
+    def _getCustomHelp(self):
+        """Override this method in subclasses to add custom help content
+        
+        Example usage in a subclass:
+        
+        class MyCustomTUIViewer(TUIMarkupViewer):
+            def _getCustomHelp(self):
+                return '''CUSTOM FEATURES:
+• F1 - My custom feature 1
+• F2 - My custom feature 2
+• Custom button - Does something special'''
+        """
+        return ""
+
+    def _formatHelpAsHTML(self, text_content):
+        """Convert plain text help content to nicely formatted HTML"""
+        import re
+        
+        # Start with HTML structure
+        html = """
+        <html>
+        <head>
+        <style>
+        body { 
+            font-family: 'Segoe UI', Arial, sans-serif; 
+            font-size: 11px; 
+            line-height: 1.4; 
+            margin: 10px;
+            background-color: #f8f9fa;
+        }
+        h1 { 
+            color: #2c3e50; 
+            font-size: 16px; 
+            font-weight: bold; 
+            margin: 0 0 15px 0; 
+            padding-bottom: 5px;
+            border-bottom: 2px solid #3498db;
+        }
+        h2 { 
+            color: #34495e; 
+            font-size: 13px; 
+            font-weight: bold; 
+            margin: 15px 0 8px 0; 
+            background-color: #ecf0f1;
+            padding: 5px 8px;
+            border-left: 4px solid #3498db;
+        }
+        ul { 
+            margin: 5px 0; 
+            padding-left: 0;
+        }
+        li { 
+            margin: 3px 0; 
+            padding: 2px 0;
+            list-style: none;
+        }
+        li:before { 
+            content: "• "; 
+            color: #3498db; 
+            font-weight: bold; 
+            margin-right: 5px;
+        }
+        .keyboard { 
+            background-color: #e8f4fd; 
+            padding: 2px 6px; 
+            border-radius: 3px; 
+            font-family: 'Courier New', monospace; 
+            font-weight: bold;
+            color: #2980b9;
+        }
+        .description { 
+            color: #555; 
+        }
+        </style>
+        </head>
+        <body>
+        """
+        
+        # Split content into lines
+        lines = text_content.strip().split('\n')
+        
+        for line in lines:
+            line = line.strip()
             
-            # Rotate 90 degrees clockwise around the view normal
-            # Calculate the view normal (from position to focal point)
-            view_normal = [focal[0] - pos[0], focal[1] - pos[1], focal[2] - pos[2]]
+            if not line:
+                html += "<br/>"
+                continue
             
-            # Rotate the viewUp vector 90 degrees around the view normal
-            # For a 90-degree rotation around Z-axis: (x, y) -> (-y, x)
-            new_viewUp = [-viewUp[1], viewUp[0], viewUp[2]]
-            camera.SetViewUp(new_viewUp)
-            self.renderWindow.Render()
+            # Check if it's a main title (no bullet point)
+            if line and not line.startswith('•') and not line.startswith('*'):
+                if ':' in line and not line.startswith(' '):
+                    # It's a section header
+                    html += f"<h2>{line}</h2>"
+                else:
+                    # It's a main title
+                    html += f"<h1>{line}</h1>"
+            else:
+                # It's a bullet point
+                if line.startswith('•'):
+                    line = line[1:].strip()
+                elif line.startswith('*'):
+                    line = line[1:].strip()
+                
+                # Look for keyboard shortcuts (text before first dash)
+                if ' - ' in line:
+                    parts = line.split(' - ', 1)
+                    if len(parts) == 2:
+                        key_part = parts[0].strip()
+                        desc_part = parts[1].strip()
+                        
+                        # Format keyboard shortcuts
+                        if any(char in key_part for char in ['•', 'h', '.', 'u', 'r', 'R', '1', '2', '3', '4', '5', 'p', 'm', 'c', 'o', 'l', 'w', 'V']):
+                            html += f"<li><span class='keyboard'>{key_part}</span> - <span class='description'>{desc_part}</span></li>"
+                        else:
+                            html += f"<li><span class='keyboard'>{key_part}</span> - <span class='description'>{desc_part}</span></li>"
+                    else:
+                        html += f"<li>{line}</li>"
+                else:
+                    html += f"<li>{line}</li>"
+        
+        html += "</body></html>"
+        return html
 
     # Window level methods inherited from base class
 
@@ -273,7 +418,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
         if self.threeDButton.isChecked():
             self.setGrossFrame(3)
     def __gridButtonAction(self):
-        if self.gridButton.isChecked():
+        if self.gridViewButton.isChecked():
             self.setGrossFrame(4)
 
 
@@ -539,7 +684,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
         ## POINTS
         pointSize = self.boundingDist * 0.01
         # Show lines when in spline mode, otherwise use the original logic
-        SHOW_LINES = (self.markupMode == 'Spline')
+        SHOW_LINES = self.splineClosed # If spline closed (but points) then show a closed line
         LOOP = self.splineClosed  # Use the spline closed setting
         tfA = [i==j for i,j in zip([1,0,0], self.getViewNormal(0))]
         tfB = [i==j for i,j in zip([0,-1,0], self.getViewNormal(1))]
@@ -564,7 +709,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
                     self.rendererArray[i].AddActor(ptsActor_i)
                     self.markupActorList.append(ptsActor_i)
                     if SHOW_LINES:
-                        lineWidth = 3 if self.markupMode == 'Spline' else 3
+                        lineWidth = 3
                         lineActor_i = self.Markups.getAllPointsLineActor(self.currentTimeID, lineWidth, LOOP, cpX, nn, pointSize*0.9)
                         if lineActor_i is not None:
                             self.rendererArray[i].AddActor(lineActor_i)
@@ -575,32 +720,24 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
             for ipdActor in pdActors:
                 self.rendererArray[3].AddActor(ipdActor)
                 self.markupActorList.append(ipdActor)
-        ## SPLINE
-        splineActors = self.Markups.getAllSplineActors(self.currentTimeID)
-        if len(splineActors) > 0:
-            for isplActor in splineActors:
-                self.rendererArray[3].AddActor(isplActor)
-                self.markupActorList.append(isplActor)
+        ## SPLINE - splines disabled in TUI
+        # self.Markups.showSplines_timeID_CP(self.currentTimeID, self.resliceCursor.GetCenter(), self.getViewNormal(2), pointSize*0.9)
         if (window is not None) and (level is not None):
             self.setWindowLevel(window, level)
         self.renderWindow.Render()
 
-    def __buildCursorActors(self):
-        X = self.getCurrentX() # TODO add connection to reslice cursor
-        norms3 = [self.resliceCursorWidgetArray[i].GetResliceCursorRepresentation().GetPlaneSource().GetNormal() for i in range(3)]
-        planes3 = [vtkfilters.buildPlanePtAndNorm(X, iNorm, PLANE_SIZE=self.boundingDist*0.1, RESOLUTION=self.boundingDist*0.05) for iNorm in norms3]
+    def __updateCrosshairs(self, SHOW):
         for i in range(3):
-            mapper = vtk.vtkPolyDataMapper()
-            mapper.SetInputData(planes3[i])
-            mapper.ScalarVisibilityOff()
-            planeActor = vtk.vtkActor()
-            planeActor.GetProperty().SetRepresentationToSurface()
-            planeActor.GetProperty().SetColor(self.planeBackgroundColors[i])
-            planeActor.SetMapper(mapper)
-            self.planeActors3.append(planeActor)
+            iActor = self.resliceCursorWidgetArray[i].GetRepresentation().GetResliceCursorActor()
+            if SHOW:
+                self.rendererArray[i].AddActor(iActor)
+            else:
+                self.rendererArray[i].RemoveActor(iActor)
+        self.renderWindow.Render()
+
 
     def __update3DCursor(self, SHOW):
-        iActor = self.resliceCursorWidgetArray[0].GetRepresentation().GetResliceCursorActor()
+        iActor = self.resliceCursorWidgetArray[2].GetRepresentation().GetResliceCursorActor()
         if SHOW:
             self.rendererArray[3].AddActor(iActor)
         else:
@@ -631,125 +768,11 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
             contour = vtkfilters.contourFilter(self.getCurrentVTIObject(), self.contourVal)
             return vtkfilters.getConnectedRegionLargest(contour)
 
-    # ======================== Markups - 3D specific implementations ================================================
-    def markupModeChanged(self, mode):
-        """Override base class to handle cursor widget enabling/disabling"""
-        # Call parent method first
-        super().markupModeChanged(mode)
-        
-        # Enable/disable cursor interaction based on markup mode
-        if mode == 'Spline':
-            # Disable cursor interaction to allow spline widget to get LMB events
-            # Keep the image display but disable the cursor interaction
-            for i in range(3):
-                if self.resliceCursorWidgetArray[i] is not None:
-                    iActor = self.resliceCursorWidgetArray[i].GetRepresentation().GetResliceCursorActor()
-                    self.rendererArray[i].RemoveActor(iActor)
-        else:
-            # Re-enable cursor interaction for other modes
-            for i in range(3):
-                if self.resliceCursorWidgetArray[i] is not None:
-                    # Restore normal priority
-                    self.resliceCursorWidgetArray[i].SetPriority(1.0)
-                    # Re-add interaction observers
-                    self.resliceCursorWidgetArray[i].AddObserver('StartInteractionEvent', self.ResliceCursorStartCallback)
-                    self.resliceCursorWidgetArray[i].AddObserver('InteractionEvent', self.ResliceCursorCallback)
-                    self.resliceCursorWidgetArray[i].AddObserver('EndInteractionEvent', self.ResliceCursorEndCallback)
-        
-        # Force render update
-        self.renderWindow.Render()
 
-    def removeActorFromAllRenderers(self, actor):
-        """Remove actor from all 3D renderers"""
-        for i in range(4):
-            self.rendererArray[i].RemoveActor(actor)
-
-    def updateViewAfterTimeChange(self):
-        """Update view after time change for 3D viewer"""
-        self.resliceCursor.SetImage(self.getCurrentVTIObject()) # FIXME - check the picker
-        self.updateViewAfterSliceChange()
-
-    def addSpline(self, X): #TODO - TESTING -
-        nn = self.getCurrentViewNormal()
-        pts = vtkfilters.ftk.buildCircle3D(X, nn, 0.03, 25)
-        print('Build circle at X and norm:',str(X), str(nn))
-        self.Markups.addSpline(pts, self.getCurrentReslice(), self.getCurrentRenderer(), self.graphicsViewVTK, self.currentTimeID, self.getCurrentSliceID())
-        self._updateMarkups()
-
-
-    # ======================== OTHER OUTPUTS ===========================================================================
-    def saveMontage(self, outputFullFile, startPt, endPt, nImages, viewID):
-        outputDir = os.path.split(outputFullFile)[0]
-        fList = self.__saveImages(outputDir, startPt, endPt, nImages, viewID)
-        os.system('cd %s && montage %s -tile %dx1 -geometry 300x300+0+0 %s' % (
-            outputDir, ' '.join(fList), len(fList), outputFullFile))
-        for iFile in fList:
-            os.unlink(iFile)
-        return outputFullFile
-
-    # def saveGIF(self, outputFullFile, deltaEndSlice, deltaSlice):
-    #     return self.__saveImages(outputFullFile, deltaEndSlice, deltaSlice, False, MAKE_GIF=True)
-
-    def saveImages(self, outputDir, startPt, endPt, nImages, viewID, outputPrefix='', FULL_VIEW=False, size=None):
-        return self.__saveImages( outputDir, startPt, endPt, nImages, viewID, outputPrefix=outputPrefix,
-                                  FULL_VIEW=FULL_VIEW, size=size)
-
-    def __saveImages(self, outputDir, startPt, endPt, nImages, viewID, outputPrefix='', FULL_VIEW=False, size=None):
-        from PIL import Image
-        fileOutList = []
-        self.interactionView = viewID
-        w, l = self.getWindowLevel()
-        lowP, highP = l-(w/2.), l+(w/2.)
-        imageLine = vtkfilters.buildPolyLineBetweenTwoPoints(startPt, endPt, nImages)
-        allCP = vtkfilters.getPtsAsNumpy(imageLine)
-        for k1, cp in enumerate(allCP):
-            self.resliceCursor.SetCenter(cp)
-            self._updateMarkups(w, l)  # will render
-            fOut = os.path.join(outputDir, f'{outputPrefix}{k1}.png')
-            if FULL_VIEW:
-                windowToImageFilter = vtk.vtkWindowToImageFilter()
-                windowToImageFilter.SetInput(self.graphicsViewVTK.GetRenderWindow())
-                # windowToImageFilter.SetMagnification(3)  # set the resolution of the output image (3 times the current resolution of vtk render window)
-                # windowToImageFilter.SetInputBufferTypeToRGBA()  # also record the alpha (transparency) channel
-                # windowToImageFilter.ReadFrontBufferOff()  # read from the back buffer
-                windowToImageFilter.Update()
-                writer = vtk.vtkPNGWriter()
-                writer.SetFileName(fOut)
-                writer.SetInputConnection(windowToImageFilter.GetOutputPort())
-                writer.Write()
-            else:
-                ii = self.getCurrentResliceAsVTI(COPY=True)
-                dims = ii.GetDimensions()
-                A = vtkfilters.getArrayAsNumpy(ii, 'ImageScalars')
-                A[A < lowP] = lowP
-                A[A > highP] = highP
-                A = A + abs(np.min(A)) # Max all pixels positive
-                A = (A / np.max(A) * 255) # Set to 0-255
-                A = np.reshape(A, (dims[0], dims[1]), order='F')
-                A = np.rot90(A, 1) # FIXME - should work out this number from viewID
-                img = Image.fromarray(A.astype(np.uint8))  # uses mode='L'
-                if size is not None:
-                    try: 
-                        size[1] 
-                    except (TypeError, IndexError): 
-                        size = [size, size]
-                    wh = img.size
-                    # print(f'Current size = {wh}')
-                    whMaxID = np.argmax(wh)
-                    ratios = [wh[0] / wh[whMaxID], wh[1] / wh[whMaxID]]
-                    if wh[whMaxID] > max(size):
-                        sizeN = [size[0] * ratios[0], size[1] * ratios[1]]
-                        # print(f'New size is {sizeN}')
-                        img = img.resize((int(sizeN[0]), int(sizeN[1])))
-                img.save(fOut)
-            fileOutList.append(fOut)
-        return fileOutList
-        # os.system('convert %s -resize 400x400 %s'%(fOut, fOut))
 
 # ======================================================================================================================
 # ======================================================================================================================
 # ======================================================================================================================
-
 
 
 ### ====================================================================================================================

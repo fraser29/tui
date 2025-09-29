@@ -186,28 +186,14 @@ class ImageInteractor(vtk.vtkInteractorStyleTrackballCamera):
 
 
         elif key == "p": # SCREENSHOT  / HISTOGRAM
-            outDir = os.path.join(self.parentImageViewer.workingDirLineEdit.text(), 'TEMP_SCREENSHOT')
             ffOut = os.path.join(self.parentImageViewer.workingDirLineEdit.text(), 'screenshot.png')
-            thisSlice = self.parentImageViewer.currentSliceID
-            fileOutList = []
-            os.makedirs(outDir, exist_ok=True)
-            for id, k1 in enumerate(range(0, 200, 5)):
-                nextSlice = thisSlice + k1
-                self.parentImageViewer.moveSliceSlider(nextSlice)
-                fOut = outDir + '/%d.png'%(id)
-                windowToImageFilter = vtk.vtkWindowToImageFilter()
-                windowToImageFilter.SetInput(self.parentImageViewer.graphicsViewVTK.GetRenderWindow())
-                windowToImageFilter.Update()
-
-                writer = vtk.vtkPNGWriter()
-                writer.SetFileName(fOut)
-                writer.SetInputConnection(windowToImageFilter.GetOutputPort())
-                writer.Write()
-                fileOutList.append(fOut)
-                # os.system('convert %s -resize 400x400 %s'%(fOut, fOut))
-            os.system('cd %s && montage %s -tile %dx1 -geometry 300x300+0+0 %s'%(outDir, ' '.join(fileOutList), len(fileOutList), ffOut))
-            print(id, ffOut)
-            shutil.rmtree(outDir)
+            windowToImageFilter = vtk.vtkWindowToImageFilter()
+            windowToImageFilter.SetInput(self.parentImageViewer.graphicsViewVTK.GetRenderWindow())
+            windowToImageFilter.Update()
+            writer = vtk.vtkPNGWriter()
+            writer.SetFileName(ffOut)
+            writer.SetInputConnection(windowToImageFilter.GetOutputPort())
+            writer.Write()
 
         elif key == "P": # SAVE PLANE
             plane = self.parentImageViewer.getCurrentResliceAsVTP()
@@ -265,3 +251,26 @@ class ImageInteractor(vtk.vtkInteractorStyleTrackballCamera):
 
 # ======================================================================================================================
 # ======================================================================================================================
+# Screen shots to montage: 
+            # outDir = os.path.join(self.parentImageViewer.workingDirLineEdit.text(), 'TEMP_SCREENSHOT')
+            # ffOut = os.path.join(self.parentImageViewer.workingDirLineEdit.text(), 'screenshot.png')
+            # thisSlice = self.parentImageViewer.currentSliceID
+            # fileOutList = []
+            # os.makedirs(outDir, exist_ok=True)
+            # for id, k1 in enumerate(range(0, 200, 5)):
+            #     nextSlice = thisSlice + k1
+            #     self.parentImageViewer.moveSliceSlider(nextSlice)
+            #     fOut = outDir + '/%d.png'%(id)
+            #     windowToImageFilter = vtk.vtkWindowToImageFilter()
+            #     windowToImageFilter.SetInput(self.parentImageViewer.graphicsViewVTK.GetRenderWindow())
+            #     windowToImageFilter.Update()
+
+            #     writer = vtk.vtkPNGWriter()
+            #     writer.SetFileName(fOut)
+            #     writer.SetInputConnection(windowToImageFilter.GetOutputPort())
+            #     writer.Write()
+            #     fileOutList.append(fOut)
+            #     # os.system('convert %s -resize 400x400 %s'%(fOut, fOut))
+            # os.system('cd %s && montage %s -tile %dx1 -geometry 300x300+0+0 %s'%(outDir, ' '.join(fileOutList), len(fileOutList), ffOut))
+            # print(id, ffOut)
+            # shutil.rmtree(outDir)
