@@ -177,15 +177,21 @@ class Ui_BASEUI(object):
         self.rightPanelLayout.addWidget(self.markupGroupBox, 4, 0, 1, 1)
         #
         #
+        # Help Button
+        self.helpButton = QtWidgets.QPushButton(self.centralwidget)
+        self.helpButton.setObjectName("helpButton")
+        self.rightPanelLayout.addWidget(self.helpButton, 5, 0, 1, 1)
+        #
+        #
         # 
         spacerItem1 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
-        self.rightPanelLayout.addItem(spacerItem1, 5, 0, 1, 1)
+        self.rightPanelLayout.addItem(spacerItem1, 6, 0, 1, 1)
         #
         #
         # Add Customised Buttons Label
         self.customButtonsLabel = QtWidgets.QLabel(self.centralwidget)
         self.customButtonsLabel.setObjectName("customButtonsLabel")
-        self.rightPanelLayout.addWidget(self.customButtonsLabel, 6, 0, 1, 1)
+        self.rightPanelLayout.addWidget(self.customButtonsLabel, 7, 0, 1, 1)
 
         # CUSTOMISABLE BUTTONS
         self.pushButtonsLayout = QtWidgets.QGridLayout()
@@ -196,12 +202,12 @@ class Ui_BASEUI(object):
             button.setObjectName(f"button{i+1}")
             self.pushButtonsLayout.addWidget(button, i//2, i%2, 1, 1)
             self.modPushButtons.append(button)
-        self.rightPanelLayout.addLayout(self.pushButtonsLayout, 7, 0, 1, 1)
+        self.rightPanelLayout.addLayout(self.pushButtonsLayout, 8, 0, 1, 1)
 
         # Add Animation Controls Label
         self.animationControlsLabel = QtWidgets.QLabel(self.centralwidget)
         self.animationControlsLabel.setObjectName("animationControlsLabel")
-        self.rightPanelLayout.addWidget(self.animationControlsLabel, 8, 0, 1, 1)
+        self.rightPanelLayout.addWidget(self.animationControlsLabel, 9, 0, 1, 1)
 
         # ANIMATION CONTROLS
         self.animationLayout = QtWidgets.QVBoxLayout()
@@ -234,7 +240,7 @@ class Ui_BASEUI(object):
         self.speedControlLayout.addWidget(self.speedSlider)
         
         self.animationLayout.addLayout(self.speedControlLayout)
-        self.rightPanelLayout.addLayout(self.animationLayout, 9, 0, 1, 1)
+        self.rightPanelLayout.addLayout(self.animationLayout, 10, 0, 1, 1)
 
         # Add the right panel widget to the main layout
         self.mainLayout.addWidget(self.rightPanelWidget, 0, 1, 1, 1)
@@ -295,6 +301,7 @@ class Ui_BASEUI(object):
         self.imMarkupButton_B.setText(_translate("BASEUI", "Nothing"))
         self.markupModeLabel.setText(_translate("BASEUI", "Markup Mode:"))
         self.closedSplineCheck.setText(_translate("BASEUI", "Closed Spline"))
+        self.helpButton.setText(_translate("BASEUI", "Help"))
         #
         # self.freehandInteractorButton.setText(_translate("BASEUI", "FREEHAND DRAW"))
         # self.label_7.setText(_translate("BASEUI", "Contour"))

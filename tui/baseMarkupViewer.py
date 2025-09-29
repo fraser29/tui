@@ -476,6 +476,10 @@ class BaseMarkupViewer:
             self.markupModeComboBox.currentTextChanged.connect(self.markupModeChanged)
         if hasattr(self, 'closedSplineCheck'):
             self.closedSplineCheck.stateChanged.connect(self.splineClosedChanged)
+        
+        # Help button
+        if hasattr(self, 'helpButton'):
+            self.helpButton.clicked.connect(self.showHelpWindow)
 
     # MARKUP METHODS
     def deleteAllMarkups(self):
@@ -529,6 +533,181 @@ class BaseMarkupViewer:
     def setWindowLevel(self, w, l):
         """Set window level - to be overridden by subclasses"""
         pass
+
+    def showHelpWindow(self):
+        """Show help window with keyboard shortcuts and interaction guide"""
+        # Import here to avoid circular imports
+        from PyQt5 import QtWidgets
+        
+        help_window = QtWidgets.QDialog(self)
+        help_window.setWindowTitle("TUI Help")
+        help_window.setModal(False)
+        help_window.resize(500, 600)
+        
+        layout = QtWidgets.QVBoxLayout(help_window)
+        
+        # Help text
+        help_text = QtWidgets.QTextEdit()
+        help_text.setReadOnly(True)
+        
+        # Read base help content from file
+        help_content = self._loadHelpContent()
+        
+        # Allow subclasses to append custom help
+        custom_help = self._getCustomHelp()
+        if custom_help:
+            help_content += "\n\n" + custom_help
+        
+        # Convert to HTML for nicer formatting
+        html_content = self._formatHelpAsHTML(help_content)
+        help_text.setHtml(html_content)
+        layout.addWidget(help_text)
+        
+        # Close button
+        close_button = QtWidgets.QPushButton("Close")
+        close_button.clicked.connect(help_window.accept)
+        layout.addWidget(close_button)
+        
+        help_window.show()
+
+    def _loadHelpContent(self):
+        """Load help content from help file"""
+        import os
+        help_file = os.path.join(os.path.dirname(__file__), self._getHelpFileName())
+        try:
+            with open(help_file, 'r', encoding='utf-8') as f:
+                return f.read()
+        except FileNotFoundError:
+            return f"Help file not found. Please ensure {self._getHelpFileName()} exists in the tui directory."
+        except Exception as e:
+            return f"Error loading help file: {str(e)}"
+
+    def _getHelpFileName(self):
+        """Override this method in subclasses to specify different help files"""
+        return "help.txt"
+
+    def _getCustomHelp(self):
+        """Override this method in subclasses to add custom help content
+        
+        Example usage in a subclass:
+        
+        class MyCustomTUIViewer(TUIMarkupViewer):
+            def _getCustomHelp(self):
+                return '''CUSTOM FEATURES:
+• F1 - My custom feature 1
+• F2 - My custom feature 2
+• Custom button - Does something special'''
+        """
+        return ""
+
+    def _formatHelpAsHTML(self, text_content):
+        """Convert plain text help content to nicely formatted HTML"""
+        import re
+        
+        # Start with HTML structure
+        html = """
+        <html>
+        <head>
+        <style>
+        body { 
+            font-family: 'Segoe UI', Arial, sans-serif; 
+            font-size: 11px; 
+            line-height: 1.4; 
+            margin: 10px;
+            background-color: #f8f9fa;
+        }
+        h1 { 
+            color: #2c3e50; 
+            font-size: 16px; 
+            font-weight: bold; 
+            margin: 0 0 15px 0; 
+            padding-bottom: 5px;
+            border-bottom: 2px solid #3498db;
+        }
+        h2 { 
+            color: #34495e; 
+            font-size: 13px; 
+            font-weight: bold; 
+            margin: 15px 0 8px 0; 
+            background-color: #ecf0f1;
+            padding: 5px 8px;
+            border-left: 4px solid #3498db;
+        }
+        ul { 
+            margin: 5px 0; 
+            padding-left: 0;
+        }
+        li { 
+            margin: 3px 0; 
+            padding: 2px 0;
+            list-style: none;
+        }
+        li:before { 
+            content: "• "; 
+            color: #3498db; 
+            font-weight: bold; 
+            margin-right: 5px;
+        }
+        .keyboard { 
+            background-color: #e8f4fd; 
+            padding: 2px 6px; 
+            border-radius: 3px; 
+            font-family: 'Courier New', monospace; 
+            font-weight: bold;
+            color: #2980b9;
+        }
+        .description { 
+            color: #555; 
+        }
+        </style>
+        </head>
+        <body>
+        """
+        
+        # Split content into lines
+        lines = text_content.strip().split('\n')
+        
+        for line in lines:
+            line = line.strip()
+            
+            if not line:
+                html += "<br/>"
+                continue
+            
+            # Check if it's a main title (no bullet point)
+            if line and not line.startswith('•') and not line.startswith('*'):
+                if ':' in line and not line.startswith(' '):
+                    # It's a section header
+                    html += f"<h2>{line}</h2>"
+                else:
+                    # It's a main title
+                    html += f"<h1>{line}</h1>"
+            else:
+                # It's a bullet point
+                if line.startswith('•'):
+                    line = line[1:].strip()
+                elif line.startswith('*'):
+                    line = line[1:].strip()
+                
+                # Look for keyboard shortcuts (text before first dash)
+                if ' - ' in line:
+                    parts = line.split(' - ', 1)
+                    if len(parts) == 2:
+                        key_part = parts[0].strip()
+                        desc_part = parts[1].strip()
+                        
+                        # Format keyboard shortcuts
+                        if any(char in key_part for char in ['•', 'h', '.', 'u', 'r', 'R', '1', '2', '3', '4', '5', 'p', 'm', 'c', 'o', 'l', 'w', 'V']):
+                            html += f"<li><span class='keyboard'>{key_part}</span> - <span class='description'>{desc_part}</span></li>"
+                        else:
+                            html += f"<li><span class='keyboard'>{key_part}</span> - <span class='description'>{desc_part}</span></li>"
+                    else:
+                        html += f"<li>{line}</li>"
+                else:
+                    html += f"<li>{line}</li>"
+        
+        html += "</body></html>"
+        return html
 
     def exit(self):
         """Exit application"""

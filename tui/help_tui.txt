@@ -10,7 +10,7 @@ MOUSE INTERACTIONS:
 
 KEYBOARD SHORTCUTS:
 • h - Show this help window
-• . - Add point/spline point
+• . - Add point
 • u - Remove last point
 • r - Reset 3D view
 • R - Reset all views
@@ -32,3 +32,10 @@ VIEW CONTROLS:
 • Use view buttons (Ax, Cor, Sag, 3D, Grid) to switch between views
 • Grid view shows all views simultaneously
 • Individual view buttons show one view large with others small
+
+CUSTOMISED BUTTONS:
+• Set custom actions by subclassing TUI - see online documentation
+
+ANIMATION CONTROLS:
+• Play / stop ANIMATION
+• Use speed slider to change animation speed
