@@ -89,7 +89,6 @@ class SinglePaneImageInteractor(vtk.vtkInteractorStyleImage):
     def keyPressCallback(self, obj, event):
         key = self.GetInteractor().GetKeyCode()
         keySym = self.GetInteractor().GetKeySym()
-        print('Got key press - KeyCode:', key, 'KeySym:', keySym)
         if key == "h":
             print(' . = add point (or spline point if in spline mode)')
             print(' u = remove last point')
@@ -125,10 +124,7 @@ class SinglePaneImageInteractor(vtk.vtkInteractorStyleImage):
         elif key == "m":
             print(self.parentImageViewer.patientMeta)
         elif key == "p": # SCREENSHOT
-            outDir = "/home/fraser/temp/ss"
-            ffOut = '/home/fraser/temp/out.png'
-            os.system('mkdir %s'%(outDir))
-            
+            ffOut = os.path.join(self.parentImageViewer.workingDirLineEdit.text(), 'screenshot.png')
             windowToImageFilter = vtk.vtkWindowToImageFilter()
             windowToImageFilter.SetInput(self.parentImageViewer.graphicsViewVTK.GetRenderWindow())
             windowToImageFilter.Update()
@@ -143,7 +139,7 @@ class SinglePaneImageInteractor(vtk.vtkInteractorStyleImage):
             allMarkupPointsThisTime = self.parentImageViewer.Markups.getAllPointsForTime(self.parentImageViewer.currentTimeID)
             if len(allMarkupPointsThisTime) > 0:
                 pointsPP = vtkfilters.buildPolydataFromXYZ([i.xyz for i in allMarkupPointsThisTime])
-                print(fIO.writeVTKFile(pointsPP, '/home/fraser/temp/points_%d.vtp'%(self.parentImageViewer.currentTimeID)))
+                print(fIO.writeVTKFile(pointsPP, os.path.join(self.parentImageViewer.workingDirLineEdit.text(), 'points_%d.vtp'%(self.parentImageViewer.currentTimeID))))
         elif key == "c":
             val = input("Give the contour level")
             try:
@@ -180,7 +176,7 @@ class SinglePaneImageInteractor(vtk.vtkInteractorStyleImage):
 
         else:
             # Pass key to UserDefinedCallback
-            print('Pass %s to userDefined'%(key))
+            # print('Pass %s to userDefined'%(key))
             self.userDefinedCallBack(key)
 
     def userDefinedCallBack(self, key):

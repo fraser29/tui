@@ -49,7 +49,7 @@ class Viewer2DCoordinateSystem(CoordinateSystem):
             return imageCoords
     
     def worldToImage(self, worldCoords):
-        """Transform world coordinates to image coordinates"""
+        """Transform world coordinates to image coordinates""" #TODO
         # For 2D viewers, this is more complex - may need inverse transformation
         # For now, return as-is (this might need refinement based on your specific needs)
         return worldCoords
@@ -440,6 +440,7 @@ class MarkupPoint(Markup):
     @property   
     def X(self):
         """Get world coordinates (transformed from image coordinates)"""
+        print(f"DEBUG: MarkupPoint.X: Getting X: {self._imageCoords} - {self.getWorldCoordinates()}")
         return self.getWorldCoordinates()
     
     @X.setter

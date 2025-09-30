@@ -145,7 +145,6 @@ class ImageInteractor(vtk.vtkInteractorStyleTrackballCamera):
     def keyPressCallback(self, obj, event):
         key = self.GetInteractor().GetKeyCode()
         keySym = self.GetInteractor().GetKeySym()
-        print('Got key press - KeyCode:', key, 'KeySym:', keySym)
         if key == "h":
             print(' . = add point (or spline point if in spline mode)')
             print(' x = align to primary direction')

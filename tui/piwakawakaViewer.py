@@ -529,6 +529,9 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         """Get point ID from world coordinates, accounting for reslice orientation"""
         return self.getCurrentVTIObject().FindPoint(X)
 
+    def getIJK_imageCSX(self, imageCS_X):
+        return self.getIJKAtX(self.imageCS_to_ResliceCS_X(imageCS_X))
+
     def getIJKAtX(self, X):
         """Convert world coordinates to IJK coordinates, accounting for reslice orientation"""
         ijk = [0, 0, 0]
@@ -544,20 +547,26 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         return ijk
 
 
+    def getPtID_at_IJK(self, ijk):
+        dims = self.getCurrentVTIObject().GetDimensions()
+        i, j, k = ijk
+        pointId = i + j * dims[0] + k * dims[0] * dims[1]
+        return pointId
+
+
     def getPixelValueAtReslicePosition(self, mouseX, mouseY):
         """Get pixel value at mouse position from the current reslice"""
-        X = self.mouseXYTo_ImageCS_X(mouseX, mouseY)
-        X_ = self.imageCS_To_WorldCS_X(X)
-        ptID = self.getCurrentVTIObject().FindPoint(X_)
+        X_imageCS = self.mouseXYTo_ImageCS_X(mouseX, mouseY)
+        ptID = self.getCurrentVTIObject().FindPoint(X_imageCS)
         return self.getPixelValueAtPtID_tuple(ptID)
         
     
     def getReslice_IJK_X_ID_AtMouse(self, mouseX, mouseY):
         """Get IJK coordinates at mouse position for the current reslice"""
-        X = self.mouseXYTo_ImageCS_X(mouseX, mouseY)
-        X_ = self.imageCS_To_WorldCS_X(X)
-        ijk = self.getIJKAtX(X_)
-        return ijk, X_, self.getCurrentVTIObject().FindPoint(X_)
+        X_imageCS = self.mouseXYTo_ImageCS_X(mouseX, mouseY)
+        X_worldCS = self.imageCS_To_WorldCS_X(X_imageCS)
+        ijk = self.getIJK_imageCSX(X_imageCS)
+        return ijk, X_worldCS, self.getPtID_at_IJK(ijk)
     
     
     def getPixelValueAtPtID_tuple(self, ptID):
@@ -566,11 +575,28 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         return self.getCurrentVTIObject().GetPointData().GetArray(self.currentArray).GetTuple(ptID)
 
 
-    def imageCS_To_WorldCS_X(self, imageCS_X):
-        """Convert image coordinates to world coordinates"""
+    def imageCS_to_ResliceCS_X(self, imageCS_X):
         matrix = self.getCurrentResliceMatrix()
-        # print(f"DEBUG: imageCS_To_WorldCS_X: {imageCS_X} -> {matrix.MultiplyPoint([imageCS_X[0], imageCS_X[1], imageCS_X[2], 1])[:3]}")
         return matrix.MultiplyPoint([imageCS_X[0], imageCS_X[1], imageCS_X[2], 1])[:3]
+
+
+    def imageCS_To_WorldCS_X(self, imageCS_X):
+        """Convert image coordinates to world coordinates
+            1. Convert image coordinates to reslice coordinates
+            2. Get IJK coordinates in reslice coordinates
+            3. Convert IJK coordinates to world coordinates using PatientMeta
+        """
+        worldX_in_reslice = self.imageCS_to_ResliceCS_X(imageCS_X)
+        # print(f"DEBUG: imageCS_To_WorldCS_X: {imageCS_X} -> WC-Reslice: {worldX_in_reslice}")
+        ijk_in_reslice = self.getIJKAtX(worldX_in_reslice)
+        # print(f"DEBUG: imageCS_To_WorldCS_X: {imageCS_X} -> IJK-Reslice: {ijk_in_reslice}")
+        imageCS_ijk = np.array([ijk_in_reslice[0], ijk_in_reslice[1], ijk_in_reslice[2]])
+        # print(f"DEBUG: imageCS_To_WorldCS_X: {imageCS_X} -> WC-TRUE: {self.patientMeta.imageToPatientCoordinates(imageCS_ijk)}")
+        # print(f"DEBUG: {imageCS_X} -> {np.array(self.patientMeta.imageToPatientCoordinates(imageCS_ijk))}")
+        # print('-'*50)
+        # print('')
+        return np.array(self.patientMeta.imageToPatientCoordinates(imageCS_ijk))
+
 
     def mouseXYTo_ImageCS_X(self, mouseX, mouseY):
         """Convert mouse coordinates to world coordinates using vtkPropPicker"""
