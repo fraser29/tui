@@ -68,8 +68,8 @@ class Viewer3DCoordinateSystem(CoordinateSystem):
         """Transform image coordinates to world coordinates"""
         # In 3D viewers, image and world coordinates are typically the same
         # But we can apply transformation if needed
-        if hasattr(self.parentImageViewer, 'imageResliceXToRealWorldPolydataPt'):
-            return self.parentImageViewer.imageResliceXToRealWorldPolydataPt(imageCoords).GetCenter()
+        if hasattr(self.parentImageViewer, 'imageCS_To_WorldCS_X'):
+            return self.parentImageViewer.imageCS_To_WorldCS_X(imageCoords)
         else:
             # For 3D viewers, image and world coordinates are usually the same
             return imageCoords
@@ -212,8 +212,6 @@ class Markups(object):
                                                     timeID=timeID, 
                                                     sliceID=sliceID)
         self.markupsDict[Points][timeID] = MarkupPoints(self.coordinateSystem)
-        # DEBUG
-        # self.parentImageViewer.markupModeChanged('Spline')
 
 
     def addPoint(self, X, timeID, sliceID, norm=None):
@@ -244,18 +242,13 @@ class Markups(object):
     def addSpline(self, pts, reslice, renderer, interactor, timeID, sliceID, LOOP, isHandDrawn=True):
         self.markupsDict[Splines][timeID].addSpline(pts, reslice, renderer, interactor, handDrawn=isHandDrawn, LOOP=LOOP, timeID=timeID, sliceID=sliceID)
 
-
+    # NOT USED
     def showSplines_timeID_CP(self, timeID, CP, N, dx): # Used by TUI
         for iTimeID in self.markupsDict[Splines].keys():
             for iSpline in self.markupsDict[Splines][timeID]:
                 if iTimeID == timeID:
                     ABCD = iSpline.getPlane()
-                    print(f"DEBUG: {ABCD}, {iSpline.getPoints()}")
-                    print(f"DEBUG: CP: {CP}")
-                    print(f"DEBUG: N: {N}")
-                    print(f"DEBUG: dx: {dx}")
-                    # if planes_within_tol(ABCD, CP, N, dx):
-                    if True:
+                    if planes_within_tol(ABCD, CP, N, dx):
                         iSpline.SetEnabled(1)
                         iSpline.On()
                     else:
@@ -370,23 +363,29 @@ class MarkupPoints(list):
         return pp
 
     def getPointsWithinBounds(self, CP, N, delta):
-        dists = [abs(vtkfilters.ftk.distanceToPlane(i.X, N, CP)) for i in self]
+        dists = [abs(vtkfilters.ftk.distanceToPlane(i, N, CP)) for i in self.getPoints_ImageCS()]
         tf = np.array(dists) < delta
-        return [i for B,i in zip(tf, self) if B]
+        return [i for iTF,i in zip(tf, self) if iTF]
 
-    def getPolyLine(self, LOOP=False, boundCP=None, boundN=None, bounddx=None):
+    def getPolyLine(self, LOOP=False):
+        if len(self) < 2:
+            return None
+        pp = vtkfilters.buildPolyLineFromXYZ(self.getPointsNumpy(), LOOP)
+        return pp
+
+    def getPolyLine_ImageCS(self, LOOP=False, boundCP=None, boundN=None, bounddx=None):
         if len(self) < 2:
             return None
         if boundCP is not None:
             subList = self.getPointsWithinBounds(boundCP, boundN, bounddx)
             if len(subList) == 0:
                 return None
-            pp = vtkfilters.buildPolyLineFromXYZ(np.array([i.X for i in subList]), LOOP)
+            pp = vtkfilters.buildPolyLineFromXYZ(np.array([i.getImageCoordinates() for i in subList]), LOOP)
         else:
-            pp = vtkfilters.buildPolyLineFromXYZ(self.getPointsNumpy(), LOOP)
+            pp = vtkfilters.buildPolyLineFromXYZ(self.getPoints_ImageCS(), LOOP)
         return pp
 
-    def getAllPointsPolyData(self, pointSize, boundCP=None, boundN=None, bounddx=None):
+    def getAllPointsPolyData_ImageCS(self, pointSize, boundCP=None, boundN=None, bounddx=None):
         if len(self) == 0:
             return None
         if boundCP is not None:
@@ -400,7 +399,7 @@ class MarkupPoints(list):
         return pp
 
     def getActorForAllPoints(self, pointSize, boundCP=None, boundN=None, bounddx=None):
-        pp = self.getAllPointsPolyData(pointSize, boundCP=boundCP, boundN=boundN, bounddx=bounddx)
+        pp = self.getAllPointsPolyData_ImageCS(pointSize, boundCP=boundCP, boundN=boundN, bounddx=bounddx)
         if (pp is None) or (pp.GetNumberOfPoints() < 1):
             return None
         ptMapper = vtk.vtkPolyDataMapper()
@@ -413,7 +412,7 @@ class MarkupPoints(list):
 
 
     def getLineActorForAllPoints(self, lineWidth=3, LOOP=False, boundCP=None, boundN=None, bounddx=None):
-        polyLine = self.getPolyLine(LOOP=LOOP, boundCP=boundCP, boundN=boundN, bounddx=bounddx)
+        polyLine = self.getPolyLine_ImageCS(LOOP=LOOP, boundCP=boundCP, boundN=boundN, bounddx=bounddx)
         if polyLine is None:
             return None
         lineMapper = vtk.vtkPolyDataMapper()
@@ -440,7 +439,6 @@ class MarkupPoint(Markup):
     @property   
     def X(self):
         """Get world coordinates (transformed from image coordinates)"""
-        print(f"DEBUG: MarkupPoint.X: Getting X: {self._imageCoords} - {self.getWorldCoordinates()}")
         return self.getWorldCoordinates()
     
     @X.setter

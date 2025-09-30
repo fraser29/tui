@@ -71,83 +71,85 @@ class _TUIProj(object):
         return os.path.join(str(self.ex.workingDirLineEdit.text()), fileName)
 
 
-    def getLMPoints_xyz(self, minN=1):
+    def getLMPoints_xyz(self):
         allMarkupPointsThisTime = self.ex.Markups.getXNumpyFromPoints(self.ex.currentTimeID)
-        if len(allMarkupPointsThisTime) < minN:
-            raise ValueError('Not enough points for requested: Need %d, have %d'%(minN, len(allMarkupPointsThisTime)))
         return allMarkupPointsThisTime
 
 
-    def getLMPoints_poly(self, minN=1, RETURN_LINE=False, LINE_LOOP=True):
-        if RETURN_LINE:
-            pointsPP = self.ex.Markups.getPolylineFromPoints(self.ex.currentTimeID, LOOP=LINE_LOOP)
-        else:
-            pointsPP = self.ex.Markups.getPolyPointsFromPoints(self.ex.currentTimeID)
-        if pointsPP is None:
-            pointsPP = vtkfilters.vtk.vtkPolyData()
-        if (pointsPP.GetNumberOfPoints() < minN):
-            raise ValueError('Not enough points for requested: Need %d, have %d'%(minN, pointsPP.GetNumberOfPoints()))
-        return pointsPP
+    def getLMPoints_xyz_time(self):
+        ppDict = self._getMarkupAsPolydata()
+        outDict = {}
+        for iTime in ppDict.keys():
+            outDict[iTime] = vtkfilters.getPtsAsNumpy(ppDict[iTime])
+        return outDict
 
-    def _save(self, polyData, featureName=None, prefix='', extn='vtp'):
-        if polyData is None:
+
+    def _save(self, polyDataDict, featureName=None, prefix='', extn='vtp', FORCE_PVD_EVEN_IF_SINGLE=False):
+        if polyDataDict is None:
             return 
         if featureName is None:
             featureName = dialogGetName(self.ex)
         if len(featureName) == 0:
             return
-        fileOut = self.getFullFileName(fileName=featureName, prefix=prefix, extn=extn)
-        fIO.writeVTKFile(polyData, fileOut)
+        if len(polyDataDict) == 1 and not FORCE_PVD_EVEN_IF_SINGLE:
+            fileOut = self.getFullFileName(fileName=featureName, prefix=prefix, extn=extn)
+            fileOut = fIO.writeVTKFile(polyDataDict[self.ex.times[0]], fileOut)
+        else:
+            fileOut = fIO.writeVTK_PVD_Dict(polyDataDict, 
+                                rootDir=self.ex.workingDirLineEdit.text(), 
+                                filePrefix=featureName, fileExtn=extn)
         return fileOut
 
 
     def saveVOI(self, featureName=None):
-        print(featureName)
-        pp = self._getMarkupAsPolydata(minN=4, BUILD_OUTLINE=True)
-        return self._save(pp, featureName=featureName, prefix='fov')
+        ppDict = self.getVOI_dict()
+        return self._save(ppDict, featureName=featureName, prefix='fov')
 
 
-    def savePoints(self, featureName=None, minN=1):
-        pp = self._getMarkupAsPolydata(minN=minN, BUILD_LMPts=True)
-        return self._save(pp, featureName=featureName, prefix='pt')
+    def savePoints(self, featureName=None):
+        ppDict = self.getPolyDataPoints_dict()
+        return self._save(ppDict, featureName=featureName, prefix='pt')
 
 
-    def saveLine(self, featureName=None, minN=2, lineLoop=False, splineDist=None, prefix='line'):
-        pp = self._getMarkupAsPolydata(minN=minN, BUILD_LINE=True, LINE_LOOP=lineLoop)
-        if splineDist is not None:
-            pp = vtkfilters.filterSpline(pp, splineDist)
-        return self._save(pp, featureName=featureName, prefix=prefix)
+    def saveLine(self, featureName=None, lineLoop=False, splineDist=None, prefix='line'):
+        ppDict = self.getPolyDataLine_dict(LOOP=lineLoop, spacing=splineDist)
+        return self._save(ppDict, featureName=featureName, prefix=prefix)
 
 
-    def saveMask(self, featureName=None): # TODO - this currently just simple shrinkwrap
-        pp = self._getMarkupAsPolydata(minN=4, BUILD_MASK=True)
-        return self._save(pp, featureName=featureName, prefix='mask')
+    def getPolyDataPoints_dict(self):
+        return self._getMarkupAsPolydata()
 
 
-    def _getMarkupAsPolydata(self, minN=1, BUILD_LMPts=False,
-               BUILD_SPHERE=False, BUILD_OUTLINE=False, BUILD_MASK=False, BUILD_LINE=False, LINE_LOOP=True):
+    def getPolyDataLine_dict(self, LOOP=False, spacing=None):
+        ptsDict = self._getMarkupAsPolydata()
+        lineDict = {}
+        for iTime in ptsDict.keys():
+            lineDict[iTime] = vtkfilters.buildPolyLineFromXYZ(vtkfilters.getPtsAsNumpy(ptsDict[iTime]), LOOP=LOOP)
+            if spacing is not None:
+                lineDict[iTime] = vtkfilters.filterVtpSpline(lineDict[iTime], spacing=spacing)
+        return lineDict
+
+
+    def getVOI_dict(self):
+        ptsDict = self._getMarkupAsPolydata()
+        voiDict = {}
+        for iTime in ptsDict.keys():
+            voiDict[iTime] = vtkfilters.getOutline(ptsDict[iTime])
+        return voiDict
+
+
+    def _getMarkupAsPolydata(self):
+        outDict = {}
         try:
-            pointsPP = self.getLMPoints_poly(minN, RETURN_LINE=BUILD_LINE, LINE_LOOP=LINE_LOOP)
+            for k1 in range(len(self.ex.times)):
+                pp = self.ex.Markups.getPolyPointsFromPoints(timeID=k1)
+                if pp.GetNumberOfPoints() > 0:
+                    outDict[self.ex.times[k1]] = pp
         except (AttributeError, ValueError) as e:
             print(e)
-            return
-        if BUILD_SPHERE:
-            R = vtkfilters.getPolyMeanRadius(pointsPP, EXCLUDE_CENTER=False)
-            X = pointsPP.GetCenter()
-            ss = vtkfilters.buildSphereSource(X, R)
-            ss = vtkfilters.filterTriangulate(ss)
-            return ss
-        if BUILD_LMPts:
-            return pointsPP
-        if BUILD_LINE:
-            return pointsPP
-        if BUILD_MASK:
-            mask = vtkfilters.shrinkWrapData(pointsPP)
-            return mask
-        if BUILD_OUTLINE:
-            oo = vtkfilters.getOutline(pointsPP)
-            return oo
-        return pointsPP
+        return outDict
+
+
 
 
 ### ====================================================================================================================
@@ -170,9 +172,8 @@ class TUIProject(_TUIProj):
     One function may look something like: 
     
     def my_algorithm(self): 
-        landmarks = self.getLMPoints_xyz(minN=2)
+        landmarks = self.getLMPoints_xyz() # Gets at current timestep
         mask = my_segmentation_from_landmarks(landmarks)
-        self.saveMask(mask) # This will open dialogue to save file. 
 
     """
     def __init__(self, app=None, VERBOSE=False):
@@ -269,7 +270,7 @@ class TUIBasic(TUIProject):
 
 
     def savePolyLine_(self):
-        fOut = self.saveLine(minN=2)
+        fOut = self.saveLine(LINE_LOOP=self.ex.splineClosed)
         if (fOut is not None) and self.ex.VERBOSE:
             print(f"Written line to {fOut}")
     
@@ -318,7 +319,7 @@ class TUI2D(TUI2DProject):
 
 
     def savePolyLine_(self):
-        fOut = self.saveLine(minN=2)
+        fOut = self.saveLine(LINE_LOOP=self.ex.splineClosed)
         if (fOut is not None) and self.ex.VERBOSE:
             print(f"Written line to {fOut}")
     

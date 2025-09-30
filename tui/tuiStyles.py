@@ -60,7 +60,7 @@ class ImageInteractor(vtk.vtkInteractorStyleTrackballCamera):
         (mouseX, mouseY) = self.GetInteractor().GetEventPosition()
         activeRenderer = self.GetInteractor().FindPokedRenderer(mouseX, mouseY)
         self.parentImageViewer.interactionView = self.parentImageViewer.rendererArray.index(activeRenderer)
-        X = self.parentImageViewer.mouseXYToWorldX(mouseX, mouseY)
+        X = self.parentImageViewer.mouseXYTo_ImageCS_X(mouseX, mouseY)
         return X
 
     ## ========== DEFAULT ===================================================================
@@ -200,7 +200,7 @@ class ImageInteractor(vtk.vtkInteractorStyleTrackballCamera):
             print(fIO.writeVTKFile(plane, os.path.join(self.parentImageViewer.workingDirLineEdit.text(), "plane.vtp")))
 
         elif key == "c":
-            val = input("Give the contour level")
+            val = 1000.0
             try:
                 val = float(val)
                 self.parentImageViewer.setContourVal(val)

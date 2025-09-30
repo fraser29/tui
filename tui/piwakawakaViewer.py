@@ -587,14 +587,10 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
             3. Convert IJK coordinates to world coordinates using PatientMeta
         """
         worldX_in_reslice = self.imageCS_to_ResliceCS_X(imageCS_X)
-        # print(f"DEBUG: imageCS_To_WorldCS_X: {imageCS_X} -> WC-Reslice: {worldX_in_reslice}")
         ijk_in_reslice = self.getIJKAtX(worldX_in_reslice)
-        # print(f"DEBUG: imageCS_To_WorldCS_X: {imageCS_X} -> IJK-Reslice: {ijk_in_reslice}")
+        if ijk_in_reslice is None:
+            return None
         imageCS_ijk = np.array([ijk_in_reslice[0], ijk_in_reslice[1], ijk_in_reslice[2]])
-        # print(f"DEBUG: imageCS_To_WorldCS_X: {imageCS_X} -> WC-TRUE: {self.patientMeta.imageToPatientCoordinates(imageCS_ijk)}")
-        # print(f"DEBUG: {imageCS_X} -> {np.array(self.patientMeta.imageToPatientCoordinates(imageCS_ijk))}")
-        # print('-'*50)
-        # print('')
         return np.array(self.patientMeta.imageToPatientCoordinates(imageCS_ijk))
 
 

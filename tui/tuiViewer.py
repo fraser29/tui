@@ -329,8 +329,13 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
         return tuiUtils.imageX_2_PointID(self.getCurrentVTIObject(), X)
 
     def getIJKAtX(self, X):
-        IJK = self.patientMeta.patientToImageCoordinates(X)
-        return IJK
+        """Convert world coordinates to IJK coordinates, accounting for reslice orientation"""
+        ijk = [0, 0, 0]
+        pcoords = [0.0, 0.0, 0.0]
+        res = self.getCurrentVTIObject().ComputeStructuredCoordinates(X, ijk, pcoords)
+        if res == 0:
+            return None
+        return ijk
 
     def getIJKAtPtID(self, ptID):
         return tuiUtils.imageID_2_IJK(self.getCurrentVTIObject(), ptID)
@@ -341,44 +346,47 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
     def getPixelValueAtPtID_tuple(self, ptID):
         return self.getCurrentVTIObject().GetPointData().GetArray(self.currentArray).GetTuple(ptID)
 
-    def mouseXYToWorldX(self, mouseX, mouseY):
+    def mouseXYTo_ImageCS_X(self, mouseX, mouseY):
+        # Can not get direct from interactor - need to go though active cursor widget.
         # Get the current reslice cursor widget
         if self.interactionView >2:
             return None
         widget = self.resliceCursorWidgetArray[self.interactionView]
         if widget is None:
             return None
-        
-        # Get the reslice cursor representation
         rep = widget.GetRepresentation()
-        
-        # Get the plane source
         planeSource = rep.GetPlaneSource()
-        
-        # Get the plane normal and origin
         normal = planeSource.GetNormal()
         origin = planeSource.GetOrigin()
-        
-        # Create a plane implicit function
         plane = vtk.vtkPlane()
         plane.SetNormal(normal)
         plane.SetOrigin(origin)
-        
-        # Create a point picker
         picker = vtk.vtkPointPicker()
         picker.SetTolerance(0.005)
-        
-        # Pick the point
         picker.Pick(mouseX, mouseY, 0, self.rendererArray[self.interactionView])
-        
-        # Get the picked point
         pickedPoint = picker.GetPickPosition()
-        
-        # Project the picked point onto the plane
         projectedPoint = [0, 0, 0]
         plane.ProjectPoint(pickedPoint, origin, normal, projectedPoint)
-        
         return projectedPoint
+
+    def imageCS_to_ResliceCS_X(self, imageCS_X):
+        return imageCS_X
+        # matrix = self.getCurrentResliceMatrix()
+        # return matrix.MultiplyPoint([imageCS_X[0], imageCS_X[1], imageCS_X[2], 1])[:3]
+
+
+    def imageCS_To_WorldCS_X(self, imageCS_X):
+        """Convert image coordinates to world coordinates
+            1. Convert image coordinates to reslice coordinates
+            2. Get IJK coordinates in reslice coordinates
+            3. Convert IJK coordinates to world coordinates using PatientMeta
+        """
+        worldX_in_reslice = self.imageCS_to_ResliceCS_X(imageCS_X)
+        ijk_in_reslice = self.getIJKAtX(worldX_in_reslice)
+        if ijk_in_reslice is None:
+            return None
+        imageCS_ijk = np.array([ijk_in_reslice[0], ijk_in_reslice[1], ijk_in_reslice[2]])
+        return np.array(self.patientMeta.imageToPatientCoordinates(imageCS_ijk))
 
     def getCurrentViewNormal(self): # uses view under mouse
         return np.array(self.resliceCursorWidgetArray[self.interactionView].GetResliceCursorRepresentation().GetPlaneSource().GetNormal())
@@ -526,7 +534,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
 
         ptsActor = self.Markups.getAllPointsActors(self.currentTimeID, pointSize)
         if ptsActor is not None:
-            # We add to 3D and then only to other views if all points withon 2 delta X of slice
+            # We add to 3D and then only to other views if all points within 2 delta X of slice
             self.rendererArray[3].AddActor(ptsActor)
             self.markupActorList.append(ptsActor)
             if SHOW_LINES:
