@@ -125,13 +125,7 @@ class BaseMarkupViewer:
     def saveLine(self, featureName=None, LINE_LOOP=False):
         """Save line as polydata"""
         try:
-            if self.markupMode == 'Spline':
-                lineDict = self.getMarkupAsPolydata()
-            else:
-                ptsDict = self.getMarkupAsPolydata()
-                lineDict = {}
-                for iTime in ptsDict.keys():
-                    lineDict[iTime] = vtkfilters.buildPolyLineFromXYZ(vtkfilters.getPtsAsNumpy(ptsDict[iTime]), LOOP=LINE_LOOP or self.splineClosed)
+            lineDict = self.getMarkupAsPolydata_lines(LINE_LOOP=LINE_LOOP)
             return self._save(lineDict, featureName=featureName, prefix='line')
         except Exception as e:
             print(f"Error in _saveLine: {e}")
@@ -164,6 +158,20 @@ class BaseMarkupViewer:
             if self.VERBOSE:
                 print(f"Error getting markup polydata: {e}")
         return outDict
+
+    def getMarkupAsPolydata_lines(self, LINE_LOOP=False):
+        try:
+            if self.markupMode == 'Spline':
+                lineDict = self.getMarkupAsPolydata()
+            else:
+                ptsDict = self.getMarkupAsPolydata()
+                lineDict = {}
+                for iTime in ptsDict.keys():
+                    lineDict[iTime] = vtkfilters.buildPolyLineFromXYZ(vtkfilters.getPtsAsNumpy(ptsDict[iTime]), LOOP=LINE_LOOP or self.splineClosed)
+            return lineDict
+        except Exception as e:
+            print(f"Error in getMarkupAsPolydata_lines: {e}")
+            return None
 
     def _save(self, polyDataDict, featureName=None, prefix='', extn='vtp', FORCE_PVD_EVEN_IF_SINGLE=False):
         """Save polydata dictionary to files"""
