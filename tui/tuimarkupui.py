@@ -6,115 +6,51 @@
 # NOW - managed by CURSOR
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-import os
-import site
-# Get the site-packages directory
-site_packages = site.getsitepackages()[0]
-qt_plugins_path = os.path.join(site_packages, 'PyQt5', 'Qt5', 'plugins')
-os.environ['QT_QPA_PLATFORM_PLUGIN_PATH'] = qt_plugins_path
+from .baseMarkupUI import BaseMarkupUI
 
 
-class Ui_BASEUI(object):
+class Ui_BASEUI(BaseMarkupUI):
     def setupUi(self, BASEUI):
-        BASEUI.setObjectName("BASEUI")
-        BASEUI.resize(1260, 1027)
-        self.centralwidget = QtWidgets.QWidget(BASEUI)
-        self.centralwidget.setObjectName("centralwidget")
-        self.mainLayout = QtWidgets.QGridLayout(self.centralwidget)
-        self.mainLayout.setObjectName("gridLayout_5")
-        self.leftPanelLayout = QtWidgets.QVBoxLayout()
-        self.leftPanelLayout.setObjectName("verticalLayout_2")
-        self.graphicsViewLayout = QtWidgets.QHBoxLayout()
-        self.graphicsViewLayout.setObjectName("horizontalLayout_3")
-        self.graphicsView = QtWidgets.QGraphicsView(self.centralwidget)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.graphicsView.sizePolicy().hasHeightForWidth())
-        self.graphicsView.setSizePolicy(sizePolicy)
-        self.graphicsView.setMinimumSize(QtCore.QSize(900, 900))
-        self.graphicsView.setAutoFillBackground(True)
-        self.graphicsView.setFrameShape(QtWidgets.QFrame.NoFrame)
-        self.graphicsView.setFrameShadow(QtWidgets.QFrame.Plain)
-        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
-        brush.setStyle(QtCore.Qt.SolidPattern)
-        self.graphicsView.setBackgroundBrush(brush)
-        self.graphicsView.setObjectName("graphicsView")
-        self.graphicsViewLayout.addWidget(self.graphicsView)
-        self.verticalLayout = QtWidgets.QVBoxLayout()
-        self.verticalLayout.setObjectName("verticalLayout")
-        self.label_4 = QtWidgets.QLabel(self.centralwidget)
-        self.label_4.setObjectName("label_4")
-        self.verticalLayout.addWidget(self.label_4)
-        self.graphicsViewLayout.addLayout(self.verticalLayout)
-        self.leftPanelLayout.addLayout(self.graphicsViewLayout)
-        self.timeControlLayout = QtWidgets.QHBoxLayout()
-        self.timeControlLayout.setObjectName("horizontalLayout")
-        self.label_3 = QtWidgets.QLabel(self.centralwidget)
-        self.label_3.setObjectName("label_3")
-        self.timeControlLayout.addWidget(self.label_3)
-        self.timeSlider = QtWidgets.QSlider(self.centralwidget)
-        self.timeSlider.setOrientation(QtCore.Qt.Horizontal)
-        self.timeSlider.setObjectName("timeSlider")
-        self.timeControlLayout.addWidget(self.timeSlider)
-        self.timeLabel = QtWidgets.QLabel(self.centralwidget)
-        self.timeLabel.setObjectName("timeLabel")
-        self.timeControlLayout.addWidget(self.timeLabel)
-        self.leftPanelLayout.addLayout(self.timeControlLayout)
-        self.mainLayout.addLayout(self.leftPanelLayout, 0, 0, 1, 1)
-
-        # Create a container widget for the right panel
-        self.rightPanelWidget = QtWidgets.QWidget(self.centralwidget)
-        self.rightPanelWidget.setMaximumWidth(300)  # Set the desired maximum width here
-
-        # Create the right panel layout
-        self.rightPanelLayout = QtWidgets.QGridLayout(self.rightPanelWidget)
-        self.rightPanelLayout.setObjectName("gridLayout_4")
-        #
-        #
-        #
-        # IMAGE MANIPULATION
-        self.imageManipulationGroupBox = QtWidgets.QGroupBox(self.centralwidget)
-        self.imageManipulationGroupBox.setObjectName("imageManipulationGroupBox")
-        self.imageManipulationControlLayout = QtWidgets.QGridLayout(self.imageManipulationGroupBox)
-        self.imageManipulationControlLayout.setObjectName("gridLayout_2")
-        self.imageManipulationButtonsLayout = QtWidgets.QVBoxLayout()
-        self.imageManipulationButtonsLayout.setObjectName("verticalLayout_4")
+        """Setup TUI-specific UI components."""
+        # Call parent setup
+        super().setupUi(BASEUI)
+    
+    def _addImageManipulationControls(self):
+        """Add TUI-specific image manipulation controls."""
         self.imManip_A = QtWidgets.QPushButton(self.imageManipulationGroupBox)
         self.imManip_A.setObjectName("imManip_A")
         self.imManip_A.setEnabled(True)
         self.imManip_A.setCheckable(True)
         self.imageManipulationButtonsLayout.addWidget(self.imManip_A)
-        #
+        
         self.imManip_B = QtWidgets.QPushButton(self.imageManipulationGroupBox)
         self.imManip_B.setObjectName("imManip_B")
         self.imManip_B.setEnabled(False)
         self.imageManipulationButtonsLayout.addWidget(self.imManip_B)
-        self.imageManipulationControlLayout.addLayout(self.imageManipulationButtonsLayout, 0, 0, 1, 1)
-        self.rightPanelLayout.addWidget(self.imageManipulationGroupBox, 0, 0, 1, 1)
-        #
-        #
+    
+    def _addAdditionalControls(self):
+        """Add TUI-specific additional controls."""
         # 3D Cursor
         self.cursor3DCheck = QtWidgets.QCheckBox(self.centralwidget)
         self.cursor3DCheck.setObjectName("cursor3DCheck")
         self.rightPanelLayout.addWidget(self.cursor3DCheck, 1, 0, 1, 1)
-        #
-        #
+        
         # Select Array
         self.selectArrayComboBox = QtWidgets.QComboBox(self.centralwidget)
         self.selectArrayComboBox.setObjectName("selectArrayComboBox")
         self.rightPanelLayout.addWidget(self.selectArrayComboBox, 2, 0, 1, 1)
-        #
-        #
+        
         # View Buttons
         self.viewButtonsLayout = QtWidgets.QHBoxLayout()
         self.viewButtonsLayout.setSizeConstraint(QtWidgets.QLayout.SetFixedSize)
         self.viewButtonsLayout.setObjectName("horizontalLayout_6")
+        
         self.axialButton = QtWidgets.QPushButton(self.centralwidget)
         self.axialButton.setMaximumSize(QtCore.QSize(40, 40))
         self.axialButton.setCheckable(True)
         self.axialButton.setObjectName("axialButton")
         self.viewButtonsLayout.addWidget(self.axialButton)
+        
         self.threeDButton = QtWidgets.QPushButton(self.centralwidget)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -125,6 +61,7 @@ class Ui_BASEUI(object):
         self.threeDButton.setCheckable(True)
         self.threeDButton.setObjectName("threeDButton")
         self.viewButtonsLayout.addWidget(self.threeDButton)
+        
         self.saggitalButton = QtWidgets.QPushButton(self.centralwidget)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -135,6 +72,7 @@ class Ui_BASEUI(object):
         self.saggitalButton.setCheckable(True)
         self.saggitalButton.setObjectName("saggitalButton")
         self.viewButtonsLayout.addWidget(self.saggitalButton)
+        
         self.coronalButton = QtWidgets.QPushButton(self.centralwidget)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -145,6 +83,7 @@ class Ui_BASEUI(object):
         self.coronalButton.setCheckable(True)
         self.coronalButton.setObjectName("coronalButton")
         self.viewButtonsLayout.addWidget(self.coronalButton)
+        
         self.gridViewButton = QtWidgets.QPushButton(self.centralwidget)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -155,92 +94,11 @@ class Ui_BASEUI(object):
         self.gridViewButton.setCheckable(True)
         self.gridViewButton.setObjectName("gridButton")
         self.viewButtonsLayout.addWidget(self.gridViewButton)
+        
         self.rightPanelLayout.addLayout(self.viewButtonsLayout, 3, 0, 1, 1)
-        #
-        #
-        # IMAGE MARKUP
-        self.markupGroupBox = QtWidgets.QGroupBox(self.centralwidget)
-        self.markupGroupBox.setObjectName("imageMarkupGroupBox")
-        self.imageMarkupControlLayout = QtWidgets.QGridLayout(self.markupGroupBox)
-        self.imageMarkupControlLayout.setObjectName("gridLayout_2")
-        self.imageMarkupButtonsLayout = QtWidgets.QVBoxLayout()
-        self.imageMarkupButtonsLayout.setObjectName("verticalLayout_4")
-        self.imMarkupButton_A = QtWidgets.QPushButton(self.markupGroupBox)
-        self.imMarkupButton_A.setObjectName("imMarkupButton_A")
-        self.imageMarkupButtonsLayout.addWidget(self.imMarkupButton_A)
-        #
-        self.imMarkupButton_B = QtWidgets.QPushButton(self.markupGroupBox)
-        self.imMarkupButton_B.setObjectName("imMarkupButton_B")
-        self.imageMarkupButtonsLayout.addWidget(self.imMarkupButton_B)
-        
-        # Add markup mode controls
-        self.markupModeLayout = QtWidgets.QVBoxLayout()
-        self.markupModeLayout.setObjectName("markupModeLayout")
-        
-        # Point/Spline mode toggle
-        self.markupModeLabel = QtWidgets.QLabel(self.markupGroupBox)
-        self.markupModeLabel.setObjectName("markupModeLabel")
-        self.markupModeLayout.addWidget(self.markupModeLabel)
-        
-        self.markupModeComboBox = QtWidgets.QComboBox(self.markupGroupBox)
-        self.markupModeComboBox.setObjectName("markupModeComboBox")
-        self.markupModeComboBox.addItem("Point")
-        # self.markupModeComboBox.addItem("Spline")
-        self.markupModeLayout.addWidget(self.markupModeComboBox)
-        
-        # Closed spline checkbox
-        self.closedSplineCheck = QtWidgets.QCheckBox(self.markupGroupBox)
-        self.closedSplineCheck.setObjectName("closedSplineCheck")
-        self.closedSplineCheck.setChecked(True)  # Default to closed
-        self.markupModeLayout.addWidget(self.closedSplineCheck)
-        
-        self.imageMarkupButtonsLayout.addLayout(self.markupModeLayout)
-        self.imageMarkupControlLayout.addLayout(self.imageMarkupButtonsLayout, 0, 0, 1, 1)
-        self.rightPanelLayout.addWidget(self.markupGroupBox, 4, 0, 1, 1)
-        #
-        #
-        # Help Button
-        self.helpButton = QtWidgets.QPushButton(self.centralwidget)
-        self.helpButton.setObjectName("helpButton")
-        self.rightPanelLayout.addWidget(self.helpButton, 5, 0, 1, 1)
-        #
-        #
-        # 
-        spacerItem1 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
-        self.rightPanelLayout.addItem(spacerItem1, 6, 0, 1, 1)
-        #
-        #
-        # Add Customised Buttons Label
-        self.customButtonsLabel = QtWidgets.QLabel(self.centralwidget)
-        self.customButtonsLabel.setObjectName("customButtonsLabel")
-        self.rightPanelLayout.addWidget(self.customButtonsLabel, 7, 0, 1, 1)
-
-        # CUSTOMISABLE BUTTONS
-        self.pushButtonsLayout = QtWidgets.QGridLayout()
-        self.pushButtonsLayout.setObjectName("gridLayout_3")
-        self.modPushButtons = []
-        for i in range(12):
-            button = QtWidgets.QPushButton(self.centralwidget)
-            button.setObjectName(f"button{i+1}")
-            self.pushButtonsLayout.addWidget(button, i//2, i%2, 1, 1)
-            self.modPushButtons.append(button)
-        self.rightPanelLayout.addLayout(self.pushButtonsLayout, 8, 0, 1, 1)
-
-        # Animation Controls
-        self.animationControlsLabel = QtWidgets.QLabel(self.centralwidget)
-        self.animationControlsLabel.setObjectName("animationControlsLabel")
-        self.rightPanelLayout.addWidget(self.animationControlsLabel, 9, 0, 1, 1)
-
-        # Animation controls layout
-        self.animationLayout = QtWidgets.QVBoxLayout()
-        self.animationLayout.setObjectName("animationLayout")
-
-        # Play/Pause button
-        self.playPauseButton = QtWidgets.QPushButton(self.centralwidget)
-        self.playPauseButton.setObjectName("playPauseButton")
-        self.playPauseButton.setCheckable(True)
-        self.animationLayout.addWidget(self.playPauseButton)
-
+    
+    def _addAnimationControls(self):
+        """Add TUI-specific animation controls."""
         # Speed control
         self.speedLabel = QtWidgets.QLabel(self.centralwidget)
         self.speedLabel.setObjectName("speedLabel")
@@ -255,95 +113,28 @@ class Ui_BASEUI(object):
         self.speedSlider.setTickPosition(QtWidgets.QSlider.TicksBelow)
         self.animationLayout.addWidget(self.speedSlider)
 
-        self.rightPanelLayout.addLayout(self.animationLayout, 10, 0, 1, 1)
-
-        # Add the right panel widget to the main layout
-        self.mainLayout.addWidget(self.rightPanelWidget, 0, 1, 1, 1)
-
-        self.workingDirLayout = QtWidgets.QHBoxLayout()
-        self.workingDirLayout.setObjectName("horizontalLayout_7")
-        self.label_5 = QtWidgets.QLabel(self.centralwidget)
-        self.label_5.setObjectName("label_5")
-        self.workingDirLayout.addWidget(self.label_5)
-        self.workingDirLineEdit = QtWidgets.QLineEdit(self.centralwidget)
-        self.workingDirLineEdit.setObjectName("workingDirLineEdit")
-        self.workingDirLayout.addWidget(self.workingDirLineEdit)
-        self.workingDirToolButton = QtWidgets.QToolButton(self.centralwidget)
-        self.workingDirToolButton.setObjectName("workingDirToolButton")
-        self.workingDirLayout.addWidget(self.workingDirToolButton)
-        self.mainLayout.addLayout(self.workingDirLayout, 1, 0, 1, 1)
-        BASEUI.setCentralWidget(self.centralwidget)
-        self.menubar = QtWidgets.QMenuBar(BASEUI)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 1260, 22))
-        self.menubar.setObjectName("menubar")
-        self.menuFile = QtWidgets.QMenu(self.menubar)
-        self.menuFile.setObjectName("menuFile")
-        self.menuLoad = QtWidgets.QMenu(self.menuFile)
-        self.menuLoad.setObjectName("menuLoad")
-        BASEUI.setMenuBar(self.menubar)
-        self.statusbar = QtWidgets.QStatusBar(BASEUI)
-        self.statusbar.setObjectName("statusbar")
-        BASEUI.setStatusBar(self.statusbar)
-        self.actionDicom = QtWidgets.QAction(BASEUI)
-        self.actionDicom.setObjectName("actionDicom")
-        self.actionVTK_Image = QtWidgets.QAction(BASEUI)
-        self.actionVTK_Image.setObjectName("actionVTK_Image")
-        self.actionQuit = QtWidgets.QAction(BASEUI)
-        self.actionQuit.setObjectName("actionQuit")
-        self.menuLoad.addAction(self.actionDicom)
-        self.menuLoad.addAction(self.actionVTK_Image)
-        self.menuFile.addAction(self.menuLoad.menuAction())
-        self.menuFile.addAction(self.actionQuit)
-        self.menubar.addAction(self.menuFile.menuAction())
-
-        self.retranslateUi(BASEUI)
-        QtCore.QMetaObject.connectSlotsByName(BASEUI)
-        
-        # Connect working directory tool button
-        self.workingDirToolButton.clicked.connect(self.selectWorkingDirectory)
-
-    def retranslateUi(self, BASEUI):
+    def _retranslateSubclassSpecific(self, BASEUI):
+        """TUI-specific translations."""
         _translate = QtCore.QCoreApplication.translate
         BASEUI.setWindowTitle("TUI")
-        self.label_3.setText(_translate("BASEUI", "Time"))
-        self.timeLabel.setText(_translate("BASEUI", "0/0 [0.0]"))
-        #
-        self.imageManipulationGroupBox.setTitle(_translate("BASEUI", "Image manipulation"))
+        
+        # Image manipulation controls
         self.imManip_A.setText(_translate("BASEUI", "Toggle crosshairs"))
         self.imManip_B.setText(_translate("BASEUI", "Rotate 90°"))
-        #
-        self.markupGroupBox.setTitle(_translate("BASEUI", "Image markup"))
+        
+        # Markup controls
         self.imMarkupButton_A.setText(_translate("BASEUI", "Spline markup"))
-        self.imMarkupButton_B.setText(_translate("BASEUI", "Nothing")) # TODO
-        self.markupModeLabel.setText(_translate("BASEUI", "Markup Mode:"))
+        self.imMarkupButton_B.setText(_translate("BASEUI", "Nothing"))  # TODO
         self.closedSplineCheck.setText(_translate("BASEUI", "Closed loop"))
-        #
-        self.helpButton.setText(_translate("BASEUI", "Help"))
-        #
-        # self.freehandInteractorButton.setText(_translate("BASEUI", "FREEHAND DRAW"))
-        # self.label_7.setText(_translate("BASEUI", "Contour"))
-        #
+        
+        # Additional controls
         self.axialButton.setText(_translate("BASEUI", "Ax"))
         self.threeDButton.setText(_translate("BASEUI", "3D"))
         self.saggitalButton.setText(_translate("BASEUI", "Sag"))
         self.coronalButton.setText(_translate("BASEUI", "Cor"))
         self.gridViewButton.setText(_translate("BASEUI", "Grid"))
         self.cursor3DCheck.setText(_translate("BASEUI", "Show 3D Cursor"))
-        self.label_5.setText(_translate("BASEUI", "Working directroy"))
-        self.workingDirToolButton.setText(_translate("BASEUI", "..."))
-        self.menuFile.setTitle(_translate("BASEUI", "File"))
-        self.menuLoad.setTitle(_translate("BASEUI", "Load"))
-        self.actionDicom.setText(_translate("BASEUI", "Dicom"))
-        self.actionVTK_Image.setText(_translate("BASEUI", "VTK Image"))
-        self.actionQuit.setText(_translate("BASEUI", "Quit"))
-        self.actionQuit.setShortcut(_translate("BASEUI", "Q"))
-        #
-        self.customButtonsLabel.setText(_translate("BASEUI", "Customised Buttons"))
-        for iButton in self.modPushButtons:
-            iButton.setText(_translate("BASEUI", "PushButton"))
-        #
+        
         # Animation controls
-        self.animationControlsLabel.setText(_translate("BASEUI", "Animation Controls"))
-        self.playPauseButton.setText(_translate("BASEUI", "Play"))
         self.speedLabel.setText(_translate("BASEUI", "Speed"))
 
