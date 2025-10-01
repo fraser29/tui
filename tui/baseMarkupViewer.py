@@ -69,6 +69,7 @@ class BaseMarkupViewer:
         # Initialize markups
         self.Markups = tuiMarkups.Markups(self)
         self.markupActorList = []
+        self.nSplinePoints = 100
 
     def _setupDefaultButtons(self):
         """Setup default customized buttons that can be overridden by subclasses"""
@@ -121,13 +122,16 @@ class BaseMarkupViewer:
             print(f"Error in _savePoints: {e}")
             return None
 
-    def saveLine(self, featureName=None, lineLoop=None):
+    def saveLine(self, featureName=None, LINE_LOOP=False):
         """Save line as polydata"""
         try:
-            ptsDict = self.getMarkupAsPolydata()
-            lineDict = {}
-            for iTime in ptsDict.keys():
-                lineDict[iTime] = vtkfilters.buildPolyLineFromXYZ(vtkfilters.getPtsAsNumpy(ptsDict[iTime]), LOOP=lineLoop or self.splineClosed)
+            if self.markupMode == 'Spline':
+                lineDict = self.getMarkupAsPolydata()
+            else:
+                ptsDict = self.getMarkupAsPolydata()
+                lineDict = {}
+                for iTime in ptsDict.keys():
+                    lineDict[iTime] = vtkfilters.buildPolyLineFromXYZ(vtkfilters.getPtsAsNumpy(ptsDict[iTime]), LOOP=LINE_LOOP or self.splineClosed)
             return self._save(lineDict, featureName=featureName, prefix='line')
         except Exception as e:
             print(f"Error in _saveLine: {e}")
@@ -150,7 +154,10 @@ class BaseMarkupViewer:
         outDict = {}
         try:
             for k1 in range(len(self.times)):
-                pp = self.Markups.getPolyPointsFromPoints(timeID=k1)
+                if self.markupMode == 'Spline':
+                    pp = self.Markups.getSplinePolyData(timeID=k1, nSplinePts=self.nSplinePoints)
+                else:
+                    pp = self.Markups.getPolyPointsFromPoints(timeID=k1)
                 if pp.GetNumberOfPoints() > 0:
                     outDict[self.times[k1]] = pp
         except (AttributeError, ValueError) as e:
@@ -167,7 +174,7 @@ class BaseMarkupViewer:
             
         if featureName is None:
             featureName = dialogGetName(self)
-        if not featureName:
+        if not featureName: # If user cancels
             return None
         try:
             if len(polyDataDict) == 1 and not FORCE_PVD_EVEN_IF_SINGLE:
@@ -176,7 +183,7 @@ class BaseMarkupViewer:
             else:
                 fileOut = fIO.writeVTK_PVD_Dict(polyDataDict, 
                                     rootDir=self._getWorkingDirectory(), 
-                                    filePrefix=featureName, fileExtn=extn)
+                                    filePrefix=prefix+featureName, fileExtn=extn)
             return fileOut
         except Exception as e:
             print(f"Error saving file: {e}")

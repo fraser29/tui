@@ -274,6 +274,9 @@ class Markups(object):
         """Get splines list for each time"""
         return [self.markupsDict[Splines].get(iTimeID, []) for iTimeID in range(self.nTimes)]
 
+    def getSplinePolyData(self, timeID, nSplinePts=100):
+        return self.markupsDict[Splines][timeID].getSplinePolyData_WorldCS(nSplinePts)
+
 
     def getAllPointsActors(self, timeID, pointSize, boundCP=None, boundN=None, bounddx=None):
         return self.markupsDict[Points][timeID].getActorForAllPoints(pointSize, boundCP, boundN, bounddx)
@@ -495,6 +498,8 @@ class MarkupSplines(list):
     def addSpline(self, Xarrary, reslice, renderer, interactor, handDrawn, LOOP, timeID=0, sliceID=0):
         self.append(MarkupSpline(Xarrary, reslice, renderer, interactor, handDrawn, LOOP, coordinateSystem=self.coordinateSystem, timeID=timeID, sliceID=sliceID))
 
+    def getSplinePolyData_WorldCS(self, nSplinePts=100):
+        return vtkfilters.appendPolyDataList([i.getSplinePolyData_WorldCS(nSplinePts) for i in self])
 
 ### ====================================================================================================================
 ### MARKUP - SPLINE
@@ -561,6 +566,11 @@ class MarkupSpline(Markup, vtk.vtkSplineWidget):
         self.GetPolyData(poly)
         return poly
 
+    def getSplinePolyData_WorldCS(self, nSplinePts=100):
+        pts = self.getPoints(nSplinePts=nSplinePts) # Note LOOP done here with splining
+        # but if self.LOOP  AND we had NO splining - then do loop. 
+        worldCoords = np.array([self.transformToWorld(i) for i in pts])
+        return vtkfilters.buildPolyLineFromXYZ(worldCoords, LOOP=(self.LOOP and (nSplinePts is None)))
 
     def getPoints(self, nSplinePts=None):
         pts = []
@@ -570,7 +580,7 @@ class MarkupSpline(Markup, vtk.vtkSplineWidget):
             pts.append(ixyz)
         if nSplinePts is not None:
             pts = vtkfilters.ftk.splinePoints(pts, nSplinePts, periodic=self.LOOP, RETURN_NUMPY=False)
-        return np.array(pts)
+        return np.array(pts).T
 
     def getPlane(self):
         return vtkfilters.ftk.fitPlaneToPoints(self.getPoints())
