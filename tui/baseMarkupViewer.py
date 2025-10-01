@@ -113,32 +113,32 @@ class BaseMarkupViewer:
         if self.VERBOSE:
             print("All markups cleared")
 
-    def savePoints(self, featureName=None):
+    def savePoints(self, featureName=None, prefix='pt'):
         """Save points as polydata"""
         try:
             ppDict = self.getMarkupAsPolydata()
-            return self._save(ppDict, featureName=featureName, prefix='pt')
+            return self._save(ppDict, featureName=featureName, prefix=prefix)
         except Exception as e:
             print(f"Error in _savePoints: {e}")
             return None
 
-    def saveLine(self, featureName=None, LINE_LOOP=False):
+    def saveLine(self, featureName=None, LINE_LOOP=False, prefix='line'):
         """Save line as polydata"""
         try:
             lineDict = self.getMarkupAsPolydata_lines(LINE_LOOP=LINE_LOOP)
-            return self._save(lineDict, featureName=featureName, prefix='line')
+            return self._save(lineDict, featureName=featureName, prefix=prefix)
         except Exception as e:
             print(f"Error in _saveLine: {e}")
             return None
 
-    def saveVOI(self, featureName=None):
+    def saveVOI(self, featureName=None, prefix='fov'):
         """Save VOI as polydata"""
         try:
             ptsDict = self.getMarkupAsPolydata()
             voiDict = {}
             for iTime in ptsDict.keys():
                 voiDict[iTime] = vtkfilters.getOutline(ptsDict[iTime])
-            return self._save(voiDict, featureName=featureName, prefix='fov')
+            return self._save(voiDict, featureName=featureName, prefix=prefix)
         except Exception as e:
             print(f"Error in _saveVOI: {e}")
             return None
@@ -190,7 +190,7 @@ class BaseMarkupViewer:
                 fileOut = fIO.writeVTKFile(polyDataDict[self.times[0]], fileOut)
             else:
                 fileOut = fIO.writeVTK_PVD_Dict(polyDataDict, 
-                                    rootDir=self._getWorkingDirectory(), 
+                                    rootDir=self.getWorkingDirectory(), 
                                     filePrefix=prefix+featureName, fileExtn=extn)
             return fileOut
         except Exception as e:
@@ -202,7 +202,7 @@ class BaseMarkupViewer:
         try:
             from PyQt5 import QtWidgets
             fileName, _ = QtWidgets.QFileDialog.getSaveFileName(
-                self, "Save File", self._getWorkingDirectory(), 
+                self, "Save File", self.getWorkingDirectory(), 
                 "VTK Files (*.vtp);;All Files (*)")
             return fileName if fileName else ""
         except Exception as e:
@@ -240,7 +240,7 @@ class BaseMarkupViewer:
                 fileName = fileName + extn
         return os.path.join(str(self.workingDir), fileName)
 
-    def _getWorkingDirectory(self):
+    def getWorkingDirectory(self):
         """Get working directory"""
         try:
             if hasattr(self, 'workingDirLineEdit') and self.workingDirLineEdit:
@@ -538,7 +538,7 @@ class BaseMarkupViewer:
 
     
     # FILE LOADING METHODS
-    def setWorkingDir(self, workingDir):
+    def setWorkingDirectory(self, workingDir):
         """Set working directory"""
         self.workingDir = workingDir
         self.workingDirLineEdit.setText(workingDir)
@@ -547,11 +547,11 @@ class BaseMarkupViewer:
         """Open directory selector and update working directory"""
         try:
             from PyQt5 import QtWidgets
-            currentDir = self._getWorkingDirectory()
+            currentDir = self.getWorkingDirectory()
             dirName = QtWidgets.QFileDialog.getExistingDirectory(
                 self, "Select Working Directory", currentDir)
             if dirName:
-                self.setWorkingDir(dirName)
+                self.setWorkingDirectory(dirName)
                 if self.VERBOSE:
                     print(f"Working directory set to: {dirName}")
         except Exception as e:
@@ -593,7 +593,7 @@ class BaseMarkupViewer:
         self.vtiDict = dcmSeries.buildVTIDict()
         if self.VERBOSE:
             print(f"Have VTI dict. Times (ms): {[int(i*1000.0) for i in sorted(self.vtiDict.keys())]}")
-        self.setWorkingDir(os.path.split(dicomDir)[0])
+        self.setWorkingDirectory(os.path.split(dicomDir)[0])
         self._setupAfterLoad()
 
     def loadVTI_or_PVD(self, fileName=None):
@@ -610,7 +610,7 @@ class BaseMarkupViewer:
                 vtkfilters.ensureScalarsSet(self.vtiDict[iTime])
             if self.VERBOSE:
                 print('Data loaded...')
-            self.setWorkingDir(os.path.split(fileName)[0])
+            self.setWorkingDirectory(os.path.split(fileName)[0])
             self._setupAfterLoad()
 
     def _setupAfterLoad(self):

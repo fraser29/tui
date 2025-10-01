@@ -306,7 +306,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
             
             # Create piwakawaka viewer instance
             piwakawaka_viewer = piwakawakaViewer.PIWAKAWAKAMarkupViewer(VERBOSE=self.VERBOSE)
-            piwakawaka_viewer.setWorkingDir(self.workingDir)
+            piwakawaka_viewer.setWorkingDirectory(self.workingDir)
             
             # Load the reslice data directly from memory
             piwakawaka_viewer.loadResliceDataFromMemory(reslice_data_dict, center, normal)
