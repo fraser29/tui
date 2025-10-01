@@ -128,25 +128,14 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.customSliceNormals = []
         #
         # GRAPHICS VIEW SETUP
-        try:
-            self.graphicsViewVTK = QVTKRenderWindowInteractor(self.graphicsView)
-        except AttributeError:
-            self.graphicsViewVTK = QVTKRenderWindowInteractor(self.widget) # vtkRenderWindowInteractor
-        self.graphicsViewVTK.setObjectName("graphicsView")
-        self.graphicsViewVTK.RemoveObservers("KeyPressEvent")
-        self.graphicsViewVTK.RemoveObservers("CharEvent")
-        layout = piwakawakamarkupui.QtWidgets.QVBoxLayout(self.graphicsView)
-        layout.addWidget(self.graphicsViewVTK)
-        self.graphicsView.setLayout(layout)
-        ##
-        self.renderWindow = self.graphicsViewVTK.GetRenderWindow()
+        # Use common VTK setup from base class
+        self.graphicsViewVTK, self.renderWindow = self._setupVTKInteractor(self.graphicsView)
+        
+        # Piwakawaka-specific renderer setup (single renderer)
         self.renderer = vtk.vtkRenderer()
         self.renderWindow.AddRenderer(self.renderer)
-        self.renderWindow.SetMultiSamples(0)
-        #
+        
         self.interactionState = None
-        self.graphicsViewVTK.Initialize()
-        self.graphicsViewVTK.Start()
         self.graphicsViewVTK.picker = vtk.vtkPropPicker()
         #
         self.connections()
@@ -548,27 +537,8 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
     def getCurrentResliceMatrix(self):
         return self.getCurrentReslice().GetResliceAxes()
 
-    def getPointIDAtX(self, X):
-        """Get point ID from world coordinates, accounting for reslice orientation"""
-        return self.getCurrentVTIObject().FindPoint(X)
-
     def getIJK_imageCSX(self, imageCS_X):
         return self.getIJKAtX(self.imageCS_to_ResliceCS_X(imageCS_X))
-
-    def getIJKAtX(self, X):
-        """Convert world coordinates to IJK coordinates, accounting for reslice orientation"""
-        ijk = [0, 0, 0]
-        pcoords = [0.0, 0.0, 0.0]
-        res = self.getCurrentVTIObject().ComputeStructuredCoordinates(X, ijk, pcoords)
-        if res == 0:
-            return None
-        return ijk
-
-    def getIJKAtPtID(self, ptID):
-        X = self.getCurrentVTIObject().GetPoint(ptID)
-        ijk = self.getIJKAtX(X)
-        return ijk
-
 
     def getPtID_at_IJK(self, ijk):
         dims = self.getCurrentVTIObject().GetDimensions()
@@ -576,26 +546,18 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         pointId = i + j * dims[0] + k * dims[0] * dims[1]
         return pointId
 
-
     def getPixelValueAtReslicePosition(self, mouseX, mouseY):
         """Get pixel value at mouse position from the current reslice"""
         X_imageCS = self.mouseXYTo_ImageCS_X(mouseX, mouseY)
         ptID = self.getCurrentVTIObject().FindPoint(X_imageCS)
         return self.getPixelValueAtPtID_tuple(ptID)
         
-    
     def getReslice_IJK_X_ID_AtMouse(self, mouseX, mouseY):
         """Get IJK coordinates at mouse position for the current reslice"""
         X_imageCS = self.mouseXYTo_ImageCS_X(mouseX, mouseY)
         X_worldCS = self.imageCS_To_WorldCS_X(X_imageCS)
         ijk = self.getIJK_imageCSX(X_imageCS)
         return ijk, X_worldCS, self.getPtID_at_IJK(ijk)
-    
-    
-    def getPixelValueAtPtID_tuple(self, ptID):
-        if (ptID < 0) or (ptID >= self.getCurrentVTIObject().GetNumberOfPoints()):
-            return None
-        return self.getCurrentVTIObject().GetPointData().GetArray(self.currentArray).GetTuple(ptID)
 
 
     def imageCS_to_ResliceCS_X(self, imageCS_X):

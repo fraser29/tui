@@ -730,6 +730,84 @@ class BaseMarkupViewer:
     def setWindowLevel(self, w, l):
         """Set window level - to be overridden by subclasses"""
         pass
+    
+    # CAMERA METHODS
+    def cameraReset(self):
+        """Reset camera to default position - to be overridden by subclasses"""
+        pass
+    
+    def cameraReset3D(self):
+        """Reset 3D camera clipping range - to be overridden by subclasses"""
+        pass
+    
+    # COORDINATE CONVERSION METHODS
+    def getPointIDAtX(self, X):
+        """Get point ID from world coordinates - to be overridden by subclasses"""
+        return self.getCurrentVTIObject().FindPoint(X)
+    
+    def getIJKAtX(self, X):
+        """Convert world coordinates to IJK coordinates - to be overridden by subclasses"""
+        ijk = [0, 0, 0]
+        pcoords = [0.0, 0.0, 0.0]
+        res = self.getCurrentVTIObject().ComputeStructuredCoordinates(X, ijk, pcoords)
+        if res == 0:
+            return None
+        return ijk
+    
+    def getIJKAtPtID(self, ptID):
+        """Get IJK coordinates from point ID - to be overridden by subclasses"""
+        X = self.getCurrentVTIObject().GetPoint(ptID)
+        return self.getIJKAtX(X)
+    
+    def getPixelValueAtPtID_tuple(self, ptID):
+        """Get pixel value tuple from point ID - to be overridden by subclasses"""
+        if (ptID < 0) or (ptID >= self.getCurrentVTIObject().GetNumberOfPoints()):
+            return None
+        return self.getCurrentVTIObject().GetPointData().GetArray(self.currentArray).GetTuple(ptID)
+    
+    def imageCS_To_WorldCS_X(self, imageCS_X):
+        """Convert image coordinates to world coordinates - to be overridden by subclasses"""
+        # Default implementation - subclasses should override with proper coordinate system handling
+        return imageCS_X
+    
+    def getCurrentViewNormal(self):
+        """Get current view normal - to be overridden by subclasses"""
+        return np.array([0, 0, 1])  # Default Z-axis normal
+    
+    def getViewNormal(self, i):
+        """Get view normal for view i - to be overridden by subclasses"""
+        return self.getCurrentViewNormal()
+    
+    # RENDERING METHODS
+    def updateViewAfterSliceChange(self):
+        """Update view after slice change - to be overridden by subclasses"""
+        pass
+    
+    # COMMON INITIALIZATION METHODS
+    def _setupVTKInteractor(self, graphicsView):
+        """Setup common VTK interactor initialization"""
+        try:
+            self.graphicsViewVTK = QVTKRenderWindowInteractor(graphicsView)
+        except AttributeError:
+            self.graphicsViewVTK = QVTKRenderWindowInteractor(self.widget)  # vtkRenderWindowInteractor
+        
+        self.graphicsViewVTK.setObjectName("graphicsView")
+        self.graphicsViewVTK.RemoveObservers("KeyPressEvent")
+        self.graphicsViewVTK.RemoveObservers("CharEvent")
+        
+        # Import QtWidgets here to avoid circular imports
+        from PyQt5 import QtWidgets
+        layout = QtWidgets.QVBoxLayout(graphicsView)
+        layout.addWidget(self.graphicsViewVTK)
+        graphicsView.setLayout(layout)
+        
+        self.renderWindow = self.graphicsViewVTK.GetRenderWindow()
+        self.renderWindow.SetMultiSamples(0)
+        
+        self.graphicsViewVTK.Initialize()
+        self.graphicsViewVTK.Start()
+        
+        return self.graphicsViewVTK, self.renderWindow
 
     def showHelpWindow(self):
         """Show help window with keyboard shortcuts and interaction guide"""

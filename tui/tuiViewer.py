@@ -56,26 +56,14 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
                                       [0.1, 0.1, 0.1]]
         #
         # GRAPHICS VIEW SETUP
-        try:
-            self.graphicsViewVTK = QVTKRenderWindowInteractor(self.graphicsView)
-        except AttributeError:
-            self.graphicsViewVTK = QVTKRenderWindowInteractor(self.widget) # vtkRenderWindowInteractor
-        self.graphicsViewVTK.setObjectName("graphicsView")
-        self.graphicsViewVTK.RemoveObservers("KeyPressEvent")
-        self.graphicsViewVTK.RemoveObservers("CharEvent")
-        layout = tuimarkupui.QtWidgets.QVBoxLayout(self.graphicsView)
-        layout.addWidget(self.graphicsViewVTK)
-        self.graphicsView.setLayout(layout)
-        ##
-        # print(self.graphicsViewVTK) # vtkRenderWindowInteractor
-        # print(self.graphicsViewVTK.GetRenderWindow())
-        # print(self.graphicsViewVTK.GetInteractorStyle()) # vtkInteractorStyleSwitch
-        ##
-        self.renderWindow = self.graphicsViewVTK.GetRenderWindow()
+        # Use common VTK setup from base class
+        self.graphicsViewVTK, self.renderWindow = self._setupVTKInteractor(self.graphicsView)
+        
+        # TUI-specific renderer setup (4 renderers for multi-view)
         self.rendererArray = [vtk.vtkRenderer(), vtk.vtkRenderer(), vtk.vtkRenderer(), vtk.vtkRenderer()]
         for k1 in range(4):
             self.renderWindow.AddRenderer(self.rendererArray[k1])
-        self.renderWindow.SetMultiSamples(0)
+        
         self.resliceCursorWidgetArray = [None] * 3  # [Bot R, Bot L, Top L]
         self.resliceCursor = vtk.vtkResliceCursor()
 
@@ -85,8 +73,6 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
         #
         self.interactionState = None
         self.interactionView = None
-        self.graphicsViewVTK.Initialize()
-        self.graphicsViewVTK.Start()
         #
         self.viewButtonList = [None] * 5
         self.connections()
@@ -398,23 +384,12 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
     def getPointIDAtX(self, X):
         return tuiUtils.imageX_2_PointID(self.getCurrentVTIObject(), X)
 
-    def getIJKAtX(self, X):
-        """Convert world coordinates to IJK coordinates, accounting for reslice orientation"""
-        ijk = [0, 0, 0]
-        pcoords = [0.0, 0.0, 0.0]
-        res = self.getCurrentVTIObject().ComputeStructuredCoordinates(X, ijk, pcoords)
-        if res == 0:
-            return None
-        return ijk
-
     def getIJKAtPtID(self, ptID):
         return tuiUtils.imageID_2_IJK(self.getCurrentVTIObject(), ptID)
 
     def getPixelValueAtX_tuple(self, X):
         ptID = self.getPointIDAtX(X)
         return self.getPixelValueAtPtID_tuple(ptID)
-    def getPixelValueAtPtID_tuple(self, ptID):
-        return self.getCurrentVTIObject().GetPointData().GetArray(self.currentArray).GetTuple(ptID)
 
     def mouseXYTo_ImageCS_X(self, mouseX, mouseY):
         # Can not get direct from interactor - need to go though active cursor widget.
@@ -564,8 +539,9 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
     def updateViewAfterTimeChange(self): # NEED TO TRIGGER ON A TIME CHANGE
         self.resliceCursor.SetImage(self.getCurrentVTIObject()) # FIXME - check the picker
         self.updateViewAfterSliceChange()
-
+    
     def updateViewAfterSliceChange(self):
+        """Update view after slice change for 3D viewer"""
         self.renderWindow.Render()
 
     def updateAllActorsToCurrentSlice(self):
@@ -587,6 +563,11 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
             for i in range(4):
                 self.rendererArray[i].RemoveActor(iActor)
         self.markupActorList = []
+
+    def removeActorFromAllRenderers(self, actor):
+        """Remove actor from all 4 renderers in 3D viewer"""
+        for i in range(4):
+            self.rendererArray[i].RemoveActor(actor)
 
     def _updateMarkups(self, window=None, level=None):
         self.clearCurrentMarkups()
