@@ -48,27 +48,27 @@ class _TUIProj(object):
             else:
                 workDir = os.getcwd()
         
-        self.ex.workingDirLineEdit.setText(workDir)
+        self.ex.setWorkingDir(workDir)
         if self.ex.VERBOSE:
             print("WORK-DIR set to :", workDir)
         if scalar is not None:
             self.ex.setCurrentArray(scalar) # Example to set shown array (else take scalar)
 
 
-    def getFullFileName(self, fileName=None, prefix=None, extn=None):
-        if fileName is None:
-            fileName = dialogGetName(self.ex)
-        if len(fileName) == 0:
-            return
-        if prefix is not None:
-            if not fileName.startswith(prefix):
-                fileName = prefix+fileName
-        if extn is not None:
-            if not extn.startswith('.'):
-                extn = '.'+extn
-            if not fileName.endswith(extn):
-                fileName = fileName + extn
-        return os.path.join(str(self.ex.workingDirLineEdit.text()), fileName)
+    # def getFullFileName(self, fileName=None, prefix=None, extn=None):
+    #     if fileName is None:
+    #         fileName = dialogGetName(self.ex)
+    #     if len(fileName) == 0:
+    #         return
+    #     if prefix is not None:
+    #         if not fileName.startswith(prefix):
+    #             fileName = prefix+fileName
+    #     if extn is not None:
+    #         if not extn.startswith('.'):
+    #             extn = '.'+extn
+    #         if not fileName.endswith(extn):
+    #             fileName = fileName + extn
+    #     return os.path.join(str(self.ex.workingDirLineEdit.text()), fileName)
 
 
     def getLMPoints_xyz(self):
@@ -84,70 +84,70 @@ class _TUIProj(object):
         return outDict
 
 
-    def _save(self, polyDataDict, featureName=None, prefix='', extn='vtp', FORCE_PVD_EVEN_IF_SINGLE=False):
-        if polyDataDict is None:
-            return 
-        if featureName is None:
-            featureName = dialogGetName(self.ex)
-        if len(featureName) == 0:
-            return
-        if len(polyDataDict) == 1 and not FORCE_PVD_EVEN_IF_SINGLE:
-            fileOut = self.getFullFileName(fileName=featureName, prefix=prefix, extn=extn)
-            fileOut = fIO.writeVTKFile(polyDataDict[self.ex.times[0]], fileOut)
-        else:
-            fileOut = fIO.writeVTK_PVD_Dict(polyDataDict, 
-                                rootDir=self.ex.workingDirLineEdit.text(), 
-                                filePrefix=featureName, fileExtn=extn)
-        return fileOut
+    # def _save(self, polyDataDict, featureName=None, prefix='', extn='vtp', FORCE_PVD_EVEN_IF_SINGLE=False):
+    #     if polyDataDict is None:
+    #         return 
+    #     if featureName is None:
+    #         featureName = dialogGetName(self.ex)
+    #     if len(featureName) == 0:
+    #         return
+    #     if len(polyDataDict) == 1 and not FORCE_PVD_EVEN_IF_SINGLE:
+    #         fileOut = self.getFullFileName(fileName=featureName, prefix=prefix, extn=extn)
+    #         fileOut = fIO.writeVTKFile(polyDataDict[self.ex.times[0]], fileOut)
+    #     else:
+    #         fileOut = fIO.writeVTK_PVD_Dict(polyDataDict, 
+    #                             rootDir=self.ex.workingDirLineEdit.text(), 
+    #                             filePrefix=featureName, fileExtn=extn)
+    #     return fileOut
 
 
-    def saveVOI(self, featureName=None):
-        ppDict = self.getVOI_dict()
-        return self._save(ppDict, featureName=featureName, prefix='fov')
+    # def saveVOI(self, featureName=None):
+    #     ppDict = self.getVOI_dict()
+    #     return self._save(ppDict, featureName=featureName, prefix='fov')
 
 
-    def savePoints(self, featureName=None):
-        ppDict = self.getPolyDataPoints_dict()
-        return self._save(ppDict, featureName=featureName, prefix='pt')
+    # def savePoints(self, featureName=None):
+    #     ppDict = self.getPolyDataPoints_dict()
+    #     return self._save(ppDict, featureName=featureName, prefix='pt')
 
 
-    def saveLine(self, featureName=None, lineLoop=False, splineDist=None, prefix='line'):
-        ppDict = self.getPolyDataLine_dict(LOOP=lineLoop, spacing=splineDist)
-        return self._save(ppDict, featureName=featureName, prefix=prefix)
+    # def saveLine(self, featureName=None, lineLoop=False, splineDist=None, prefix='line'):
+    #     ppDict = self.getPolyDataLine_dict(LOOP=lineLoop, spacing=splineDist)
+    #     return self._save(ppDict, featureName=featureName, prefix=prefix)
 
 
-    def getPolyDataPoints_dict(self):
-        return self._getMarkupAsPolydata()
+    # def getPolyDataPoints_dict(self):
+    #     return self._getMarkupAsPolydata()
 
 
-    def getPolyDataLine_dict(self, LOOP=False, spacing=None):
-        ptsDict = self._getMarkupAsPolydata()
-        lineDict = {}
-        for iTime in ptsDict.keys():
-            lineDict[iTime] = vtkfilters.buildPolyLineFromXYZ(vtkfilters.getPtsAsNumpy(ptsDict[iTime]), LOOP=LOOP)
-            if spacing is not None:
-                lineDict[iTime] = vtkfilters.filterVtpSpline(lineDict[iTime], spacing=spacing)
-        return lineDict
+    # def getPolyDataLine_dict(self, LOOP=False, spacing=None):
+    #     ptsDict = self._getMarkupAsPolydata()
+    #     lineDict = {}
+    #     for iTime in ptsDict.keys():
+    #         lineDict[iTime] = vtkfilters.buildPolyLineFromXYZ(vtkfilters.getPtsAsNumpy(ptsDict[iTime]), LOOP=LOOP)
+    #         if spacing is not None:
+    #             lineDict[iTime] = vtkfilters.filterVtpSpline(lineDict[iTime], spacing=spacing)
+    #     return lineDict
 
 
-    def getVOI_dict(self):
-        ptsDict = self._getMarkupAsPolydata()
-        voiDict = {}
-        for iTime in ptsDict.keys():
-            voiDict[iTime] = vtkfilters.getOutline(ptsDict[iTime])
-        return voiDict
+    # def getVOI_dict(self):
+    #     ptsDict = self._getMarkupAsPolydata()
+    #     voiDict = {}
+    #     for iTime in ptsDict.keys():
+    #         voiDict[iTime] = vtkfilters.getOutline(ptsDict[iTime])
+    #     return voiDict
 
 
-    def _getMarkupAsPolydata(self):
-        outDict = {}
-        try:
-            for k1 in range(len(self.ex.times)):
-                pp = self.ex.Markups.getPolyPointsFromPoints(timeID=k1)
-                if pp.GetNumberOfPoints() > 0:
-                    outDict[self.ex.times[k1]] = pp
-        except (AttributeError, ValueError) as e:
-            print(e)
-        return outDict
+    # def _getMarkupAsPolydata(self):
+    #     outDict = {}
+    #     try:
+    #         for k1 in range(len(self.ex.times)):
+    #             pp = self.ex.Markups.getPolyPointsFromPoints(timeID=k1)
+    #             if pp.GetNumberOfPoints() > 0:
+    #                 outDict[self.ex.times[k1]] = pp
+    #     except (AttributeError, ValueError) as e:
+    #         print(e)
+    #     return outDict
 
 
 
@@ -259,18 +259,18 @@ class TUIBasic(TUIProject):
 
 
     def saveVOI_(self):
-        fOut = self.saveVOI()
+        fOut = self.ex.saveVOI()
         if (fOut is not None) and self.ex.VERBOSE:
             print(f"Written VOI to {fOut}")
 
     def savePolyPts_(self):
-        fOut = self.savePoints()
+        fOut = self.ex.savePoints()
         if (fOut is not None) and self.ex.VERBOSE:
             print(f"Written points to {fOut}")
 
 
     def savePolyLine_(self):
-        fOut = self.saveLine(LINE_LOOP=self.ex.splineClosed)
+        fOut = self.ex.saveLine(LINE_LOOP=self.ex.splineClosed)
         if (fOut is not None) and self.ex.VERBOSE:
             print(f"Written line to {fOut}")
     
@@ -308,18 +308,18 @@ class TUI2D(TUI2DProject):
 
 
     def saveVOI_(self):
-        fOut = self.saveVOI()
+        fOut = self.ex.saveVOI()
         if (fOut is not None) and self.ex.VERBOSE:
             print(f"Written VOI to {fOut}")
 
     def savePolyPts_(self):
-        fOut = self.savePoints()
+        fOut = self.ex.savePoints()
         if (fOut is not None) and self.ex.VERBOSE:
             print(f"Written points to {fOut}")
 
 
     def savePolyLine_(self):
-        fOut = self.saveLine(LINE_LOOP=self.ex.splineClosed)
+        fOut = self.ex.saveLine(LINE_LOOP=self.ex.splineClosed)
         if (fOut is not None) and self.ex.VERBOSE:
             print(f"Written line to {fOut}")
     

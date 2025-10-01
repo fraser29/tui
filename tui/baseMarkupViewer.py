@@ -9,12 +9,14 @@ Base viewer class for common functionality between 2D and 3D viewers.
 @email: callaghan.fm@gmail.com
 """
 
+import os
 import vtk
 import numpy as np
 from ngawari import fIO
 from ngawari import vtkfilters
 import spydcmtk
 from tui import tuiMarkups
+from tui.tuiUtils import dialogGetName
 
 from vtk.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor # type: ignore
 
@@ -42,6 +44,7 @@ class BaseMarkupViewer:
         self.scalarRange = {'Default':[0,255]}
         self.boundingDist = 0.0
         self.multiPointFactor = 0.0001
+        self.workingDir = os.getcwd()
         
         # Markup mode settings
         self.markupMode = 'Point'  # 'Point' or 'Spline'
@@ -58,11 +61,183 @@ class BaseMarkupViewer:
         self.modPushButtonDict = dict(zip(range(self.nModPushButtons),
                                           [['Mod-Button%d'%(i),dummyModButtonAction] for i in range(1,self.nModPushButtons+1)]))
         
+        # Set default customized buttons (can be overridden by subclasses)
+        self._setupDefaultButtons()
+        
         self.VERBOSE = VERBOSE
         
         # Initialize markups
         self.Markups = tuiMarkups.Markups(self)
         self.markupActorList = []
+
+    def _setupDefaultButtons(self):
+        """Setup default customized buttons that can be overridden by subclasses"""
+        self.modPushButtonDict = {
+            0: ['Save points', self._defaultSavePoints],
+            1: ['Save line', self._defaultSaveLine],
+            2: ['Save VOI', self._defaultSaveVOI],
+            3: ['Clear Markups', self._defaultClearMarkups],
+        }
+
+    def _defaultSavePoints(self):
+        """Default save points action"""
+        try:
+            fOut = self.savePoints()
+            if fOut and self.VERBOSE:
+                print(f"Written points to {fOut}")
+        except Exception as e:
+            print(f"Error saving points: {e}")
+
+    def _defaultSaveLine(self):
+        """Default save line action"""
+        try:
+            fOut = self.saveLine()
+            if fOut and self.VERBOSE:
+                print(f"Written line to {fOut}")
+        except Exception as e:
+            print(f"Error saving line: {e}")
+
+    def _defaultSaveVOI(self):
+        """Default save VOI action"""
+        try:
+            fOut = self.saveVOI()
+            if fOut and self.VERBOSE:
+                print(f"Written VOI to {fOut}")
+        except Exception as e:
+            print(f"Error saving VOI: {e}")
+
+    def _defaultClearMarkups(self):
+        """Default clear markups action"""
+        self.deleteAllMarkups()
+        if self.VERBOSE:
+            print("All markups cleared")
+
+    def savePoints(self, featureName=None):
+        """Save points as polydata"""
+        try:
+            ppDict = self.getMarkupAsPolydata()
+            return self._save(ppDict, featureName=featureName, prefix='pt')
+        except Exception as e:
+            print(f"Error in _savePoints: {e}")
+            return None
+
+    def saveLine(self, featureName=None, lineLoop=None):
+        """Save line as polydata"""
+        try:
+            ptsDict = self.getMarkupAsPolydata()
+            lineDict = {}
+            for iTime in ptsDict.keys():
+                lineDict[iTime] = vtkfilters.buildPolyLineFromXYZ(vtkfilters.getPtsAsNumpy(ptsDict[iTime]), LOOP=lineLoop or self.splineClosed)
+            return self._save(lineDict, featureName=featureName, prefix='line')
+        except Exception as e:
+            print(f"Error in _saveLine: {e}")
+            return None
+
+    def saveVOI(self, featureName=None):
+        """Save VOI as polydata"""
+        try:
+            ptsDict = self.getMarkupAsPolydata()
+            voiDict = {}
+            for iTime in ptsDict.keys():
+                voiDict[iTime] = vtkfilters.getOutline(ptsDict[iTime])
+            return self._save(voiDict, featureName=featureName, prefix='fov')
+        except Exception as e:
+            print(f"Error in _saveVOI: {e}")
+            return None
+
+    def getMarkupAsPolydata(self):
+        """Get markups as polydata dictionary"""
+        outDict = {}
+        try:
+            for k1 in range(len(self.times)):
+                pp = self.Markups.getPolyPointsFromPoints(timeID=k1)
+                if pp.GetNumberOfPoints() > 0:
+                    outDict[self.times[k1]] = pp
+        except (AttributeError, ValueError) as e:
+            if self.VERBOSE:
+                print(f"Error getting markup polydata: {e}")
+        return outDict
+
+    def _save(self, polyDataDict, featureName=None, prefix='', extn='vtp', FORCE_PVD_EVEN_IF_SINGLE=False):
+        """Save polydata dictionary to files"""
+        if polyDataDict is None or len(polyDataDict) == 0:
+            if self.VERBOSE:
+                print("No data to save")
+            return None
+            
+        if featureName is None:
+            featureName = dialogGetName(self)
+        if not featureName:
+            return None
+        try:
+            if len(polyDataDict) == 1 and not FORCE_PVD_EVEN_IF_SINGLE:
+                fileOut = self.getFullFileName(fileName=featureName, prefix=prefix, extn=extn)
+                fileOut = fIO.writeVTKFile(polyDataDict[self.times[0]], fileOut)
+            else:
+                fileOut = fIO.writeVTK_PVD_Dict(polyDataDict, 
+                                    rootDir=self._getWorkingDirectory(), 
+                                    filePrefix=featureName, fileExtn=extn)
+            return fileOut
+        except Exception as e:
+            print(f"Error saving file: {e}")
+            return None
+
+    def getFileNameViaDialog(self):
+        """Get filename via dialog"""
+        try:
+            from PyQt5 import QtWidgets
+            fileName, _ = QtWidgets.QFileDialog.getSaveFileName(
+                self, "Save File", self._getWorkingDirectory(), 
+                "VTK Files (*.vtp);;All Files (*)")
+            return fileName if fileName else ""
+        except Exception as e:
+            if self.VERBOSE:
+                print(f"Error getting filename: {e}")
+            return ""
+
+    def getFullFileName_interactive(self, fileName=None, prefix=None, extn=None):
+        """Get full filename with prefix and extension"""
+        if fileName is None:
+            fileName = self.getFileNameViaDialog()
+        if not fileName:
+            return ""
+        if prefix and not fileName.startswith(prefix):
+            fileName = prefix + fileName
+        if extn and not extn.startswith('.'):
+            extn = '.' + extn
+        if extn and not fileName.endswith(extn):
+            fileName = fileName + extn
+        return fileName
+
+
+    def getFullFileName(self, fileName=None, prefix=None, extn=None):
+        if fileName is None:
+            fileName = dialogGetName(self)
+        if len(fileName) == 0:
+            return
+        if prefix is not None:
+            if not fileName.startswith(prefix):
+                fileName = prefix+fileName
+        if extn is not None:
+            if not extn.startswith('.'):
+                extn = '.'+extn
+            if not fileName.endswith(extn):
+                fileName = fileName + extn
+        return os.path.join(str(self.workingDir), fileName)
+
+    def _getWorkingDirectory(self):
+        """Get working directory"""
+        try:
+            if hasattr(self, 'workingDirLineEdit') and self.workingDirLineEdit:
+                text = str(self.workingDirLineEdit.text())
+                if text:
+                    return text
+            # Fallback to workingDir attribute or current directory
+            if hasattr(self, 'workingDir') and self.workingDir:
+                return self.workingDir
+            return os.getcwd()
+        except Exception:
+            return os.getcwd()
 
     def __setScalarRangeForCurrentArray(self):
         """Set scalar range for current array"""
@@ -346,7 +521,27 @@ class BaseMarkupViewer:
         if hasattr(self, 'renderWindow'):
             self.renderWindow.Render()
 
+    
     # FILE LOADING METHODS
+    def setWorkingDir(self, workingDir):
+        """Set working directory"""
+        self.workingDir = workingDir
+        self.workingDirLineEdit.setText(workingDir)
+
+    def selectWorkingDirectory(self):
+        """Open directory selector and update working directory"""
+        try:
+            from PyQt5 import QtWidgets
+            currentDir = self._getWorkingDirectory()
+            dirName = QtWidgets.QFileDialog.getExistingDirectory(
+                self, "Select Working Directory", currentDir)
+            if dirName:
+                self.setWorkingDir(dirName)
+                if self.VERBOSE:
+                    print(f"Working directory set to: {dirName}")
+        except Exception as e:
+            print(f"Error selecting working directory: {e}")
+
     def _getFileViaDialog(self):
         """Get file via dialog"""
         if not hasattr(self, 'fileDialog') or not hasattr(self, 'workingDirLineEdit'):
@@ -383,6 +578,7 @@ class BaseMarkupViewer:
         self.vtiDict = dcmSeries.buildVTIDict()
         if self.VERBOSE:
             print(f"Have VTI dict. Times (ms): {[int(i*1000.0) for i in sorted(self.vtiDict.keys())]}")
+        self.setWorkingDir(os.path.split(dicomDir)[0])
         self._setupAfterLoad()
 
     def loadVTI_or_PVD(self, fileName=None):
@@ -399,6 +595,7 @@ class BaseMarkupViewer:
                 vtkfilters.ensureScalarsSet(self.vtiDict[iTime])
             if self.VERBOSE:
                 print('Data loaded...')
+            self.setWorkingDir(os.path.split(fileName)[0])
             self._setupAfterLoad()
 
     def _setupAfterLoad(self):

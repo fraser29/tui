@@ -124,6 +124,10 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
         # Image manipulation buttons
         self.imManip_A.clicked.connect(self.toggleCrosshairs)
         # self.imManip_B.clicked.connect(self.rotateCamera90)
+        
+        # Markup mode connections
+        self.imMarkupButton_A.clicked.connect(self.currentSliceToPiwakaka)
+
         ##
         self.updatePushButtonDict()
 
@@ -267,6 +271,72 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
             self.__update3DCursor(SHOW=False)
 
     # Markup mode methods inherited from base class
+    def currentSliceToPiwakaka(self):
+        """Take current reslice from Axial view and open piwakawaka instance with all time points"""
+        try:
+            # Check if we're in axial view (view 2)
+            if self.interactionView != 2:
+                # Switch to axial view first
+                self.setGrossFrame(2)
+                self.interactionView = 2
+            
+            # Get current reslice data for all time points
+            reslice_data_dict = {}
+            
+            # Get the current reslice center and normal from axial view
+            current_center = self.resliceCursor.GetCenter()
+            axial_normal = self.getViewNormal(2)  # Axial view normal
+            
+            # Create reslice data for all time points
+            for time_idx, time_val in enumerate(self.times):
+                vti_obj = self.vtiDict[time_val]
+                
+                # Create a reslice for this time point using the current axial slice
+                # Use the same reslice function as piwakawaka
+                from tui.piwakawakaViewer import _defineReslice
+                reslice = _defineReslice(vti_obj, 'AXIAL', current_center, normalVector=axial_normal)
+                
+                # Store the reslice output
+                reslice_data_dict[time_val] = reslice.GetOutput()
+            
+            # Launch piwakawaka with the reslice data
+            self._launchPiwakawakaWithResliceData(reslice_data_dict, current_center, axial_normal)
+            
+        except Exception as e:
+            print(f"Error launching piwakawaka: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def _launchPiwakawakaWithResliceData(self, reslice_data_dict, center, normal):
+        """Launch piwakawaka instance with reslice data from all time points"""
+        try:
+            # Import necessary modules
+            from tui import piwakawakaViewer, piwakawakamarkupui
+            
+            # Launch piwakawaka with the reslice data directly in memory
+            app = piwakawakamarkupui.QtWidgets.QApplication.instance()
+            if app is None:
+                app = piwakawakamarkupui.QtWidgets.QApplication(['PIWAKAWAKA Reslice Viewer'])
+            
+            # Create piwakawaka viewer instance
+            piwakawaka_viewer = piwakawakaViewer.PIWAKAWAKAMarkupViewer(VERBOSE=self.VERBOSE)
+            piwakawaka_viewer.setWorkingDir(self.workingDir)
+            
+            # Load the reslice data directly from memory
+            piwakawaka_viewer.loadResliceDataFromMemory(reslice_data_dict, center, normal)
+            
+            # Copy patient metadata from TUI viewer to ensure coordinate system consistency
+            # This overrides the patientMeta initialized in loadResliceDataFromMemory
+            piwakawaka_viewer.patientMeta = self.patientMeta
+            if self.VERBOSE:
+                print(f"Launched piwakawaka with reslice data from {len(reslice_data_dict)} time points")
+                print(f"Patient metadata copied from TUI viewer")
+            
+        except Exception as e:
+            print(f"Error in _launchPiwakawakaWithResliceData: {e}")
+            import traceback
+            traceback.print_exc()
+    
 
     # Array selection methods inherited from base class
 
@@ -371,8 +441,6 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
 
     def imageCS_to_ResliceCS_X(self, imageCS_X):
         return imageCS_X
-        # matrix = self.getCurrentResliceMatrix()
-        # return matrix.MultiplyPoint([imageCS_X[0], imageCS_X[1], imageCS_X[2], 1])[:3]
 
 
     def imageCS_To_WorldCS_X(self, imageCS_X):

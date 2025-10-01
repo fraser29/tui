@@ -283,6 +283,9 @@ class Ui_BASEUI(object):
 
         self.retranslateUi(BASEUI)
         QtCore.QMetaObject.connectSlotsByName(BASEUI)
+        
+        # Connect working directory tool button
+        self.workingDirToolButton.clicked.connect(self.selectWorkingDirectory)
 
     def retranslateUi(self, BASEUI):
         _translate = QtCore.QCoreApplication.translate

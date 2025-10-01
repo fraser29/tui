@@ -349,6 +349,33 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         if self.VERBOSE:
             print(f"Set custom slice data: {len(centers)} centers and {len(normals)} normals")
 
+    def loadResliceDataFromMemory(self, reslice_data_dict, center, normal):
+        """Load reslice data directly from memory instead of from files
+        
+        Args:
+            reslice_data_dict: Dictionary with time values as keys and vtkImageData as values
+            center: Center point of the reslice
+            normal: Normal vector of the reslice
+        """
+        if self.VERBOSE:
+            print(f"Loading reslice data from memory: {len(reslice_data_dict)} time points")
+            print(f"Reslice center: {center}")
+            print(f"Reslice normal: {normal}")
+            # print(f"Arrays: {vtkfilters.getArrayNames(self.vtiDict[self.getCurrentTime()])}")
+        
+        self.vtiDict = reslice_data_dict.copy()
+        self.times = sorted(reslice_data_dict.keys())
+        
+        # Use existing method to set custom slice parameters
+        self.setCustomSliceCentersAndNormals([center], [normal])
+        
+        # Initialize patient metadata - this will be overridden if launched from TUI
+        self.patientMeta.initFromVTI(self.getCurrentVTIObject())
+        if self.VERBOSE:
+            print("Initialized patient metadata from reslice data")
+        
+        self._setupAfterLoad()
+
     # Array selection methods inherited from base class
 
     # File loading methods inherited from base class
@@ -451,10 +478,6 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
                 resliceList.append(reslice)
             
             self.resliceDict[timeStep] = resliceList
-            
-            if self.VERBOSE:
-                print(f"Built {len(resliceList)} reslices for timestep {timeStep}")
-        
         if self.VERBOSE:
             print(f"Reslice dictionary built with {len(self.sliceCenters)} slices")
     
@@ -619,22 +642,15 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
 
     def __setupNewImageData(self): # ONLY ON NEW DATA LOAD
         self._BaseMarkupViewer__setScalarRangeForCurrentArray()
-        
         # Set background color
         self.renderer.SetBackground(0.1, 0.1, 0.1)
-        
         # Create image actor for slice display
         self.imageActor = vtk.vtkImageActor()
         self.renderer.AddActor(self.imageActor)
-        
         # Update to show current slice
         self.updateImageSlice()
-        
         # Set initial window level based on data
         self.resetWindowLevel()
-        
-        # Image setup complete
-        
         # Render
         self.cameraReset()
         self.cameraReset3D()
@@ -658,13 +674,13 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         currentReslice = self.getCurrentReslice()
         if currentReslice is not None:
             thisImageSlice = currentReslice.GetOutput()
-            if self.VERBOSE:
-                print(f"Setting up imageActor at slice {self.currentSliceID} of {self.maxSliceID}")
-                if self.currentSliceID < len(self.sliceCenters):
-                    print(f"Slice center: {self.sliceCenters[self.currentSliceID]}")
-                if self.currentSliceID < len(self.sliceNormals):
-                    print(f"Slice normal: {self.sliceNormals[self.currentSliceID]}")
-                print(f"Image range: {thisImageSlice.GetPointData().GetScalars().GetRange()}")
+            # if self.VERBOSE:
+            #     print(f"Setting up imageActor at slice {self.currentSliceID} of {self.maxSliceID}")
+            #     if self.currentSliceID < len(self.sliceCenters):
+            #         print(f"Slice center: {self.sliceCenters[self.currentSliceID]}")
+            #     if self.currentSliceID < len(self.sliceNormals):
+            #         print(f"Slice normal: {self.sliceNormals[self.currentSliceID]}")
+            #     print(f"Image range: {thisImageSlice.GetPointData().GetScalars().GetRange()}")
             self.imageActor.SetInputData(thisImageSlice)
         else:
             if self.VERBOSE:
