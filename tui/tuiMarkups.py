@@ -20,71 +20,6 @@ from scipy import ndimage
 ### COORDINATE SYSTEM ABSTRACTION
 ### ====================================================================================================================
 
-class CoordinateSystem:
-    """Abstract base for coordinate transformations"""
-    def __init__(self, parentImageViewer):
-        self.parentImageViewer = parentImageViewer
-    
-    def imageToWorld(self, imageCoords):
-        """Transform image coordinates to world coordinates"""
-        raise NotImplementedError("Subclasses must implement imageToWorld")
-    
-    def worldToImage(self, worldCoords):
-        """Transform world coordinates to image coordinates"""
-        raise NotImplementedError("Subclasses must implement worldToImage")
-    
-    def getTransformMatrix(self):
-        """Get the current transform matrix"""
-        raise NotImplementedError("Subclasses must implement getTransformMatrix")
-
-class Viewer2DCoordinateSystem(CoordinateSystem):
-    """2D viewer coordinate system (piwakawaka)"""
-    
-    def imageToWorld(self, imageCoords):
-        """Transform image coordinates to world coordinates using reslice matrix"""
-        if hasattr(self.parentImageViewer, 'imageCS_To_WorldCS_X'):
-            return self.parentImageViewer.imageCS_To_WorldCS_X(imageCoords)
-        else:
-            # Fallback for compatibility
-            return imageCoords
-    
-    def worldToImage(self, worldCoords):
-        """Transform world coordinates to image coordinates""" #TODO
-        # For 2D viewers, this is more complex - may need inverse transformation
-        # For now, return as-is (this might need refinement based on your specific needs)
-        return worldCoords
-    
-    def getTransformMatrix(self):
-        """Get the current reslice matrix"""
-        if hasattr(self.parentImageViewer, 'getCurrentResliceMatrix'):
-            return self.parentImageViewer.getCurrentResliceMatrix()
-        else:
-            return None
-
-class Viewer3DCoordinateSystem(CoordinateSystem):
-    """3D viewer coordinate system (tui)"""
-    
-    def imageToWorld(self, imageCoords):
-        """Transform image coordinates to world coordinates"""
-        # In 3D viewers, image and world coordinates are typically the same
-        # But we can apply transformation if needed
-        if hasattr(self.parentImageViewer, 'imageCS_To_WorldCS_X'):
-            return self.parentImageViewer.imageCS_To_WorldCS_X(imageCoords)
-        else:
-            # For 3D viewers, image and world coordinates are usually the same
-            return imageCoords
-    
-    def worldToImage(self, worldCoords):
-        """Transform world coordinates to image coordinates"""
-        # In 3D viewers, image and world coordinates are typically the same
-        return worldCoords
-    
-    def getTransformMatrix(self):
-        """Get the current reslice matrix"""
-        if hasattr(self.parentImageViewer, 'getCurrentResliceMatrix'):
-            return self.parentImageViewer.getCurrentResliceMatrix()
-        else:
-            return None
 
 ### ====================================================================================================================
 ### ====================================================================================================================
@@ -103,48 +38,37 @@ class Markups(object):
     def __init__(self, parent, nTimes=0):
         self.parentImageViewer = parent
         self.nTimes = nTimes
-        self.coordinateSystem = self._createCoordinateSystem()
         self.markupsDict = {} # Dict(k=typestr, v=Dict(k=timeID, v=list_of_markup))
         self.markupsTypesCollections = {Points: MarkupPoints,
                                         Splines: MarkupSplines,
                                         Polydata: MarkupPolydatas,
                                         Masks: MarkupMasks}
         self.reset()
-    
-    def _createCoordinateSystem(self):
-        """Factory method to create appropriate coordinate system"""
-        viewerType = type(self.parentImageViewer).__name__
-        if 'piwakawaka' in viewerType.lower():
-            return Viewer2DCoordinateSystem(self.parentImageViewer)
-        elif 'tui' in viewerType.lower():
-            return Viewer3DCoordinateSystem(self.parentImageViewer)
-        else:
-            # Default to 2D coordinate system for backward compatibility
-            return Viewer2DCoordinateSystem(self.parentImageViewer)
+
 
     def initForNewData(self, nTimes):
         self.nTimes = nTimes
         self.reset()
 
+
     def __genEmptyDict(self, CollectionClass):
         if CollectionClass is not None:
             if CollectionClass == MarkupPoints:
-                return dict(zip(range(self.nTimes), [CollectionClass(self.coordinateSystem) for _ in range(self.nTimes)]))
+                return dict(zip(range(self.nTimes), [CollectionClass() for _ in range(self.nTimes)]))
             elif CollectionClass == MarkupSplines:
-                return dict(zip(range(self.nTimes), [CollectionClass(self.coordinateSystem) for _ in range(self.nTimes)]))
+                return dict(zip(range(self.nTimes), [CollectionClass() for _ in range(self.nTimes)]))
             else:
                 return dict(zip(range(self.nTimes), [CollectionClass() for _ in range(self.nTimes)]))
         else:
             return dict(zip(range(self.nTimes), [[] for _ in range(self.nTimes)]))
 
+
     def reset(self, timeID=None, markupType_list=()):
         if len(markupType_list) == 0:
             markupType_list = self.markupsTypesCollections.keys()
-        
         # Clean up spline widgets before resetting
         if Splines in markupType_list or len(markupType_list) == 0:
             self._cleanupSplineWidgets(timeID)
-        
         if timeID is None:
             for iType in markupType_list:
                 self.markupsDict[iType] = self.__genEmptyDict(self.markupsTypesCollections.get(iType, None))
@@ -152,9 +76,11 @@ class Markups(object):
             for iType in markupType_list:
                 self.markupsDict[iType][timeID] = self.markupsTypesCollections.get(iType, None)
 
+
     def resetMarkup(self, markupType):
         self.reset(markupType_list=[markupType])
-    
+
+
     def _cleanupSplineWidgets(self, timeID=None):
         """Clean up spline widgets by properly disabling and removing them from interactor"""
         if Splines not in self.markupsDict:
@@ -170,68 +96,68 @@ class Markups(object):
             if timeID in self.markupsDict[Splines]:
                 for spline in self.markupsDict[Splines][timeID]:
                     self._disableSplineWidget(spline)
-    
+
+
     def _disableSplineWidget(self, spline):
         """Properly disable a spline widget and remove it from interactor"""
         try:
             # Disable the widget
             spline.SetEnabled(0)
             spline.Off()
-            
             # Try to remove observers to prevent memory leaks
             try:
                 spline.RemoveAllObservers()
             except:
                 pass
-                
             # Force render update to ensure widget is visually removed
             if hasattr(self.parentImageViewer, 'renderWindow'):
                 self.parentImageViewer.renderWindow.Render()
-                
         except Exception as e:
             # If there's an error disabling the widget, just continue
             # This prevents crashes if the widget is already destroyed
             if hasattr(self.parentImageViewer, 'VERBOSE') and self.parentImageViewer.VERBOSE:
                 print(f"Warning: Error disabling spline widget: {e}")
 
+
     # ============ POINTS ==============================================================================================
     def getNumberOfPoints(self, timeID):
         return len(self.markupsDict[Points][timeID])
 
 
-    def _addPoint(self, X, timeID, sliceID, norm=None):
-        self.markupsDict[Points][timeID].addPoint(X, norm, timeID, sliceID)
+    def _addPoint(self, X_image, X_world, timeID, sliceID, norm=None, orientation=None):
+        self.markupsDict[Points][timeID].addPoint(X_image, X_world, norm, timeID, sliceID, orientation)
 
-    def convertPointsToSpline(self, timeID, sliceID):
-        self.markupsDict[Splines][timeID].addSpline(self.markupsDict[Points][timeID].getPoints_ImageCS(), 
+    def convertPointsToSpline(self, timeID, sliceID, orientation):
+        self.markupsDict[Splines][timeID].addSpline(self.markupsDict[Points][timeID].getImage_np(), 
                                                     reslice=self.parentImageViewer.getCurrentReslice(), 
                                                     renderer=self.parentImageViewer.getCurrentRenderer(), 
                                                     interactor=self.parentImageViewer.graphicsViewVTK, 
                                                     handDrawn=True,
                                                     LOOP=self.parentImageViewer.splineClosed,
                                                     timeID=timeID, 
-                                                    sliceID=sliceID)
-        self.markupsDict[Points][timeID] = MarkupPoints(self.coordinateSystem)
+                                                    sliceID=sliceID,
+                                                    orientation=orientation)
+        self.markupsDict[Points][timeID] = MarkupPoints()
 
 
-    def addPoint(self, X, timeID, sliceID, norm=None):
+    def addPoint(self, X_image, X_world, timeID, sliceID, norm=None, orientation=None):
         if self.parentImageViewer.markupMode == 'Spline':
-            self._addSplinePoint(X, timeID, sliceID, norm)
+            self._addSplinePoint(X_image, X_world, timeID, sliceID, norm, orientation)
         else:
-            self._addPoint(X, timeID, sliceID, norm)
+            self._addPoint(X_image, X_world, timeID, sliceID, norm, orientation=orientation)
 
-    def _addSplinePoint(self, X, timeID, sliceID, norm=None):
-        if len(self.markupsDict[Splines][timeID]) >= 1:
+    def _addSplinePoint(self, X_image, X_world, timeID, sliceID, norm=None, orientation=None):
+        if self.markupsDict[Splines][timeID].isSplineOnThisSlice(sliceID):
             print("Interact with the spline widget to add a point")
             print("    Shift+LMB: move a spline handle")
             print("    CTRL+RMB: remove a spline handle")
             print("    MMB: translate spline")
             print("    RMB: scale spline")
         elif len(self.markupsDict[Points][timeID]) == 2:
-            self._addPoint(X, timeID, sliceID, norm)
-            self.convertPointsToSpline(timeID, sliceID)
+            self._addPoint(X_image, X_world, timeID, sliceID, norm)
+            self.convertPointsToSpline(timeID, sliceID, orientation)
         else:
-            self._addPoint(X, timeID, sliceID, norm)
+            self._addPoint(X_image, X_world, timeID, sliceID, norm, orientation=orientation)
 
     def removeLastPoint(self, timeID):
         try:
@@ -275,23 +201,20 @@ class Markups(object):
         return [self.markupsDict[Splines].get(iTimeID, []) for iTimeID in range(self.nTimes)]
 
     def getSplinePolyData(self, timeID, nSplinePts=100):
-        return self.markupsDict[Splines][timeID].getSplinePolyData_WorldCS(nSplinePts)
+        return self.markupsDict[Splines][timeID].getSplinePolyData_WorldCS(self.parentImageViewer.imageCS_To_WorldCS_X, nSplinePts)
 
 
-    def getAllPointsActors(self, timeID, pointSize, boundCP=None, boundN=None, bounddx=None):
-        return self.markupsDict[Points][timeID].getActorForAllPoints(pointSize, boundCP, boundN, bounddx)
+    def getAllPointsActors(self, timeID, pointSize, boundCP=None, boundN=None, bounddx=None, sliceID=None):
+        return self.markupsDict[Points][timeID].getActorForAllPoints(pointSize, boundCP, boundN, bounddx, sliceID=sliceID)
 
     def getAllPointsLineActor(self, timeID, lineWidth=3, LOOP=False, boundCP=None, boundN=None, bounddx=None):
         return self.markupsDict[Points][timeID].getLineActorForAllPoints(lineWidth, LOOP, boundCP, boundN, bounddx)
 
-    def getPolylineFromPoints(self, timeID, LOOP=False):
-        return self.markupsDict[Points][timeID].getPolyLine(LOOP)
-
-    def getPolyPointsFromPoints(self, timeID):
+    def getPolyDataFromPoints(self, timeID):
         return self.markupsDict[Points][timeID].getPolyData()
 
     def getXNumpyFromPoints(self, timeID):
-        return self.markupsDict[Points][timeID].getPointsNumpy()
+        return self.markupsDict[Points][timeID].getWorld_np()
     
     def getAllPointsForTime(self, timeID):
         """Get all points for a specific time"""
@@ -310,70 +233,48 @@ class Markup(object):
     """
     Parent class for Markup with coordinate system awareness
     """
-    def __init__(self, coordinateSystem, timeID=0, sliceID=0):
-        self.coordinateSystem = coordinateSystem
+    def __init__(self, timeID=0, sliceID=0, orientation=None):
         self.timeID = timeID
         self.sliceID = sliceID
-        self.parentImageViewer = coordinateSystem.parentImageViewer
+        self.orientation = orientation
     
-    def getWorldCoordinates(self):
-        """Get world coordinates - implemented by subclasses"""
-        raise NotImplementedError("Subclasses must implement getWorldCoordinates")
-    
-    def getImageCoordinates(self):
-        """Get image coordinates - implemented by subclasses"""
-        raise NotImplementedError("Subclasses must implement getImageCoordinates")
-    
-    def transformToWorld(self, imageCoords):
-        """Transform image coordinates to world"""
-        return self.coordinateSystem.imageToWorld(imageCoords)
-    
-    def transformToImage(self, worldCoords):
-        """Transform world coordinates to image"""
-        return self.coordinateSystem.worldToImage(worldCoords)
-    
-    def getTransformMatrix(self):
-        """Get the current transform matrix"""
-        return self.coordinateSystem.getTransformMatrix()
-
 ### ====================================================================================================================
 ### MARKUP - POINTS-LIST
 class MarkupPoints(list):
-    def __init__(self, coordinateSystem=None):
+    def __init__(self):
         super(MarkupPoints, self).__init__([])
-        self.pointRGB = [1, 0, 0]
         self.lineRGB = [1, 0.5, 0.7]
-        self.coordinateSystem = coordinateSystem
 
-    def addPoint(self, X, norm=None, timeID=0, sliceID=0):
+    def addPoint(self, X_image, X_world, norm=None, timeID=0, sliceID=0, orientation=None):
         # X is expected to be in image coordinates
-        point = MarkupPoint(X, self.coordinateSystem, norm=norm, timeID=timeID, sliceID=sliceID)
+        point = MarkupPoint(X_image, X_world, norm=norm, timeID=timeID, sliceID=sliceID, orientation=orientation)
         self.append(point)
 
     def removePoint(self, ID=-1):
         self.pop(ID)
 
-    def getPoints_ImageCS(self):
-        return np.array([i.getImageCoordinates() for i in self])
+    def getImage_np(self):
+        return np.array([i.X_image for i in self])
 
-    def getPointsNumpy(self):
-        return np.array([i.X for i in self])
+    def getWorld_np(self):
+        return np.array([i.X_world for i in self])
 
     def getPolyData(self):
-        pp = vtkfilters.buildPolydataFromXYZ(self.getPointsNumpy())
+        pp = vtkfilters.buildPolydataFromXYZ(self.getWorld_np())
         nn = np.array([i.norm for i in self])
         vtkfilters.setArrayFromNumpy(pp, nn, "normal", SET_VECTOR=True)
         return pp
 
     def getPointsWithinBounds(self, CP, N, delta):
-        dists = [abs(vtkfilters.ftk.distanceToPlane(i, N, CP)) for i in self.getPoints_ImageCS()]
+        print(f"DEBUG: X:{self.getImage_np()}, CP: {CP}, N:{N}, dx:{delta}")
+        dists = [abs(vtkfilters.ftk.distanceToPlane(i, N, CP)) for i in self.getImage_np()]
         tf = np.array(dists) < delta
         return [i for iTF,i in zip(tf, self) if iTF]
 
     def getPolyLine(self, LOOP=False):
         if len(self) < 2:
             return None
-        pp = vtkfilters.buildPolyLineFromXYZ(self.getPointsNumpy(), LOOP)
+        pp = vtkfilters.buildPolyLineFromXYZ(self.getWorld_np(), LOOP)
         return pp
 
     def getPolyLine_ImageCS(self, LOOP=False, boundCP=None, boundN=None, bounddx=None):
@@ -383,32 +284,34 @@ class MarkupPoints(list):
             subList = self.getPointsWithinBounds(boundCP, boundN, bounddx)
             if len(subList) == 0:
                 return None
-            pp = vtkfilters.buildPolyLineFromXYZ(np.array([i.getImageCoordinates() for i in subList]), LOOP)
+            pp = vtkfilters.buildPolyLineFromXYZ(np.array([i.X_image for i in subList]), LOOP)
         else:
-            pp = vtkfilters.buildPolyLineFromXYZ(self.getPoints_ImageCS(), LOOP)
+            pp = vtkfilters.buildPolyLineFromXYZ(self.getImage_np(), LOOP)
         return pp
 
-    def getAllPointsPolyData_ImageCS(self, pointSize, boundCP=None, boundN=None, bounddx=None):
+    def getAllPointsPolyData_ImageCS(self, pointSize, boundCP=None, boundN=None, bounddx=None, sliceID=None):
         if len(self) == 0:
             return None
         if boundCP is not None:
             subList = self.getPointsWithinBounds(boundCP, boundN, bounddx)
             if len(subList) == 0:
                 return None
-            allData = [i.getSphereSourceViewerCS(pointSize) for i in subList]
+            allData = [i.getSphereSource_Image(pointSize) for i in subList]
+        elif sliceID is not None:
+            allData = [i.getSphereSource_Image(pointSize) for i in self if i.sliceID==sliceID]
         else:
-            allData = [i.getSphereSourceViewerCS(pointSize) for i in self]
+            allData = [i.getSphereSource_Image(pointSize) for i in self]
         pp = vtkfilters.appendPolyDataList(allData)
         return pp
 
-    def getActorForAllPoints(self, pointSize, boundCP=None, boundN=None, bounddx=None):
-        pp = self.getAllPointsPolyData_ImageCS(pointSize, boundCP=boundCP, boundN=boundN, bounddx=bounddx)
+    def getActorForAllPoints(self, pointSize, boundCP=None, boundN=None, bounddx=None, sliceID=None):
+        pp = self.getAllPointsPolyData_ImageCS(pointSize, boundCP=boundCP, boundN=boundN, bounddx=bounddx, sliceID=sliceID)
         if (pp is None) or (pp.GetNumberOfPoints() < 1):
             return None
         ptMapper = vtk.vtkPolyDataMapper()
         ptMapper.SetInputData(pp)
         ptActor = vtk.vtkActor()
-        ptActor.GetProperty().SetColor(self.pointRGB)
+        ptActor.GetProperty().SetColor(self[0].farbe)
         ptActor.PickableOff()
         ptActor.SetMapper(ptMapper)
         return ptActor
@@ -433,57 +336,23 @@ class MarkupPoints(list):
 ### ====================================================================================================================
 ### MARKUP - POINT
 class MarkupPoint(Markup):
-    def __init__(self, X, coordinateSystem, norm=None, timeID=0, sliceID=0):
-        super().__init__(coordinateSystem, timeID, sliceID)
-        self._imageCoords = X  # Image coordinates (primary storage)
+    def __init__(self, X_image, x_world, norm=None, timeID=0, sliceID=0, orientation=None):
+        Markup.__init__(self, timeID, sliceID, orientation)
+        self.X_image = X_image
+        self.X_world = x_world
         self.norm = norm
-        self._worldCoords = None  # Cached world coordinates
-    
-    @property   
-    def X(self):
-        """Get world coordinates (transformed from image coordinates)"""
-        return self.getWorldCoordinates()
-    
-    @X.setter
-    def X(self, value):
-        """Set image coordinates and invalidate cached world coordinates"""
-        self._imageCoords = value
-        self._worldCoords = None
-    
-    @property
-    def xyz(self):
-        """Compatibility property for world coordinates (legacy support)"""
-        return self.getWorldCoordinates()
-    
-    def getWorldCoordinates(self):
-        """Get world coordinates (transformed from image coordinates)"""
-        if self._worldCoords is None:
-            self._worldCoords = self.transformToWorld(self._imageCoords)
-        return self._worldCoords
-    
-    def getImageCoordinates(self):
-        """Get image coordinates (primary storage)"""
-        return self._imageCoords
-    
-    def updateFromImageCoords(self, imageCoords):
-        """Update image coordinates and invalidate cached world coordinates"""
-        self._imageCoords = imageCoords
-        self._worldCoords = None
-    
-    def updateFromWorldCoords(self, worldCoords):
-        """Update image coordinates from world coordinates"""
-        self._imageCoords = self.transformToImage(worldCoords)
-        self._worldCoords = None
+        self.farbe = [1,0,0]
+        # potential - hold parent
 
-    def getSphereSourceViewerCS(self, rad=0.002):
-        Sx = vtkfilters.buildSphereSource(self.getImageCoordinates(), rad, res=16)
+    def getSphereSource_Image(self, rad=0.002):
+        Sx = vtkfilters.buildSphereSource(self.X_image, rad, res=16)
         return Sx
 
     def getPtActor(self, pointSize):
         ptMapper = vtk.vtkPolyDataMapper()
-        ptMapper.SetInputData(self.getSphereSourceViewerCS(pointSize))
+        ptMapper.SetInputData(self.getSphereSource_Image(pointSize))
         ptActor = vtk.vtkActor()
-        ptActor.GetProperty().SetColor([1, 0, 0])
+        ptActor.GetProperty().SetColor(self.farbe)
         ptActor.PickableOff()
         ptActor.SetMapper(ptMapper)
         return ptActor
@@ -491,21 +360,23 @@ class MarkupPoint(Markup):
 ### ====================================================================================================================
 ### MARKUP - SPLINES - LIST
 class MarkupSplines(list):
-    def __init__(self, coordinateSystem=None):
+    def __init__(self):
         super(MarkupSplines, self).__init__([])
-        self.coordinateSystem = coordinateSystem
 
-    def addSpline(self, Xarrary, reslice, renderer, interactor, handDrawn, LOOP, timeID=0, sliceID=0):
-        self.append(MarkupSpline(Xarrary, reslice, renderer, interactor, handDrawn, LOOP, coordinateSystem=self.coordinateSystem, timeID=timeID, sliceID=sliceID))
+    def addSpline(self, Xarrary_image, reslice, renderer, interactor, handDrawn, LOOP, timeID=0, sliceID=0, orientation=None):
+        self.append(MarkupSpline(Xarrary_image, reslice, renderer, interactor, handDrawn, LOOP, timeID=timeID, sliceID=sliceID, orientation=orientation))
 
-    def getSplinePolyData_WorldCS(self, nSplinePts=100):
-        return vtkfilters.appendPolyDataList([i.getSplinePolyData_WorldCS(nSplinePts) for i in self])
+    def getSplinePolyData_WorldCS(self, imageToWorld_func, nSplinePts=100):
+        return vtkfilters.appendPolyDataList([i.getSplinePolyData_WorldCS(imageToWorld_func, nSplinePts) for i in self])
+
+    def isSplineOnThisSlice(self, sliceID):
+        return any([i.sliceID==sliceID for i in self])
 
 ### ====================================================================================================================
 ### MARKUP - SPLINE
 class MarkupSpline(Markup, vtk.vtkSplineWidget):
-    def __init__(self, handlePoints, reslice, renderer, interactor, handDrawn, LOOP, coordinateSystem=None, timeID=0, sliceID=0):
-        Markup.__init__(self, coordinateSystem, timeID, sliceID)
+    def __init__(self, handlePoints, reslice, renderer, interactor, handDrawn, LOOP, timeID=0, sliceID=0, orientation=None):
+        Markup.__init__(self, timeID, sliceID, orientation)
         vtk.vtkSplineWidget.__init__(self)
         self.LOOP = LOOP
         
@@ -566,10 +437,11 @@ class MarkupSpline(Markup, vtk.vtkSplineWidget):
         self.GetPolyData(poly)
         return poly
 
-    def getSplinePolyData_WorldCS(self, nSplinePts=100):
+    def getSplinePolyData_WorldCS(self, imageToWorld_func, nSplinePts=100):
         pts = self.getPoints(nSplinePts=nSplinePts) # Note LOOP done here with splining
         # but if self.LOOP  AND we had NO splining - then do loop. 
-        worldCoords = np.array([self.transformToWorld(i) for i in pts])
+        worldCoords = np.array([imageToWorld_func(i, self.sliceID) for i in pts])
+        print(f"DEBUG: Have Xim {pts.shape} and Xworld {worldCoords.shape}")
         return vtkfilters.buildPolyLineFromXYZ(worldCoords, LOOP=(self.LOOP and (nSplinePts is None)))
 
     def getPoints(self, nSplinePts=None):
@@ -591,7 +463,6 @@ class MarkupSpline(Markup, vtk.vtkSplineWidget):
         self.SetEnabled(1)
         self.On()
         self.GetLineProperty().SetColor(1,0,0)
-
 
     def getActor(self):
         pass

@@ -560,18 +560,30 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         return ijk, X_worldCS, self.getPtID_at_IJK(ijk)
 
 
-    def imageCS_to_ResliceCS_X(self, imageCS_X):
-        matrix = self.getCurrentResliceMatrix()
+    def imageCS_to_ResliceCS_X(self, imageCS_X, sliceID=None):
+        if sliceID is None:
+            matrix = self.getCurrentResliceMatrix()
+        else:
+            currentTime = self.times[self.currentTimeID]
+            resliceList = self.resliceDict[currentTime]
+            matrix = resliceList[sliceID].GetResliceAxes()
         return matrix.MultiplyPoint([imageCS_X[0], imageCS_X[1], imageCS_X[2], 1])[:3]
+    
+    def resliceCS_X_to_imageCS(self, resliceX):
+        matrix = self.getCurrentResliceMatrix()
+        inv_matrix = vtk.vtkMatrix4x4()
+        vtk.vtkMatrix4x4.Invert(matrix, inv_matrix)
+        return inv_matrix.MultiplyPoint([resliceX[0], resliceX[1], resliceX[2], 1])[:3]
 
 
-    def imageCS_To_WorldCS_X(self, imageCS_X):
-        """Convert image coordinates to world coordinates
+    def imageCS_To_WorldCS_X(self, imageCS_X, sliceID=None):
+        """Convert image coordinates to world coordinates - need sliceID else will look at current
+        **not dealing with orientation change**
             1. Convert image coordinates to reslice coordinates
             2. Get IJK coordinates in reslice coordinates
             3. Convert IJK coordinates to world coordinates using PatientMeta
         """
-        worldX_in_reslice = self.imageCS_to_ResliceCS_X(imageCS_X)
+        worldX_in_reslice = self.imageCS_to_ResliceCS_X(imageCS_X, sliceID)
         ijk_in_reslice = self.getIJKAtX(worldX_in_reslice)
         if ijk_in_reslice is None:
             return None
@@ -674,7 +686,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         ## POINTS
         pointSize = self.boundingDist * 0.01
 
-        ptsActor = self.Markups.getAllPointsActors(self.currentTimeID, pointSize)
+        ptsActor = self.Markups.getAllPointsActors(self.currentTimeID, pointSize, sliceID=self.currentSliceID)
         if ptsActor is not None:
             self.renderer.AddActor(ptsActor)
             self.markupActorList.append(ptsActor)

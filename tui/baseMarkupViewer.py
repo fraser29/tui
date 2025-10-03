@@ -71,6 +71,9 @@ class BaseMarkupViewer:
         self.markupActorList = []
         self.nSplinePoints = 100
 
+        # Abstract:
+        self.sliceOrientation = None # Used by PIWAKAWAKA
+
     def _setupDefaultButtons(self):
         """Setup default customized buttons that can be overridden by subclasses"""
         self.modPushButtonDict = {
@@ -151,7 +154,7 @@ class BaseMarkupViewer:
                 if self.markupMode == 'Spline':
                     pp = self.Markups.getSplinePolyData(timeID=k1, nSplinePts=self.nSplinePoints)
                 else:
-                    pp = self.Markups.getPolyPointsFromPoints(timeID=k1)
+                    pp = self.Markups.getPolyDataFromPoints(timeID=k1)
                 if pp.GetNumberOfPoints() > 0:
                     outDict[self.times[k1]] = pp
         except (AttributeError, ValueError) as e:
@@ -699,9 +702,10 @@ class BaseMarkupViewer:
         self.Markups.reset()
         self._updateMarkups()
 
-    def addPoint(self, X, norm=None):
+    def addPoint(self, X_image, norm=None):
         """Add a point markup"""
-        self.Markups.addPoint(X, self.currentTimeID, self.getCurrentSliceID(), norm)
+        X_world = self.imageCS_To_WorldCS_X(X_image)
+        self.Markups.addPoint(X_image, X_world, self.currentTimeID, self.getCurrentSliceID(), norm, self.sliceOrientation)
         self._updateMarkups()
 
     def removeLastPoint(self):
