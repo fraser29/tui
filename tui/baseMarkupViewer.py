@@ -629,23 +629,15 @@ class BaseMarkupViewer:
         self.setupTimeSlider()
         
         # Setup array selection
-        if hasattr(self, 'selectArrayComboBox'):
-            self.selectArrayComboBox.clear()
-            arrayName = vtkfilters.getScalarsArrayName(self.vtiDict[self.getCurrentTime()])
-            if not arrayName:
-                arrayName = vtkfilters.getArrayNames(self.vtiDict[self.getCurrentTime()])[0]
-            self.currentArray = arrayName
-            self.currentTimeID = 0
-            for iArray in vtkfilters.getArrayNames(self.vtiDict[self.getCurrentTime()]):
-                self.selectArrayComboBox.addItem(iArray)
-            self.selectArrayComboBox.setCurrentText(self.currentArray)
-        else:
-            # Fallback if no combo box
-            arrayName = vtkfilters.getScalarsArrayName(self.vtiDict[self.getCurrentTime()])
-            if not arrayName:
-                arrayName = vtkfilters.getArrayNames(self.vtiDict[self.getCurrentTime()])[0]
-            self.currentArray = arrayName
-            self.currentTimeID = 0
+        self.selectArrayComboBox.clear()
+        arrayName = vtkfilters.getScalarsArrayName(self.vtiDict[self.getCurrentTime()])
+        if not arrayName:
+            arrayName = vtkfilters.getArrayNames(self.vtiDict[self.getCurrentTime()])[0]
+        self.currentArray = arrayName
+        self.currentTimeID = 0
+        for iArray in vtkfilters.getArrayNames(self.vtiDict[self.getCurrentTime()]):
+            self.selectArrayComboBox.addItem(iArray)
+        self.selectArrayComboBox.setCurrentText(self.currentArray)
         
         # Calculate bounding distance
         bounds = self.getCurrentVTIObject().GetBounds()

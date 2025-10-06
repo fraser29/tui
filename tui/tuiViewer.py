@@ -521,13 +521,19 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
         # 3D
         dims = [0,0,0]
         self.getCurrentVTIObject().GetDimensions(dims)
-        if np.prod(dims) < 60e+6: # For very large data - don't want to do this
-            print(f"Working with current array: {self.currentArray}")
-            A = vtkfilters.getArrayAsNumpy(self.getCurrentVTIObject(), self.currentArray)
-            A = A[A>1.0]
-            contourVal = np.mean(A) * 2.0
-            print(f"Made contour at value: {int(contourVal)}")
-            self.setContourVal(contourVal)
+        try:
+            if np.prod(dims) < 60e+6: # For very large data - don't want to do this
+                print(f"Working with current array: {self.currentArray}")
+                A = vtkfilters.getArrayAsNumpy(self.getCurrentVTIObject(), self.currentArray)
+                A[np.isnan(A)] = 0.0
+                A = A[A>1.0]
+                contourVal = np.mean(A) * 2.0
+                if self.VERBOSE:
+                    print(f"Made contour at value: {int(contourVal)}")
+                self.setContourVal(contourVal)
+        except Exception as e:
+            if self.VERBOSE:
+                print(f"Error setting contour value: {e}")
         ##
         # Render
         self.__frameReset()
