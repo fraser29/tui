@@ -8,13 +8,11 @@ version = "0.1.0"
 description = "Basic viewer to load 3D/4D image data with basic markup capabilities."
 readme = "README.md"
 requires-python = ">=3.6"
-license = {text = "GNU GPL V3"}
 authors = [
     {name = "Fraser M. Callaghan", email = "callaghan.fm@gmail.com"}
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: GNU GPL V3",
     "Operating System :: OS Independent",
 ]
 dependencies = [
