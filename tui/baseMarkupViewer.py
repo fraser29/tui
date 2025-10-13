@@ -751,6 +751,11 @@ class BaseMarkupViewer:
         """Reset 3D camera clipping range - to be overridden by subclasses"""
         pass
     
+    def getZoomFactor(self):
+        """Get current zoom factor from camera - to be overridden by subclasses"""
+        # Default implementation returns 1.0 (no zoom)
+        return 1.0
+    
     # COORDINATE CONVERSION METHODS
     def getPointIDAtX(self, X):
         """Get point ID from world coordinates - to be overridden by subclasses"""
