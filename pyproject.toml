@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tui"
-version = "0.1.0"
+version = "0.1.1"
 description = "Basic viewer to load 3D/4D image data with basic markup capabilities."
 readme = "README.md"
 requires-python = ">=3.6"
