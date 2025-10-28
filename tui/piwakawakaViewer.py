@@ -614,6 +614,10 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         return self.getCurrentVTIObject(COPY)
 
 
+    def hardReset(self):
+        self.__setupNewImageData()
+
+
     def __setupNewImageData(self): # ONLY ON NEW DATA LOAD
         self._BaseMarkupViewer__setScalarRangeForCurrentArray()
         # Set background color
