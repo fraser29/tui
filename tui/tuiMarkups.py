@@ -266,7 +266,6 @@ class MarkupPoints(list):
         return pp
 
     def getPointsWithinBounds(self, CP, N, delta):
-        print(f"DEBUG: X:{self.getImage_np()}, CP: {CP}, N:{N}, dx:{delta}")
         dists = [abs(vtkfilters.ftk.distanceToPlane(i, N, CP)) for i in self.getImage_np()]
         tf = np.array(dists) < delta
         return [i for iTF,i in zip(tf, self) if iTF]
@@ -441,7 +440,6 @@ class MarkupSpline(Markup, vtk.vtkSplineWidget):
         pts = self.getPoints(nSplinePts=nSplinePts) # Note LOOP done here with splining
         # but if self.LOOP  AND we had NO splining - then do loop. 
         worldCoords = np.array([imageToWorld_func(i, self.sliceID) for i in pts])
-        print(f"DEBUG: Have Xim {pts.shape} and Xworld {worldCoords.shape}")
         return vtkfilters.buildPolyLineFromXYZ(worldCoords, LOOP=(self.LOOP and (nSplinePts is None)))
 
     def getPoints(self, nSplinePts=None):

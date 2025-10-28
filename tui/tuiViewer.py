@@ -165,11 +165,32 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
             self.rendererArray[i].GetActiveCamera().SetViewUp(viewUp[i])
             self.rendererArray[i].GetActiveCamera().Zoom(2.5)
             self.rendererArray[i].ResetCamera()
+        # Set reference scale for zoom calculation (use first renderer as reference)
+        self._referenceParallelScale = self.rendererArray[0].GetActiveCamera().GetParallelScale()
         self.renderWindow.Render()
 
     def cameraReset3D(self):
         self.rendererArray[3].ResetCameraClippingRange()
         self.renderWindow.Render()
+
+    def getZoomFactor(self):
+        """Get current zoom factor from camera for 3D viewer"""
+        camera = self.rendererArray[0].GetActiveCamera()
+        if camera.GetParallelProjection():
+            # For parallel projection, use parallel scale
+            # Smaller parallel scale = more zoomed in
+            if not hasattr(self, '_referenceParallelScale'):
+                self._referenceParallelScale = camera.GetParallelScale()
+            zoom_factor = self._referenceParallelScale / camera.GetParallelScale()
+        else:
+            # For perspective projection, use view angle
+            # Smaller view angle = more zoomed in
+            if not hasattr(self, '_referenceViewAngle'):
+                self._referenceViewAngle = camera.GetViewAngle()
+            zoom_factor = self._referenceViewAngle / camera.GetViewAngle()
+        
+        # Clamp zoom factor to reasonable range
+        return max(0.1, min(10.0, zoom_factor))
 
     def toggleCrosshairs(self): 
         if self.imManip_A.isChecked():
@@ -589,7 +610,18 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
     def _updateMarkups(self, window=None, level=None):
         self.clearCurrentMarkups()
         ## POINTS
-        pointSize = self.boundingDist * 0.01
+        # Calculate base point size
+        basePointSize = self.boundingDist * 0.01
+        
+        # Get zoom factor and adjust point size accordingly
+        zoom_factor = self.getZoomFactor()
+        # As we zoom in (zoom_factor > 1), we want smaller points
+        # As we zoom out (zoom_factor < 1), we want larger points
+        pointSize = basePointSize / zoom_factor
+        
+        # Clamp point size to reasonable range
+        pointSize = max(basePointSize * 0.1, min(basePointSize * 5.0, pointSize))
+        
         # Show lines when in spline mode, otherwise use the original logic
         SHOW_LINES = self.splineClosed # If spline closed (but points) then show a closed line
         LOOP = self.splineClosed  # Use the spline closed setting
@@ -611,6 +643,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
             cpX = self.resliceCursor.GetCenter()
             for i in range(3):
                 nn = self.getViewNormal(i)
+                # Use the same zoom-adjusted point size for individual views
                 ptsActor_i = self.Markups.getAllPointsActors(self.currentTimeID, pointSize, cpX, nn, pointSize*0.9)
                 if ptsActor_i is not None:
                     self.rendererArray[i].AddActor(ptsActor_i)

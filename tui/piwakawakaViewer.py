@@ -226,11 +226,33 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.renderer.GetActiveCamera().ParallelProjectionOn()
         self.renderer.GetActiveCamera().Zoom(2.5)
         self.renderer.ResetCamera()
+        # Set reference scale for zoom calculation
+        self._referenceParallelScale = self.renderer.GetActiveCamera().GetParallelScale()
         self.renderWindow.Render()
 
     def cameraReset3D(self):
         self.renderer.ResetCameraClippingRange()
         self.renderWindow.Render()
+
+    def getZoomFactor(self):
+        """Get current zoom factor from camera for 2D viewer"""
+        camera = self.renderer.GetActiveCamera()
+        if camera.GetParallelProjection():
+            # For parallel projection, use parallel scale
+            # Smaller parallel scale = more zoomed in
+            # We'll use a reference scale to calculate zoom factor
+            if not hasattr(self, '_referenceParallelScale'):
+                self._referenceParallelScale = camera.GetParallelScale()
+            zoom_factor = self._referenceParallelScale / camera.GetParallelScale()
+        else:
+            # For perspective projection, use view angle
+            # Smaller view angle = more zoomed in
+            if not hasattr(self, '_referenceViewAngle'):
+                self._referenceViewAngle = camera.GetViewAngle()
+            zoom_factor = self._referenceViewAngle / camera.GetViewAngle()
+        
+        # Clamp zoom factor to reasonable range
+        return max(0.1, min(10.0, zoom_factor))
 
     def flipCamera(self):
         """Flip the camera view horizontally"""
@@ -688,7 +710,17 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
     def _updateMarkups(self, window=None, level=None):
         self.clearCurrentMarkups()
         ## POINTS
-        pointSize = self.boundingDist * 0.01
+        # Calculate base point size
+        basePointSize = self.boundingDist * 0.01
+        
+        # Get zoom factor and adjust point size accordingly
+        zoom_factor = self.getZoomFactor()
+        # As we zoom in (zoom_factor > 1), we want smaller points
+        # As we zoom out (zoom_factor < 1), we want larger points
+        pointSize = basePointSize / zoom_factor
+        
+        # Clamp point size to reasonable range
+        pointSize = max(basePointSize * 0.1, min(basePointSize * 5.0, pointSize))
 
         ptsActor = self.Markups.getAllPointsActors(self.currentTimeID, pointSize, sliceID=self.currentSliceID)
         if ptsActor is not None:
