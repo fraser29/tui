@@ -641,7 +641,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
 
 
     def __setupNewImageData(self): # ONLY ON NEW DATA LOAD
-        self._BaseMarkupViewer__setScalarRangeForCurrentArray()
+        self.setScalarRangeDictionary()
         # Set background color
         self.renderer.SetBackground(0.1, 0.1, 0.1)
         # Create image actor for slice display

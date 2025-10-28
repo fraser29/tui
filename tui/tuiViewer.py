@@ -496,7 +496,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
 
 
     def __setupNewImageData(self): # ONLY ON NEW DATA LOAD
-        self._BaseMarkupViewer__setScalarRangeForCurrentArray()
+        self.setScalarRangeDictionary()
         ##
         center = self.getCurrentVTIObject().GetCenter()
         self.resliceCursor.SetCenter(center[0], center[1], center[2])
