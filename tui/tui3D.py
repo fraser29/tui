@@ -20,6 +20,7 @@ from tui.tuiUtils import renderVolume3D
 
 colors = vtk.vtkNamedColors()
 
+HOME = os.path.expanduser('~')
 
 # def add_SSAO(ren):
 #
@@ -346,7 +347,7 @@ class TUI3DBasic_A(TUI3DInteractor):
 
     def execute(self): # SAVE
         appendPoly = vtkfilters.appendPolyDataList(self.unpickablePolydataList)
-        print(fIO.writeVTKFile(appendPoly, '/home/fraser/temp/temp.vtp'))
+        print(fIO.writeVTKFile(appendPoly, f'{HOME}/temp/temp.vtp'))
 
     def setupStyleInteractor(self):
         # add the custom style
@@ -366,39 +367,27 @@ class TUI3DBasic_A(TUI3DInteractor):
 ### ====================================================================================================================
 ### ====================================================================================================================
 
-def test():
-    ff = '/media/fraser/Samsung_T3/PROJECTS/CABG/PhD_UCT_scans/E2B/contoursFull.vtp'
-    pp = fIO.readVTKFile(ff)
-    pList = [pp]
-    # for k1, iPick in enumerate(sphList):
-    #     vtkfilters.addFieldData(iPick, '%d' % (k1), 'Pick')
-    i3D = TUI3DInteractor(pList, [], TUBE=True)
-    i3D.show()
-
 
 ### ====================================================================================================================
 ### ====================================================================================================================
 
 
 def main(args):
-    if len(args) > 1:
-        ff = args[1]
-        print(ff)
-        if ff[-4:] == '.vti':
-            renderVolume3D(fIO.readVTKFile(ff))
-        else:
-            pp = fIO.readVTKFile(ff)
-            vtkfilters.delArraysExcept(pp, [])
-            # pp = vtkfilters.cleanData(pp)
-            ccList = vtkfilters.getConnectedRegionAll(pp)
-            # ccList = [vtkfilters.tubeFilter(i, 0.0005) for i in ccList]
-            # ccList = [vtkfilters.tubeFilter(vtkfilters.filterTransformPolyData(i, 100.0), 0.1) for i in ccList]
-            OBJ = TUI3DBasic_A(ccList, [])
-            print('TUI3DBasic set up')
-            OBJ.show()
-            print('DONE')
+    ff = args[1]
+    print(ff)
+    if ff[-4:] == '.vti':
+        renderVolume3D(fIO.readVTKFile(ff))
     else:
-        test()
+        pp = fIO.readVTKFile(ff)
+        vtkfilters.delArraysExcept(pp, [])
+        # pp = vtkfilters.cleanData(pp)
+        ccList = vtkfilters.getConnectedRegionAll(pp)
+        # ccList = [vtkfilters.tubeFilter(i, 0.0005) for i in ccList]
+        # ccList = [vtkfilters.tubeFilter(vtkfilters.filterTransformPolyData(i, 100.0), 0.1) for i in ccList]
+        OBJ = TUI3DBasic_A(ccList, [])
+        print('TUI3DBasic set up')
+        OBJ.show()
+        print('DONE')
 
 
 if __name__ == '__main__':
