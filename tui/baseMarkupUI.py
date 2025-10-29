@@ -160,7 +160,7 @@ class BaseMarkupUI(object):
         self.imMarkupButton_A = QtWidgets.QPushButton(self.markupGroupBox)
         self.imMarkupButton_A.setObjectName("imMarkupButton_A")
         self.imageMarkupButtonsLayout.addWidget(self.imMarkupButton_A)
-        self.imMarkupButton_A.setEnabled(False) # STILL IN BETA
+        self.imMarkupButton_A.setEnabled(True) # STILL IN BETA
         
         self.imMarkupButton_B = QtWidgets.QPushButton(self.markupGroupBox)
         self.imMarkupButton_B.setObjectName("imMarkupButton_B")

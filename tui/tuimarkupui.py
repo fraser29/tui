@@ -123,7 +123,7 @@ class Ui_BASEUI(BaseMarkupUI):
         self.imManip_B.setText(_translate("BASEUI", "Rotate 90°"))
         
         # Markup controls
-        self.imMarkupButton_A.setText(_translate("BASEUI", "Spline markup"))
+        self.imMarkupButton_A.setText(_translate("BASEUI", "Send slice to PIWAKAWAKA"))
         self.imMarkupButton_B.setText(_translate("BASEUI", "Nothing"))  # TODO
         self.closedSplineCheck.setText(_translate("BASEUI", "Closed loop"))
         

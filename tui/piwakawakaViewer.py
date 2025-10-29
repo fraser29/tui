@@ -360,7 +360,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         if self.VERBOSE:
             print(f"Set custom slice data: {len(centers)} centers and {len(normals)} normals")
 
-    def loadResliceDataFromMemory(self, reslice_data_dict, center, normal):
+    def loadResliceDataFromMemory(self, reslice_data_dict, center, normal, metaDict):
         """Load reslice data directly from memory instead of from files
         
         Args:
@@ -380,12 +380,13 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         # Use existing method to set custom slice parameters
         self.setCustomSliceCentersAndNormals([center], [normal])
         
-        # Initialize patient metadata - this will be overridden if launched from TUI
-        self.patientMeta.initFromVTI(self.getCurrentVTIObject())
-        if self.VERBOSE:
-            print("Initialized patient metadata from reslice data")
-        
         self._setupAfterLoad()
+        # OVERWRITE PATIENT METADATA WITH THE ONE FROM THE TUI VIEWER
+        self.patientMeta.initFromDictionary(metaDict)
+        if self.VERBOSE:
+            print(metaDict)
+            print("Initialized patient metadata from reslice data")
+            print(self.patientMeta)
 
     # Array selection methods inherited from base class
 

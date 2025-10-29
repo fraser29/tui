@@ -303,26 +303,27 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
             axial_normal = self.getViewNormal(2)  # Axial view normal
             
             # Create reslice data for all time points
+            metaDict = {}
             for time_idx, time_val in enumerate(self.times):
-                vti_obj = self.vtiDict[time_val]
-                
+                self.moveTimeSlider(time_idx)
                 # Create a reslice for this time point using the current axial slice
-                # Use the same reslice function as piwakawaka
-                from tui.piwakawakaViewer import _defineReslice
-                reslice = _defineReslice(vti_obj, 'AXIAL', current_center, normalVector=axial_normal)
-                
+                reslice = self.resliceCursorWidgetArray[2].GetRepresentation().GetReslice()
+                vtiObj = reslice.GetOutput()
+                metaDict['Spacing'] = vtiObj.GetSpacing()
+                metaDict['Origin'] = reslice.GetResliceAxesOrigin()
+                metaDict['ImageOrientationPatient'] = reslice.GetResliceAxesDirectionCosines()
                 # Store the reslice output
-                reslice_data_dict[time_val] = reslice.GetOutput()
+                reslice_data_dict[time_val] = vtkfilters.copyData(vtiObj)
             
             # Launch piwakawaka with the reslice data
-            self._launchPiwakawakaWithResliceData(reslice_data_dict, current_center, axial_normal)
+            self._launchPiwakawakaWithResliceData(reslice_data_dict, current_center, axial_normal, metaDict)
             
         except Exception as e:
             print(f"Error launching piwakawaka: {e}")
             import traceback
             traceback.print_exc()
 
-    def _launchPiwakawakaWithResliceData(self, reslice_data_dict, center, normal):
+    def _launchPiwakawakaWithResliceData(self, reslice_data_dict, center, normal, metaDict):
         """Launch piwakawaka instance with reslice data from all time points"""
         try:
             # Import necessary modules
@@ -332,20 +333,13 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
             app = piwakawakamarkupui.QtWidgets.QApplication.instance()
             if app is None:
                 app = piwakawakamarkupui.QtWidgets.QApplication(['PIWAKAWAKA Reslice Viewer'])
-            
             # Create piwakawaka viewer instance
             piwakawaka_viewer = piwakawakaViewer.PIWAKAWAKAMarkupViewer(VERBOSE=self.VERBOSE)
             piwakawaka_viewer.setWorkingDirectory(self.workingDir)
-            
             # Load the reslice data directly from memory
-            piwakawaka_viewer.loadResliceDataFromMemory(reslice_data_dict, center, normal)
-            
-            # Copy patient metadata from TUI viewer to ensure coordinate system consistency
-            # This overrides the patientMeta initialized in loadResliceDataFromMemory
-            piwakawaka_viewer.patientMeta = self.patientMeta
+            piwakawaka_viewer.loadResliceDataFromMemory(reslice_data_dict, center, normal, metaDict)
             if self.VERBOSE:
                 print(f"Launched piwakawaka with reslice data from {len(reslice_data_dict)} time points")
-                print(f"Patient metadata copied from TUI viewer")
             
         except Exception as e:
             print(f"Error in _launchPiwakawakaWithResliceData: {e}")
