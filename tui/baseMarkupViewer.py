@@ -257,18 +257,19 @@ class BaseMarkupViewer:
         except Exception:
             return os.getcwd()
 
-    def __setScalarRangeForCurrentArray(self):
+    def setScalarRangeDictionary(self):
         """Set scalar range for current array"""
-        sR_t = [self.vtiDict[iT].GetScalarRange() for iT in self.times]
-        self.scalarRange[self.currentArray] = [min([i[0] for i in sR_t]), max([i[1] for i in sR_t])]
+        for arrayName in vtkfilters.getArrayNames(self.getCurrentVTIObject()):
+            sR_t = [self.vtiDict[iT].GetPointData().GetArray(arrayName).GetRange() for iT in self.times]
+            self.scalarRange[arrayName] = [min([i[0] for i in sR_t]), max([i[1] for i in sR_t])]
     
     def __calculateOptimalWindowLevel(self, arrayName=None):
         """Calculate optimal window level using percentile-based approach"""
         if arrayName is None:
             arrayName = self.currentArray
             
-        if arrayName not in self.scalarRange:
-            self.__setScalarRangeForCurrentArray()
+        if arrayName not in self.scalarRange.keys():
+            self.setScalarRangeDictionary()
             
         # Get the current VTI object
         vtiObj = self.getCurrentVTIObject()
@@ -535,9 +536,7 @@ class BaseMarkupViewer:
         self.currentArray = arrayName
         if hasattr(self, 'selectArrayComboBox'):
             self.selectArrayComboBox.setCurrentText(arrayName)
-        self.resetWindowLevel()
-        if hasattr(self, 'renderWindow'):
-            self.renderWindow.Render()
+        self.hardReset()
 
     
     # FILE LOADING METHODS
@@ -755,6 +754,10 @@ class BaseMarkupViewer:
         """Get current zoom factor from camera - to be overridden by subclasses"""
         # Default implementation returns 1.0 (no zoom)
         return 1.0
+
+    def hardReset(self):
+        """Hard reset - to be overridden by subclasses"""
+        pass
     
     # COORDINATE CONVERSION METHODS
     def getPointIDAtX(self, X):

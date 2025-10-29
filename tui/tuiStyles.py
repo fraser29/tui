@@ -234,7 +234,11 @@ class ImageInteractor(vtk.vtkInteractorStyleTrackballCamera):
             w,l = self.parentImageViewer.getWindowLevel()
             print(f"Old window level: {w}, {l}")
             self.parentImageViewer.resetWindowLevel()
+            w,l = self.parentImageViewer.getWindowLevel()
             print(f"New window level: {w}, {l}")
+
+        elif key == "W":
+            self.parentImageViewer.hardReset()
 
         elif key == "V":
             self.parentImageViewer.VERBOSE = not self.parentImageViewer.VERBOSE

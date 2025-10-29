@@ -211,11 +211,19 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
         return w, l
 
     def setWindowLevel(self, w, l):
+        if self.VERBOSE:
+            old_w, old_l = self.getWindowLevel()
+            print(f"SetWindowLevel: Old window level: window={old_w:.2f}, level={old_l:.2f}")
+            print(f"SetWindowLevel: Change to: window={w:.2f}, level={l:.2f}")
         for i in range(1,3):
-            self.resliceCursorWidgetArray[i].GetRepresentation().SetWindowLevel(w, l)
+            resA = self.resliceCursorWidgetArray[i].GetRepresentation().SetWindowLevel(w, l)
         for i in range(1,3):
-            self.resliceCursorWidgetArray[i].GetRepresentation().SetLookupTable(self.resliceCursorWidgetArray[0].GetRepresentation().GetLookupTable())
+            resB = self.resliceCursorWidgetArray[i].GetRepresentation().SetLookupTable(self.resliceCursorWidgetArray[0].GetRepresentation().GetLookupTable())
         self.renderWindow.Render()
+        if self.VERBOSE:
+            new_w, new_l = self.getWindowLevel()
+            print(f"SetWindowLevel: New window level: window={new_w:.2f}, level={new_l:.2f}")
+            print(f"SetWindowLevel: resA={resA}, resB={resB}")
 
 
 
@@ -483,9 +491,12 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
             return iRS
         return ii
 
+    def hardReset(self):
+        self.__setupNewImageData()
+
 
     def __setupNewImageData(self): # ONLY ON NEW DATA LOAD
-        self._BaseMarkupViewer__setScalarRangeForCurrentArray()
+        self.setScalarRangeDictionary()
         ##
         center = self.getCurrentVTIObject().GetCenter()
         self.resliceCursor.SetCenter(center[0], center[1], center[2])
@@ -652,6 +663,8 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
         ## SPLINE - splines disabled in TUI
         # self.Markups.showSplines_timeID_CP(self.currentTimeID, self.resliceCursor.GetCenter(), self.getViewNormal(2), pointSize*0.9)
         if (window is not None) and (level is not None):
+            if self.VERBOSE:
+                print(f"UpdateMarkups: Setting window level: window={window:.2f}, level={level:.2f}")
             self.setWindowLevel(window, level)
         self.renderWindow.Render()
 
