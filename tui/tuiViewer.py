@@ -702,7 +702,9 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
     def getCurrentContourPolydata(self):
         if self.contourVal:
             contour = vtkfilters.contourFilter(self.getCurrentVTIObject(), self.contourVal)
-            return vtkfilters.getConnectedRegionLargest(contour)
+            if self.limitContourToOne:
+                contour = vtkfilters.getConnectedRegionLargest(contour)
+            return contour
 
 
 

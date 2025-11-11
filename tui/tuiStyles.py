@@ -200,12 +200,13 @@ class ImageInteractor(vtk.vtkInteractorStyleTrackballCamera):
             print(fIO.writeVTKFile(plane, os.path.join(self.parentImageViewer.workingDirLineEdit.text(), "plane.vtp")))
 
         elif key == "c":
-            val = 1000.0
+            val = input('Enter contour level: ')
             try:
-                val = float(val)
-                self.parentImageViewer.setContourVal(val)
-            except TypeError:
-                pass
+                val_float = float(val)
+                self.parentImageViewer.setContourVal(val_float)
+            except ValueError:
+                print('Invalid contour level')
+                return
 
         elif key == "L":
             val = input('Enter contour min length')
