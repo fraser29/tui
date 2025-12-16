@@ -171,7 +171,7 @@ class TUIBasic(TUIProject):
         self.pushButtonDict = {0:['Save points', self.savePolyPts_],
                               1:['Save line', self.savePolyLine_],
                               3:['Clear Markups', self.ex.deleteAllMarkups],
-                              4:['Test mask', self.testMask],
+                              4:['Save images', self.saveImages_],
                               5: ['Points to VOI', self.saveVOI_]}
 
         self.ex.updatePushButtonDict(self.pushButtonDict)
@@ -196,6 +196,23 @@ class TUIBasic(TUIProject):
 
     def testMask(self):
         print("Does nothing")
+
+
+    def saveImages_(self):
+        pts = self.getLMPoints_xyz()
+        VIEW_ID = 2 # TOP LEFT
+        self.ex.deleteAllMarkups()
+        # FORCE NORMAL
+        self.ex.interactionView = VIEW_ID
+        nn = vtkfilters.np.array(self.ex.getCurrentViewNormal())
+        p1_2 = pts[1] - pts[0]
+        p1_2N = p1_2 / vtkfilters.np.linalg.norm(p1_2)
+        nn = vtkfilters.ftk.setVecAConsitentWithVecB(nn, p1_2N)
+        dd = vtkfilters.ftk.distTwoPoints(pts[0], pts[1])
+        endPt = pts[0] + dd * nn
+        #
+        self.ex.saveImages(self.ex.workingDir, pts[0], endPt, 50, VIEW_ID, outputPrefix='DCM', size=256)
+        print(f'Saved images to {self.ex.workingDir}')
 
     # def alignRandom(self):
     #     # NOT WORKING

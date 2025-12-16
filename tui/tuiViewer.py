@@ -707,6 +707,79 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
             return contour
 
 
+    def saveImages(self, outputDir, startPt, endPt, nImages, viewID, outputPrefix='', FULL_VIEW=False, size=None):
+        return self.__saveImages( outputDir, startPt, endPt, nImages, viewID, outputPrefix=outputPrefix,
+                                  FULL_VIEW=FULL_VIEW, size=size)
+
+    def __saveImages(self, outputDir, startPt, endPt, nImages, viewID, outputPrefix='', FULL_VIEW=False, size=None):
+        from PIL import Image
+        fileOutList = []
+        w, l = self.getWindowLevel()
+        lowP, highP = l-(w/2.), l+(w/2.)
+        imageLine = vtkfilters.buildPolyLineBetweenTwoPoints(startPt, endPt, nImages)
+        allCP = vtkfilters.getPtsAsNumpy(imageLine)
+        
+        # Get camera and preserve current settings
+        camera = self.rendererArray[viewID].GetActiveCamera()
+        originalFocalPoint = np.array(camera.GetFocalPoint())
+        originalViewUp = np.array(camera.GetViewUp())
+        
+        # Calculate midpoint of the line for focal point (for 3D views)
+        midpoint = (np.array(startPt) + np.array(endPt)) / 2.0
+        
+        for k1, cp in enumerate(allCP):
+            # Update camera position for different views
+            if viewID == 3:  # 3D view - move camera along line, keep focal point fixed
+                camera.SetPosition(cp[0], cp[1], cp[2])
+                # Keep focal point at midpoint of the line (or use original if preferred)
+                camera.SetFocalPoint(midpoint[0], midpoint[1], midpoint[2])
+                # Preserve view up vector
+                camera.SetViewUp(originalViewUp[0], originalViewUp[1], originalViewUp[2])
+                camera.Modified()
+            elif viewID < 3:  # 2D views - move reslice cursor center instead
+                self.resliceCursor.SetCenter(cp[0], cp[1], cp[2])
+            else:
+                # Fallback: just set position
+                camera.SetPosition(cp[0], cp[1], cp[2])
+                camera.Modified()
+            
+            self._updateMarkups(w, l)  # will render
+            fOut = os.path.join(outputDir, f'{outputPrefix}{k1}.png')
+            if FULL_VIEW:
+                windowToImageFilter = vtk.vtkWindowToImageFilter()
+                windowToImageFilter.SetInput(self.graphicsViewVTK.GetRenderWindow())
+                windowToImageFilter.Update()
+                writer = vtk.vtkPNGWriter()
+                writer.SetFileName(fOut)
+                writer.SetInputConnection(windowToImageFilter.GetOutputPort())
+                writer.Write()
+            else:
+                ii = self.getCurrentResliceAsVTI(COPY=True)
+                dims = ii.GetDimensions()
+                A = vtkfilters.getArrayAsNumpy(ii, 'ImageScalars')
+                A[A < lowP] = lowP
+                A[A > highP] = highP
+                A = A + abs(np.min(A)) # Max all pixels positive
+                A = (A / np.max(A) * 255) # Set to 0-255
+                A = np.reshape(A, (dims[0], dims[1]), order='F')
+                A = np.rot90(A, 1) # FIXME - should work out this number from viewID
+                img = Image.fromarray(A.astype(np.uint8))  # uses mode='L'
+                if size is not None:
+                    try: 
+                        size[1] 
+                    except (TypeError, IndexError): 
+                        size = [size, size]
+                    wh = img.size
+                    whMaxID = np.argmax(wh)
+                    ratios = [wh[0] / wh[whMaxID], wh[1] / wh[whMaxID]]
+                    if wh[whMaxID] > max(size):
+                        sizeN = [size[0] * ratios[0], size[1] * ratios[1]]
+                        img = img.resize((int(sizeN[0]), int(sizeN[1])))
+                img.save(fOut)
+            fileOutList.append(fOut)
+        return fileOutList
+        # os.system('convert %s -resize 400x400 %s'%(fOut, fOut))
+
 
 # ======================================================================================================================
 # ======================================================================================================================
