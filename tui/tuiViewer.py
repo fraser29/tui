@@ -326,7 +326,6 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
     def _launchPiwakawakaWithResliceData(self, reslice_data_dict, center, normal, metaDict):
         """Launch piwakawaka instance with reslice data from all time points"""
         try:
-            # Import necessary modules
             from tui import piwakawakaViewer, piwakawakamarkupui
             
             # Launch piwakawaka with the reslice data directly in memory
