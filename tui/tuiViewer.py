@@ -213,8 +213,8 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
     def setWindowLevel(self, w, l):
         if self.VERBOSE:
             old_w, old_l = self.getWindowLevel()
-            print(f"SetWindowLevel: Old window level: window={old_w:.2f}, level={old_l:.2f}")
-            print(f"SetWindowLevel: Change to: window={w:.2f}, level={l:.2f}")
+            print(f"tuiViewer: SetWindowLevel: Old window level: window={old_w:.2f}, level={old_l:.2f}")
+            print(f"tuiViewer: SetWindowLevel: Change to: window={w:.2f}, level={l:.2f}")
         for i in range(1,3):
             resA = self.resliceCursorWidgetArray[i].GetRepresentation().SetWindowLevel(w, l)
         for i in range(1,3):
@@ -222,8 +222,8 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
         self.renderWindow.Render()
         if self.VERBOSE:
             new_w, new_l = self.getWindowLevel()
-            print(f"SetWindowLevel: New window level: window={new_w:.2f}, level={new_l:.2f}")
-            print(f"SetWindowLevel: resA={resA}, resB={resB}")
+            print(f"tuiViewer: SetWindowLevel: New window level: window={new_w:.2f}, level={new_l:.2f}")
+            print(f"tuiViewer: SetWindowLevel: resA={resA}, resB={resB}")
 
 
 
@@ -319,7 +319,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
             self._launchPiwakawakaWithResliceData(reslice_data_dict, current_center, axial_normal, metaDict)
             
         except Exception as e:
-            print(f"Error launching piwakawaka: {e}")
+            print(f"tuiViewer: Error launching piwakawaka: {e}")
             import traceback
             traceback.print_exc()
 
@@ -338,10 +338,10 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
             # Load the reslice data directly from memory
             piwakawaka_viewer.loadResliceDataFromMemory(reslice_data_dict, center, normal, metaDict)
             if self.VERBOSE:
-                print(f"Launched piwakawaka with reslice data from {len(reslice_data_dict)} time points")
+                print(f"tuiViewer: Launched piwakawaka with reslice data from {len(reslice_data_dict)} time points")
             
         except Exception as e:
-            print(f"Error in _launchPiwakawakaWithResliceData: {e}")
+            print(f"tuiViewer: Error in _launchPiwakawakaWithResliceData: {e}")
             import traceback
             traceback.print_exc()
     
@@ -548,17 +548,18 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
         self.getCurrentVTIObject().GetDimensions(dims)
         try:
             if np.prod(dims) < 60e+6: # For very large data - don't want to do this
-                print(f"Working with current array: {self.currentArray}")
+                if self.VERBOSE:
+                    print(f"tuiViewer: Working with current array: {self.currentArray}")
                 A = vtkfilters.getArrayAsNumpy(self.getCurrentVTIObject(), self.currentArray)
                 A[np.isnan(A)] = 0.0
                 A = A[A>1.0]
                 contourVal = np.mean(A) * 2.0
                 if self.VERBOSE:
-                    print(f"Made contour at value: {int(contourVal)}")
+                    print(f"tuiViewer: Made contour at value: {int(contourVal)}")
                 self.setContourVal(contourVal)
         except Exception as e:
             if self.VERBOSE:
-                print(f"Error setting contour value: {e}")
+                print(f"tuiViewer: Error setting contour value: {e}")
         ##
         # Render
         self.__frameReset()
@@ -657,7 +658,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
         # self.Markups.showSplines_timeID_CP(self.currentTimeID, self.resliceCursor.GetCenter(), self.getViewNormal(2), pointSize*0.9)
         if (window is not None) and (level is not None):
             if self.VERBOSE:
-                print(f"UpdateMarkups: Setting window level: window={window:.2f}, level={level:.2f}")
+                print(f"tuiViewer: UpdateMarkups: Setting window level: window={window:.2f}, level={level:.2f}")
             self.setWindowLevel(window, level)
         self.renderWindow.Render()
 

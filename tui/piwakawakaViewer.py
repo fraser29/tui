@@ -369,9 +369,9 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
             normal: Normal vector of the reslice
         """
         if self.VERBOSE:
-            print(f"Loading reslice data from memory: {len(reslice_data_dict)} time points")
-            print(f"Reslice center: {center}")
-            print(f"Reslice normal: {normal}")
+            print(f"piwakawakaViewer: Loading reslice data from memory: {len(reslice_data_dict)} time points")
+            print(f"piwakawakaViewer: Reslice center: {center}")
+            print(f"piwakawakaViewer: Reslice normal: {normal}")
             # print(f"Arrays: {vtkfilters.getArrayNames(self.vtiDict[self.getCurrentTime()])}")
         
         self.vtiDict = reslice_data_dict.copy()
@@ -384,9 +384,9 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         # OVERWRITE PATIENT METADATA WITH THE ONE FROM THE TUI VIEWER
         self.patientMeta.initFromDictionary(metaDict)
         if self.VERBOSE:
-            print(metaDict)
-            print("Initialized patient metadata from reslice data")
-            print(self.patientMeta)
+            print(f"piwakawakaViewer: MetaDict: {metaDict}")
+            print(f"piwakawakaViewer: Initialized patient metadata from reslice data")
+            print(f"piwakawakaViewer: PatientMeta: {self.patientMeta}")
 
     # Array selection methods inherited from base class
 
@@ -421,10 +421,10 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.currentSliceID = int(self.maxSliceID / 2)
         
         if self.VERBOSE:
-            print(f"Image dimensions: {dims}")
-            print(f"Orientation: {self.sliceOrientation}")
-            print(f"Max slice ID: {self.maxSliceID}")
-            print(f"Starting at slice: {self.currentSliceID}")
+            print(f"piwakawakaViewer: Image dimensions: {dims}")
+            print(f"piwakawakaViewer: Orientation: {self.sliceOrientation}")
+            print(f"piwakawakaViewer: Max slice ID: {self.maxSliceID}")
+            print(f"piwakawakaViewer: Starting at slice: {self.currentSliceID}")
         self.moveSliceSlider(self.currentSliceID)
     
     def buildResliceDictionary(self, orientation=None, customCenters=None, customNormals=None):
@@ -443,7 +443,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.sliceNormals = []
         
         if self.VERBOSE:
-            print(f"Building reslice dictionary with orientation: {orientation}")
+            print(f"piwakawakaViewer: Building reslice dictionary with orientation: {orientation}")
         
         # Get image dimensions for default slice generation
         ii = list(self.vtiDict.values())[0]
@@ -491,7 +491,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
             
             self.resliceDict[timeStep] = resliceList
         if self.VERBOSE:
-            print(f"Reslice dictionary built with {len(self.sliceCenters)} slices")
+            print(f"piwakawakaViewer: Reslice dictionary built with {len(self.sliceCenters)} slices")
     
     def setSliceOrientation(self, orientation):
         """Change the slice orientation and rebuild reslice dictionary"""
@@ -513,7 +513,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
     def setCustomSlices(self, centers, normals):
         """Set custom slice centers and normals and rebuild reslice dictionary"""
         if len(centers) != len(normals):
-            raise ValueError("Number of centers must match number of normals")
+            raise ValueError("piwakawakaViewer: Number of centers must match number of normals")
         
         self.buildResliceDictionary(customCenters=centers, customNormals=normals)
         
@@ -526,30 +526,30 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.updateViewAfterSliceChange()
         
         if self.VERBOSE:
-            print(f"Set {len(centers)} custom slices")
+            print(f"piwakawakaViewer: Set {len(centers)} custom slices")
     
     def getCurrentReslice(self):
         """Get the current reslice for the current timestep and slice"""
         if not hasattr(self, 'resliceDict') or not self.resliceDict:
             if self.VERBOSE:
-                print("Reslice dictionary not initialized")
+                print("piwakawakaViewer: Reslice dictionary not initialized")
             return None
             
         if self.currentTimeID >= len(self.times):
             if self.VERBOSE:
-                print(f"Current time ID {self.currentTimeID} out of range")
+                print(f"piwakawakaViewer: Current time ID {self.currentTimeID} out of range")
             return None
             
         currentTime = self.times[self.currentTimeID]
         if currentTime not in self.resliceDict:
             if self.VERBOSE:
-                print(f"Time {currentTime} not found in reslice dictionary")
+                print(f"piwakawakaViewer: Time {currentTime} not found in reslice dictionary")
             return None
             
         resliceList = self.resliceDict[currentTime]
         if self.currentSliceID >= len(resliceList):
             if self.VERBOSE:
-                print(f"Current slice ID {self.currentSliceID} out of range")
+                print(f"piwakawakaViewer: Current slice ID {self.currentSliceID} out of range")
             return None
             
         return resliceList[self.currentSliceID]
@@ -670,7 +670,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         """Update the image actor to show the current slice using pre-built reslices"""
         if not hasattr(self, 'imageActor') or not self.imageActor:
             if self.VERBOSE:
-                print("Image actor not initialized")
+                print("piwakawakaViewer: Image actor not initialized")
             return
         currentReslice = self.getCurrentReslice()
         if currentReslice is not None:
@@ -685,7 +685,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
             self.imageActor.SetInputData(thisImageSlice)
         else:
             if self.VERBOSE:
-                print(f"No reslice available for slice {self.currentSliceID}")
+                print(f"piwakawakaViewer: No reslice available for slice {self.currentSliceID}")
 
 
     def updateAllActorsToCurrentSlice(self):

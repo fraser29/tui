@@ -88,33 +88,33 @@ class BaseMarkupViewer:
         try:
             fOut = self.savePoints()
             if fOut and self.VERBOSE:
-                print(f"Written points to {fOut}")
+                print(f"baseMarkupViewer: Written points to {fOut}")
         except Exception as e:
-            print(f"Error saving points: {e}")
+            print(f"baseMarkupViewer: Error saving points: {e}")
 
     def _defaultSaveLine(self):
         """Default save line action"""
         try:
             fOut = self.saveLine()
             if fOut and self.VERBOSE:
-                print(f"Written line to {fOut}")
+                print(f"baseMarkupViewer: Written line to {fOut}")
         except Exception as e:
-            print(f"Error saving line: {e}")
+            print(f"baseMarkupViewer: Error saving line: {e}")
 
     def _defaultSaveVOI(self):
         """Default save VOI action"""
         try:
             fOut = self.saveVOI()
             if fOut and self.VERBOSE:
-                print(f"Written VOI to {fOut}")
+                print(f"baseMarkupViewer: Written VOI to {fOut}")
         except Exception as e:
-            print(f"Error saving VOI: {e}")
+            print(f"baseMarkupViewer: Error saving VOI: {e}")
 
     def _defaultClearMarkups(self):
         """Default clear markups action"""
         self.deleteAllMarkups()
         if self.VERBOSE:
-            print("All markups cleared")
+            print("baseMarkupViewer: All markups cleared")
 
     def savePoints(self, featureName=None, prefix='pt'):
         """Save points as polydata"""
@@ -122,7 +122,7 @@ class BaseMarkupViewer:
             ppDict = self.getMarkupAsPolydata()
             return self._save(ppDict, featureName=featureName, prefix=prefix)
         except Exception as e:
-            print(f"Error in _savePoints: {e}")
+            print(f"baseMarkupViewer: Error in _savePoints: {e}")
             return None
 
     def saveLine(self, featureName=None, LINE_LOOP=False, prefix='line'):
@@ -131,7 +131,7 @@ class BaseMarkupViewer:
             lineDict = self.getMarkupAsPolydata_lines(LINE_LOOP=LINE_LOOP)
             return self._save(lineDict, featureName=featureName, prefix=prefix)
         except Exception as e:
-            print(f"Error in _saveLine: {e}")
+            print(f"baseMarkupViewer: Error in _saveLine: {e}")
             return None
 
     def saveVOI(self, featureName=None, prefix='fov'):
@@ -143,7 +143,7 @@ class BaseMarkupViewer:
                 voiDict[iTime] = vtkfilters.getOutline(ptsDict[iTime])
             return self._save(voiDict, featureName=featureName, prefix=prefix)
         except Exception as e:
-            print(f"Error in _saveVOI: {e}")
+            print(f"baseMarkupViewer: Error in _saveVOI: {e}")
             return None
 
     def getMarkupAsPolydata(self):
@@ -159,7 +159,7 @@ class BaseMarkupViewer:
                     outDict[self.times[k1]] = pp
         except (AttributeError, ValueError) as e:
             if self.VERBOSE:
-                print(f"Error getting markup polydata: {e}")
+                print(f"baseMarkupViewer: Error getting markup polydata: {e}")
         return outDict
 
     def getMarkupAsPolydata_lines(self, LINE_LOOP=False):
@@ -173,14 +173,14 @@ class BaseMarkupViewer:
                     lineDict[iTime] = vtkfilters.buildPolyLineFromXYZ(vtkfilters.getPtsAsNumpy(ptsDict[iTime]), LOOP=LINE_LOOP or self.splineClosed)
             return lineDict
         except Exception as e:
-            print(f"Error in getMarkupAsPolydata_lines: {e}")
+            print(f"baseMarkupViewer: Error in getMarkupAsPolydata_lines: {e}")
             return None
 
     def _save(self, polyDataDict, featureName=None, prefix='', extn='vtp', FORCE_PVD_EVEN_IF_SINGLE=False):
         """Save polydata dictionary to files"""
         if polyDataDict is None or len(polyDataDict) == 0:
             if self.VERBOSE:
-                print("No data to save")
+                print("baseMarkupViewer: No data to save")
             return None
             
         if featureName is None:
@@ -198,7 +198,7 @@ class BaseMarkupViewer:
                                     filePrefix=prefix+featureName, fileExtn=extn)
             return fileOut
         except Exception as e:
-            print(f"Error saving file: {e}")
+            print(f"baseMarkupViewer: Error saving file: {e}")
             return None
 
     def getFileNameViaDialog(self):
@@ -211,7 +211,7 @@ class BaseMarkupViewer:
             return fileName if fileName else ""
         except Exception as e:
             if self.VERBOSE:
-                print(f"Error getting filename: {e}")
+                print(f"baseMarkupViewer: Error getting filename: {e}")
             return ""
 
     def getFullFileName_interactive(self, fileName=None, prefix=None, extn=None):
@@ -297,7 +297,7 @@ class BaseMarkupViewer:
                 return windowWidth, windowLevel
         except Exception as e:
             if self.VERBOSE:
-                print(f"Error calculating optimal window level: {e}")
+                print(f"baseMarkupViewer: Error calculating optimal window level: {e}")
         
         # Fallback to simple range-based calculation
         sR = self.scalarRange.get(arrayName, [0, 255])
@@ -319,7 +319,7 @@ class BaseMarkupViewer:
         windowWidth, windowLevel = self.__calculateOptimalWindowLevel()
         
         if self.VERBOSE:
-            print(f"Resetting window level: window={windowWidth:.2f}, level={windowLevel:.2f}")
+            print(f"baseMarkupViewer: Resetting window level: window={windowWidth:.2f}, level={windowLevel:.2f}")
         
         self._updateMarkups(window=windowWidth, level=windowLevel)
 
@@ -429,7 +429,7 @@ class BaseMarkupViewer:
         """Start the animation loop"""
         if len(self.times) <= 1:
             if self.VERBOSE:
-                print("Cannot animate: only one time step available")
+                print("baseMarkupViewer: Cannot animate: only one time step available")
             return
             
         self.isAnimating = True
@@ -448,7 +448,7 @@ class BaseMarkupViewer:
         self.animationTimer.start(interval)
         
         if self.VERBOSE:
-            print(f"Animation started at speed {self.animationSpeed} (interval: {interval}ms)")
+            print(f"baseMarkupViewer: Animation started at speed {self.animationSpeed} (interval: {interval}ms)")
 
     def stopAnimation(self):
         """Stop the animation"""
@@ -461,7 +461,7 @@ class BaseMarkupViewer:
             self.animationTimer.stop()
         
         if self.VERBOSE:
-            print("Animation stopped")
+            print("baseMarkupViewer: Animation stopped")
 
     def animateNextFrame(self):
         """Move to next frame in animation loop"""
@@ -489,20 +489,20 @@ class BaseMarkupViewer:
         
         if self.VERBOSE:
             speedNames = ["Slowest", "Slow", "Fast", "Fastest"]
-            print(f"Animation speed set to: {speedNames[speed]} (interval: {self.speedIntervals[speed]}ms)")
+            print(f"baseMarkupViewer: Animation speed set to: {speedNames[speed]} (interval: {self.speedIntervals[speed]}ms)")
 
     # MARKUP MODE CONTROLS
     def markupModeChanged(self, mode):
         """Handle markup mode change"""
         self.markupMode = mode
         if self.VERBOSE:
-            print(f"Markup mode changed to: {mode}")
+            print(f"baseMarkupViewer: Markup mode changed to: {mode}")
 
     def splineClosedChanged(self, state):
         """Handle spline closed setting change"""
         self.splineClosed = state == 2  # Qt.Checked = 2
         if self.VERBOSE:
-            print(f"Spline closed setting changed to: {self.splineClosed}")
+            print(f"baseMarkupViewer: Spline closed setting changed to: {self.splineClosed}")
 
     # DATA ACCESS METHODS
     def getCurrentTime(self):
@@ -556,9 +556,9 @@ class BaseMarkupViewer:
             if dirName:
                 self.setWorkingDirectory(dirName)
                 if self.VERBOSE:
-                    print(f"Working directory set to: {dirName}")
+                    print(f"baseMarkupViewer: Working directory set to: {dirName}")
         except Exception as e:
-            print(f"Error selecting working directory: {e}")
+            print(f"baseMarkupViewer: Error selecting working directory: {e}")
 
     def _getFileViaDialog(self):
         """Get file via dialog"""
@@ -569,7 +569,7 @@ class BaseMarkupViewer:
                                                 str(self.workingDirLineEdit.text()),
                                                 ("Image data (*.vti);;PVD(, *.pvd)"))[0]
         if self.VERBOSE:
-            print(str(fileName))
+            print(f"baseMarkupViewer: File name: {str(fileName)}")
         return str(fileName)
 
     def _getDirectoryViaDialog(self):
@@ -580,13 +580,13 @@ class BaseMarkupViewer:
                                                 ("Open dicom directory"),
                                                 str(self.workingDirLineEdit.text()))
         if self.VERBOSE:
-            print(str(dirName))
+            print(f"baseMarkupViewer: Directory name: {str(dirName)}")
         return str(dirName)
 
     def _loadDicom(self):
         """Load DICOM data"""
         if self.VERBOSE:
-            print('Load dicoms')
+            print('baseMarkupViewer: Load dicoms')
         dirName = self._getDirectoryViaDialog()
         self.loadDicomDir(dirName)
 
@@ -595,14 +595,14 @@ class BaseMarkupViewer:
         dcmSeries = spydcmtk.dcmTK.DicomSeries.setFromDirectory(dicomDir)
         self.vtiDict = dcmSeries.buildVTIDict()
         if self.VERBOSE:
-            print(f"Have VTI dict. Times (ms): {[int(i*1000.0) for i in sorted(self.vtiDict.keys())]}")
+            print(f"baseMarkupViewer: Have VTI dict. Times (ms): {[int(i*1000.0) for i in sorted(self.vtiDict.keys())]}")
         self.setWorkingDirectory(os.path.split(dicomDir)[0])
         self._setupAfterLoad()
 
     def loadVTI_or_PVD(self, fileName=None):
         """Load VTI or PVD file"""
         if self.VERBOSE:
-            print('Load VTI')
+            print('baseMarkupViewer: Load VTI')
         if not fileName:
             fileName = self._getFileViaDialog()
         if len(fileName) > 0:
@@ -612,7 +612,7 @@ class BaseMarkupViewer:
                     vtkfilters.setArrayDtype(self.vtiDict[iTime], iName, np.float64)
                 vtkfilters.ensureScalarsSet(self.vtiDict[iTime])
             if self.VERBOSE:
-                print('Data loaded...')
+                print('baseMarkupViewer: Data loaded...')
             self.setWorkingDirectory(os.path.split(fileName)[0])
             self._setupAfterLoad()
 
