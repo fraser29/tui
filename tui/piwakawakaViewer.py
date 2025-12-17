@@ -359,8 +359,10 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         
         if self.VERBOSE:
             print(f"Set custom slice data: {len(centers)} centers and {len(normals)} normals")
+            print(f"piwakawakaViewer: Set custom slice centers and normals: 0={centers[0]}")
+            print(f"piwakawakaViewer: Set custom slice normals: 0={normals[0]}")
 
-    def loadResliceDataFromMemory(self, reslice_data_dict, center, normal, metaDict):
+    def loadResliceDataFromMemory(self, reslice_data_dict, center, normal, matrix4x4):
         """Load reslice data directly from memory instead of from files
         
         Args:
@@ -370,9 +372,6 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         """
         if self.VERBOSE:
             print(f"piwakawakaViewer: Loading reslice data from memory: {len(reslice_data_dict)} time points")
-            print(f"piwakawakaViewer: Reslice center: {center}")
-            print(f"piwakawakaViewer: Reslice normal: {normal}")
-            # print(f"Arrays: {vtkfilters.getArrayNames(self.vtiDict[self.getCurrentTime()])}")
         
         self.vtiDict = reslice_data_dict.copy()
         self.times = sorted(reslice_data_dict.keys())
@@ -382,11 +381,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         
         self._setupAfterLoad()
         # OVERWRITE PATIENT METADATA WITH THE ONE FROM THE TUI VIEWER
-        self.patientMeta.initFromDictionary(metaDict)
-        if self.VERBOSE:
-            print(f"piwakawakaViewer: MetaDict: {metaDict}")
-            print(f"piwakawakaViewer: Initialized patient metadata from reslice data")
-            print(f"piwakawakaViewer: PatientMeta: {self.patientMeta}")
+        self.patientMeta._matrix = matrix4x4
 
     # Array selection methods inherited from base class
 

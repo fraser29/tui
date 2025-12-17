@@ -307,27 +307,45 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
             axial_normal = self.getViewNormal(2)  # Axial view normal
             
             # Create reslice data for all time points
-            metaDict = {}
+            # THIS IS WRONG - NOT SURE - NEED OT THINK
+            matrix4x4 = np.eye(4)
+            # matrixVTK4x4 = vtk.vtkMatrix4x4()
+            # resliceMatrix = self.resliceCursorWidgetArray[2].GetRepresentation().GetReslice().GetResliceAxes()
+            # patMatrix = self.patientMeta._matrix
+            # vtk_mat = vtk.vtkMatrix4x4()
+            # for i in range(4):
+            #     for j in range(4):
+            #         vtk_mat.SetElement(i, j, float(patMatrix[i, j]))
+            # # vtk.vtkMatrix4x4.Multiply4x4(resliceMatrix, vtk_mat, matrixVTK4x4)
+            # vtk.vtkMatrix4x4.Multiply4x4(vtk_mat, resliceMatrix, matrixVTK4x4)
+            # matrix4x4 = np.zeros((4, 4), dtype=float)
+            # for i in range(4):
+            #     for j in range(4):
+            #         matrix4x4[i, j] = matrixVTK4x4.GetElement(i, j)
+            # print(f"DEBUG: tuiViewer: matrix4x4: {matrix4x4}")
+            # matrix4x4[0:3, 0:2] *= -1
+            # print(f"DEBUG: tuiViewer: matrix4x4: {matrix4x4}")
+            ##
             for time_idx, time_val in enumerate(self.times):
                 self.moveTimeSlider(time_idx)
                 # Create a reslice for this time point using the current axial slice
                 reslice = self.resliceCursorWidgetArray[2].GetRepresentation().GetReslice()
                 vtiObj = reslice.GetOutput()
-                metaDict['Spacing'] = vtiObj.GetSpacing()
-                metaDict['Origin'] = reslice.GetResliceAxesOrigin()
-                metaDict['ImageOrientationPatient'] = reslice.GetResliceAxesDirectionCosines()
                 # Store the reslice output
-                reslice_data_dict[time_val] = vtkfilters.copyData(vtiObj)
+                thisReslice = vtkfilters.copyData(vtiObj)
+                flipY = vtkfilters.filterFlipImageData(thisReslice, 1)
+                flipX = vtkfilters.filterFlipImageData(flipY, 0)
+                reslice_data_dict[time_val] = flipX
             
             # Launch piwakawaka with the reslice data
-            self._launchPiwakawakaWithResliceData(reslice_data_dict, current_center, axial_normal, metaDict)
+            self._launchPiwakawakaWithResliceData(reslice_data_dict, current_center, axial_normal, matrix4x4)
             
         except Exception as e:
             print(f"tuiViewer: Error launching piwakawaka: {e}")
             import traceback
             traceback.print_exc()
 
-    def _launchPiwakawakaWithResliceData(self, reslice_data_dict, center, normal, metaDict):
+    def _launchPiwakawakaWithResliceData(self, reslice_data_dict, center, normal, matrix4x4):
         """Launch piwakawaka instance with reslice data from all time points"""
         try:
             from tui import piwakawakaViewer, piwakawakamarkupui
@@ -340,7 +358,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
             piwakawaka_viewer = piwakawakaViewer.PIWAKAWAKAMarkupViewer(VERBOSE=self.VERBOSE)
             piwakawaka_viewer.setWorkingDirectory(self.workingDir)
             # Load the reslice data directly from memory
-            piwakawaka_viewer.loadResliceDataFromMemory(reslice_data_dict, center, normal, metaDict)
+            piwakawaka_viewer.loadResliceDataFromMemory(reslice_data_dict, center, normal, matrix4x4)
             if self.VERBOSE:
                 print(f"tuiViewer: Launched piwakawaka with reslice data from {len(reslice_data_dict)} time points")
             
