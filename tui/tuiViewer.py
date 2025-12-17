@@ -725,14 +725,14 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
         originalViewUp = np.array(camera.GetViewUp())
         
         # Calculate midpoint of the line for focal point (for 3D views)
-        midpoint = (np.array(startPt) + np.array(endPt)) / 2.0
+        # midpoint = (np.array(startPt) + np.array(endPt)) / 2.0
         
         for k1, cp in enumerate(allCP):
             # Update camera position for different views
             if viewID == 3:  # 3D view - move camera along line, keep focal point fixed
                 camera.SetPosition(cp[0], cp[1], cp[2])
                 # Keep focal point at midpoint of the line (or use original if preferred)
-                camera.SetFocalPoint(midpoint[0], midpoint[1], midpoint[2])
+                camera.SetFocalPoint(originalFocalPoint[0], originalFocalPoint[1], originalFocalPoint[2])
                 # Preserve view up vector
                 camera.SetViewUp(originalViewUp[0], originalViewUp[1], originalViewUp[2])
                 camera.Modified()

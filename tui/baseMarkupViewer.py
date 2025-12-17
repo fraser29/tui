@@ -190,7 +190,8 @@ class BaseMarkupViewer:
         try:
             if len(polyDataDict) == 1 and not FORCE_PVD_EVEN_IF_SINGLE:
                 fileOut = self.getFullFileName(fileName=featureName, prefix=prefix, extn=extn)
-                fileOut = fIO.writeVTKFile(polyDataDict[self.times[0]], fileOut)
+                polydict_times = list(polyDataDict.keys())
+                fileOut = fIO.writeVTKFile(polyDataDict[polydict_times[0]], fileOut)
             else:
                 fileOut = fIO.writeVTK_PVD_Dict(polyDataDict, 
                                     rootDir=self.getWorkingDirectory(), 
