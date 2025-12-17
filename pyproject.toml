@@ -21,7 +21,7 @@ dependencies = [
     "spydcmtk>=1.2.14",
     "ngawari",
 ]
-
+license = { file = "LICENSE" }
 
 [project.scripts]
 tui = "tui.tuiMaster:main"
