@@ -20,6 +20,8 @@ from tui.tuiUtils import dialogGetName
 
 from vtk.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor # type: ignore
 
+from PyQt5 import QtWidgets
+
 INDEX_OFFSET = 1
 
 outputWindow = vtk.vtkOutputWindow()
@@ -204,7 +206,6 @@ class BaseMarkupViewer:
     def getFileNameViaDialog(self):
         """Get filename via dialog"""
         try:
-            from PyQt5 import QtWidgets
             fileName, _ = QtWidgets.QFileDialog.getSaveFileName(
                 self, "Save File", self.getWorkingDirectory(), 
                 "VTK Files (*.vtp);;All Files (*)")
@@ -290,9 +291,9 @@ class BaseMarkupViewer:
                 windowLevel = (p2 + p98) / 2.0
                 
                 if self.VERBOSE:
-                    print(f"Optimal window level (percentile-based): window={windowWidth:.2f}, level={windowLevel:.2f}")
-                    print(f"Data range: {np.min(arrayData):.2f} to {np.max(arrayData):.2f}")
-                    print(f"Percentile range: {p2:.2f} to {p98:.2f}")
+                    print(f"baseMarkupViewer: Optimal window level (percentile-based): window={windowWidth:.2f}, level={windowLevel:.2f}")
+                    print(f"baseMarkupViewer: Data range: {np.min(arrayData):.2f} to {np.max(arrayData):.2f}")
+                    print(f"baseMarkupViewer: Percentile range: {p2:.2f} to {p98:.2f}")
                 
                 return windowWidth, windowLevel
         except Exception as e:
@@ -549,7 +550,6 @@ class BaseMarkupViewer:
     def selectWorkingDirectory(self):
         """Open directory selector and update working directory"""
         try:
-            from PyQt5 import QtWidgets
             currentDir = self.getWorkingDirectory()
             dirName = QtWidgets.QFileDialog.getExistingDirectory(
                 self, "Select Working Directory", currentDir)
@@ -816,7 +816,6 @@ class BaseMarkupViewer:
         self.graphicsViewVTK.RemoveObservers("CharEvent")
         
         # Import QtWidgets here to avoid circular imports
-        from PyQt5 import QtWidgets
         layout = QtWidgets.QVBoxLayout(graphicsView)
         layout.addWidget(self.graphicsViewVTK)
         graphicsView.setLayout(layout)
@@ -832,7 +831,6 @@ class BaseMarkupViewer:
     def showHelpWindow(self):
         """Show help window with keyboard shortcuts and interaction guide"""
         # Import here to avoid circular imports
-        from PyQt5 import QtWidgets
         
         help_window = QtWidgets.QDialog(self)
         help_window.setWindowTitle("TUI Help")

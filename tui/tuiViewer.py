@@ -206,8 +206,12 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
     # Window level methods inherited from base class
 
     def getWindowLevel(self):
-        w = self.resliceCursorWidgetArray[self.interactionView].GetRepresentation().GetWindow()
-        l = self.resliceCursorWidgetArray[self.interactionView].GetRepresentation().GetLevel()
+        if self.interactionView < 2:
+            w = self.resliceCursorWidgetArray[self.interactionView].GetRepresentation().GetWindow()
+            l = self.resliceCursorWidgetArray[self.interactionView].GetRepresentation().GetLevel()
+        else:
+            w = 255
+            l = 127.5
         return w, l
 
     def setWindowLevel(self, w, l):
