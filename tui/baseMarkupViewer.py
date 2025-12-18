@@ -600,21 +600,40 @@ class BaseMarkupViewer:
         self._setupAfterLoad()
 
     def loadVTI_or_PVD(self, fileName=None):
-        """Load VTI or PVD file"""
+        """Load VTI or PVD file
+        fileName - string or vti-dict or vti
+        """
         if self.VERBOSE:
             print('baseMarkupViewer: Load VTI')
         if not fileName:
             fileName = self._getFileViaDialog()
-        if len(fileName) > 0:
-            self.vtiDict = fIO.readImageFileToDict(fileName)
-            for iTime in self.vtiDict.keys():
-                for iName in vtkfilters.getArrayNames(self.vtiDict[iTime]):
-                    vtkfilters.setArrayDtype(self.vtiDict[iTime], iName, np.float64)
-                vtkfilters.ensureScalarsSet(self.vtiDict[iTime])
-            if self.VERBOSE:
-                print('baseMarkupViewer: Data loaded...')
+        if isinstance(fileName, dict):
+            if isinstance(list(fileName.values())[0], vtk.vtkImageData):
+                self.vtiDict = fileName
+            else:
+                raise ValueError(f"Only accepting VTI currently")
+        elif isinstance(fileName, vtk.vtkImageData):
+            self.vtiDict = {0.0: fileName}
+        elif isinstance(fileName, str):
+            if os.path.isdir(fileName):
+                self.loadDicomDir(fileName)
+                return
+            elif len(fileName) > 0:
+                self.vtiDict = fIO.readImageFileToDict(fileName)
+        else:
+            raise ValueError(f"'fileName' should be a str or a VTI obj or dict")
+        for iTime in self.vtiDict.keys():
+            for iName in vtkfilters.getArrayNames(self.vtiDict[iTime]):
+                vtkfilters.setArrayDtype(self.vtiDict[iTime], iName, np.float64)
+            vtkfilters.ensureScalarsSet(self.vtiDict[iTime])
+        if self.VERBOSE:
+            print('baseMarkupViewer: Data loaded...')
+        try:
             self.setWorkingDirectory(os.path.split(fileName)[0])
-            self._setupAfterLoad()
+        except TypeError:
+            # probably as passed a vti dict
+            self.setWorkingDirectory(os.path.expanduser('~'))
+        self._setupAfterLoad()
 
     def _setupAfterLoad(self):
         """Setup after data load - to be overridden by subclasses"""
@@ -783,7 +802,12 @@ class BaseMarkupViewer:
         """Get pixel value tuple from point ID - to be overridden by subclasses"""
         if (ptID < 0) or (ptID >= self.getCurrentVTIObject().GetNumberOfPoints()):
             return None
-        return self.getCurrentVTIObject().GetPointData().GetArray(self.currentArray).GetTuple(ptID)
+        try:
+            return self.getCurrentVTIObject().GetPointData().GetArray(self.currentArray).GetTuple(ptID)
+        except AttributeError:
+            # This is a force set to avoid a big error dump
+            arrayNames = vtkfilters.getArrayNames(self.getCurrentVTIObject())
+            self.setCurrentArray(arrayNames[0])
     
     def imageCS_To_WorldCS_X(self, imageCS_X):
         """Convert image coordinates to world coordinates - to be overridden by subclasses"""
