@@ -205,13 +205,17 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
 
     # Window level methods inherited from base class
 
-    def getWindowLevel(self):
-        if self.interactionView < 2:
-            w = self.resliceCursorWidgetArray[self.interactionView].GetRepresentation().GetWindow()
-            l = self.resliceCursorWidgetArray[self.interactionView].GetRepresentation().GetLevel()
+    def getWindowLevel(self, viewID=None):
+        if viewID is None:
+            viewID = self.interactionView
+        if viewID < 3:
+            w = self.resliceCursorWidgetArray[viewID].GetRepresentation().GetWindow()
+            l = self.resliceCursorWidgetArray[viewID].GetRepresentation().GetLevel()
         else:
             w = 255
             l = 127.5
+            if self.VERBOSE:
+                print(f"WARNING - returning default w,l = {w},{l}. ViewID={viewID}")
         return w, l
 
     def setWindowLevel(self, w, l):
@@ -736,7 +740,8 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
     def __saveImages(self, outputDir, startPt, endPt, nImages, viewID, outputPrefix='', FULL_VIEW=False, size=None):
         from PIL import Image
         fileOutList = []
-        w, l = self.getWindowLevel()
+        w, l = self.getWindowLevel(viewID)
+        print(f"Running saveImages - w={w}, l={l}")
         lowP, highP = l-(w/2.), l+(w/2.)
         imageLine = vtkfilters.buildPolyLineBetweenTwoPoints(startPt, endPt, nImages)
         allCP = vtkfilters.getPtsAsNumpy(imageLine)
