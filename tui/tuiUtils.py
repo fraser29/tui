@@ -29,9 +29,9 @@ colours = [[1.0, 0.0, 0.0],
            ]
 
 
-def dialogGetName(parent):
+def dialogGetName(parent, prompt='Enter feature name:'):
     text, ok = tuimarkupui.QtWidgets.QInputDialog.getText(parent, 'Input Dialog',
-                                          'Enter feature name:')
+                                          prompt)
     if ok:
         return str(text)
     return  ''
