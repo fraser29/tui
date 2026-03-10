@@ -388,6 +388,8 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
     # File loading methods inherited from base class
 
 
+    def polyDataToMarkups(self, polyDataDict):
+        pass
     ## -------------------------- END UI SETUP -----------------------------------
     # ==================================================================================================================
     def _setupViewerSpecificData(self):

@@ -479,6 +479,17 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
         imageCS_ijk = np.array([ijk_in_reslice[0], ijk_in_reslice[1], ijk_in_reslice[2]])
         return np.array(self.patientMeta.imageToPatientCoordinates(imageCS_ijk))
 
+
+    def worldCS_To_ImageCS_X(self, worldCS_X):
+        """Convert world coordinates to image coordinates"""
+        worldCS_X = np.array(worldCS_X)
+        ijkImage = self.patientMeta.patientToImageCoordinates(worldCS_X.reshape(1,-1))[0]
+        ijkImage = ijkImage.astype(int)
+        id2 = self.getCurrentVTIObject().ComputePointId(ijkImage)
+        xImage = self.getCurrentVTIObject().GetPoint(id2)
+        return xImage
+
+
     def getCurrentViewNormal(self): # uses view under mouse
         return np.array(self.resliceCursorWidgetArray[self.interactionView].GetResliceCursorRepresentation().GetPlaneSource().GetNormal())
 
@@ -593,6 +604,20 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
         self.cameraReset3D()
 
 
+    def polyDataToMarkups(self, polyDataDict):
+        """Convert polydata dictionary to markups - currently just points"""
+        iTimes = sorted(polyDataDict.keys())
+        if len(iTimes) == len(self.times):
+            for k1 in range(len(self.times)):
+                thisPP = polyDataDict[iTimes[k1]]
+                for iPt in vtkfilters.getPtsAsNumpy(thisPP):
+                    X_world = iPt
+                    X_image = self.worldCS_To_ImageCS_X(X_world)
+                    norm = None # Possible it exists... 
+                    self.Markups.addPoint(X_image, X_world, k1, None, norm, None, ptColour=(0.5,0,1), ptSize=0.004)
+        self._updateMarkups(ptSizeFactor=1.0)
+
+
     # ======================== RENDERING ===============================================================================
     def updateViewAfterTimeChange(self): # NEED TO TRIGGER ON A TIME CHANGE
         self.resliceCursor.SetImage(self.getCurrentVTIObject()) # FIXME - check the picker
@@ -627,7 +652,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
         for i in range(4):
             self.rendererArray[i].RemoveActor(actor)
 
-    def _updateMarkups(self, window=None, level=None):
+    def _updateMarkups(self, window=None, level=None, ptSizeFactor=1.0):
         self.clearCurrentMarkups()
         ## POINTS
         # Calculate base point size
@@ -641,8 +666,9 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
         
         # Clamp point size to reasonable range
         pointSize = max(basePointSize * 0.1, min(basePointSize * 5.0, pointSize))
+        pointSize = pointSize * ptSizeFactor
         
-        # Show lines when in spline mode, otherwise use the original logic
+        # Show lines when in spline mode, pts
         SHOW_LINES = self.splineClosed # If spline closed (but points) then show a closed line
         LOOP = self.splineClosed  # Use the spline closed setting
         tfA = [i==j for i,j in zip([1,0,0], self.getViewNormal(0))]

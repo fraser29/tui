@@ -13,7 +13,6 @@ Basic viewer for advanced image processing:
 
 import os
 import vtk
-import shutil
 
 from ngawari import fIO
 
@@ -80,30 +79,34 @@ class ImageInteractor(vtk.vtkInteractorStyleTrackballCamera):
             self.OnLeftButtonUp()
 
     def mMoveCallback(self, obj, event):
-        X = self.getXAtMouse()
-        ## - Depending on view that mouse over - enable / disable the different widgets (THIS IS NEEDED)
-        for i in range(3):
-            if i == self.parentImageViewer.interactionView:
-                self.parentImageViewer.resliceCursorWidgetArray[i].SetPriority(1.0)
-            else:
-                self.parentImageViewer.resliceCursorWidgetArray[i].SetPriority(-1.0)
-        #
-        if self.parentImageViewer.interactionView < 4:
-            try:
-                ptID = self.parentImageViewer.getPointIDAtX(X)
-                ijk = self.parentImageViewer.getIJKAtPtID(ptID)
-                pixelVal = self.parentImageViewer.getPixelValueAtPtID_tuple(ptID)
-                if len(pixelVal) > 1:
-                    pixelVal = tuiUtils.np.linalg.norm(pixelVal)
+        try:
+            X = self.getXAtMouse()
+            ## - Depending on view that mouse over - enable / disable the different widgets (THIS IS NEEDED)
+            for i in range(3):
+                if i == self.parentImageViewer.interactionView:
+                    self.parentImageViewer.resliceCursorWidgetArray[i].SetPriority(1.0)
                 else:
-                    pixelVal = pixelVal[0]
-                self.parentImageViewer.statusBar().showMessage('I: %d, J: %d, K: %d. X: %3.3f, %3.3f, %3.3f. Pixel: %d = %3.2f'%(
-                                                                ijk[0], ijk[1], ijk[2],X[0], X[1], X[2],
-                                                                ptID, pixelVal))
-            except (ValueError, TypeError): # outside image
-                self.parentImageViewer.statusBar().showMessage('I: %d, J: %d, K: %d. X: %3.3f, %3.3f, %3.3f. %s'%(
-                                                                0,0,0,0,0,0,'Outside Image'))
-        self.OnMouseMove()
+                    self.parentImageViewer.resliceCursorWidgetArray[i].SetPriority(-1.0)
+            #
+            if self.parentImageViewer.interactionView < 4:
+                try:
+                    ptID = self.parentImageViewer.getPointIDAtX(X)
+                    ijk = self.parentImageViewer.getIJKAtPtID(ptID)
+                    pixelVal = self.parentImageViewer.getPixelValueAtPtID_tuple(ptID)
+                    if len(pixelVal) > 1:
+                        pixelVal = tuiUtils.np.linalg.norm(pixelVal)
+                    else:
+                        pixelVal = pixelVal[0]
+                    self.parentImageViewer.statusBar().showMessage('I: %d, J: %d, K: %d. X: %3.3f, %3.3f, %3.3f. Pixel: %d = %3.2f'%(
+                                                                    ijk[0], ijk[1], ijk[2],X[0], X[1], X[2],
+                                                                    ptID, pixelVal))
+                except (ValueError, TypeError): # outside image
+                    self.parentImageViewer.statusBar().showMessage('I: %d, J: %d, K: %d. X: %3.3f, %3.3f, %3.3f. %s'%(
+                                                                    0,0,0,0,0,0,'Outside Image'))
+            self.OnMouseMove()
+        except Exception as e:
+            pass
+
 
     def interactorWindowLevelEndEvent(self, obj, event):
         """

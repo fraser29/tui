@@ -278,11 +278,15 @@ class BaseMarkupUI(object):
         self.actionVTK_Image = QtWidgets.QAction(BASEUI)
         self.actionVTK_Image.setObjectName("actionVTK_Image")
         
+        self.actionVTK_PolyData = QtWidgets.QAction(BASEUI)
+        self.actionVTK_PolyData.setObjectName("actionVTK_PolyData")
+        
         self.actionQuit = QtWidgets.QAction(BASEUI)
         self.actionQuit.setObjectName("actionQuit")
         
         self.menuLoad.addAction(self.actionDicom)
         self.menuLoad.addAction(self.actionVTK_Image)
+        self.menuLoad.addAction(self.actionVTK_PolyData)
         self.menuFile.addAction(self.menuLoad.menuAction())
         self.menuFile.addAction(self.actionQuit)
         self.menubar.addAction(self.menuFile.menuAction())
@@ -333,6 +337,7 @@ class BaseMarkupUI(object):
         self.menuLoad.setTitle(_translate("BASEUI", "Load"))
         self.actionDicom.setText(_translate("BASEUI", "Dicom"))
         self.actionVTK_Image.setText(_translate("BASEUI", "VTK Image"))
+        self.actionVTK_PolyData.setText(_translate("BASEUI", "VTK PolyData"))
         self.actionQuit.setText(_translate("BASEUI", "Quit"))
         self.actionQuit.setShortcut(_translate("BASEUI", "Q"))
         self.customButtonsLabel.setText(_translate("BASEUI", "Customised Buttons"))

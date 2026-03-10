@@ -690,6 +690,8 @@ class BaseMarkupViewer:
             self.actionDicom.triggered.connect(self._loadDicom)
         if hasattr(self, 'actionVTK_Image'):
             self.actionVTK_Image.triggered.connect(self.loadVTI_or_PVD)
+        if hasattr(self, 'actionVTK_PolyData'):
+            self.actionVTK_PolyData.triggered.connect(self.loadVTK_Polydata)
         
         # Animation controls
         if hasattr(self, 'playPauseButton'):
@@ -708,6 +710,25 @@ class BaseMarkupViewer:
             self.helpButton.clicked.connect(self.showHelpWindow)
 
     # MARKUP METHODS
+    def loadVTK_Polydata(self):
+        """Load VTK Polydata"""
+        fileName = self.fileDialog.getOpenFileName(self,
+                                                ("Open polydata"),
+                                                str(self.workingDirLineEdit.text()),
+                                                ("Polydata (*.vtp);;PVD(, *.pvd)"))[0]
+        if fileName:
+            polydataDict = fIO.readPVD(fileName)
+            if self.VERBOSE:
+                print(f"baseMarkupViewer: Loaded polydata: {len(polydataDict)} time points")
+            if len(polydataDict) == 0:
+                if self.VERBOSE:
+                    print(f"baseMarkupViewer: No polydata loaded")
+                return
+            else:
+                print(list(polydataDict.values())[0].GetNumberOfPoints())
+                self.polyDataToMarkups(polydataDict)
+
+
     def deleteAllMarkups(self):
         """Delete all markups"""
         self.Markups.reset()

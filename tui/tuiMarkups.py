@@ -124,8 +124,8 @@ class Markups(object):
         return len(self.markupsDict[Points][timeID])
 
 
-    def _addPoint(self, X_image, X_world, timeID, sliceID, norm=None, orientation=None):
-        self.markupsDict[Points][timeID].addPoint(X_image, X_world, norm, timeID, sliceID, orientation)
+    def _addPoint(self, X_image, X_world, timeID, sliceID, norm=None, orientation=None, ptColour=(1,0,0), ptSize=None):
+        self.markupsDict[Points][timeID].addPoint(X_image, X_world, norm, timeID, sliceID, orientation, ptColour=ptColour, ptSize=ptSize)
 
     def convertPointsToSpline(self, timeID, sliceID, orientation):
         self.markupsDict[Splines][timeID].addSpline(self.markupsDict[Points][timeID].getImage_np(), 
@@ -140,11 +140,11 @@ class Markups(object):
         self.markupsDict[Points][timeID] = MarkupPoints()
 
 
-    def addPoint(self, X_image, X_world, timeID, sliceID, norm=None, orientation=None):
+    def addPoint(self, X_image, X_world, timeID, sliceID, norm=None, orientation=None, ptColour=(1,0,0), ptSize=None):
         if self.parentImageViewer.markupMode == 'Spline':
             self._addSplinePoint(X_image, X_world, timeID, sliceID, norm, orientation)
         else:
-            self._addPoint(X_image, X_world, timeID, sliceID, norm, orientation=orientation)
+            self._addPoint(X_image, X_world, timeID, sliceID, norm, orientation=orientation, ptColour=ptColour, ptSize=ptSize)
 
     def _addSplinePoint(self, X_image, X_world, timeID, sliceID, norm=None, orientation=None):
         if self.markupsDict[Splines][timeID].isSplineOnThisSlice(sliceID):
@@ -245,9 +245,9 @@ class MarkupPoints(list):
         super(MarkupPoints, self).__init__([])
         self.lineRGB = [1, 0.5, 0.7]
 
-    def addPoint(self, X_image, X_world, norm=None, timeID=0, sliceID=0, orientation=None):
+    def addPoint(self, X_image, X_world, norm=None, timeID=0, sliceID=0, orientation=None, ptColour=(1,0,0), ptSize=None):
         # X is expected to be in image coordinates
-        point = MarkupPoint(X_image, X_world, norm=norm, timeID=timeID, sliceID=sliceID, orientation=orientation)
+        point = MarkupPoint(X_image, X_world, norm=norm, timeID=timeID, sliceID=sliceID, orientation=orientation, ptColour=ptColour, ptSize=ptSize)
         self.append(point)
 
     def removePoint(self, ID=-1):
@@ -335,19 +335,24 @@ class MarkupPoints(list):
 ### ====================================================================================================================
 ### MARKUP - POINT
 class MarkupPoint(Markup):
-    def __init__(self, X_image, x_world, norm=None, timeID=0, sliceID=0, orientation=None):
+    def __init__(self, X_image, x_world, norm=None, timeID=0, sliceID=0, orientation=None, ptColour=(1,0,0), ptSize=None):
         Markup.__init__(self, timeID, sliceID, orientation)
         self.X_image = X_image
         self.X_world = x_world
         self.norm = norm
-        self.farbe = [1,0,0]
+        self.farbe = ptColour
+        self.rad = ptSize
         # potential - hold parent
 
-    def getSphereSource_Image(self, rad=0.002):
-        Sx = vtkfilters.buildSphereSource(self.X_image, rad, res=16)
+    def getSphereSource_Image(self, ptSize=None):
+        if ptSize is None:
+            ptSize = self.rad
+        Sx = vtkfilters.buildSphereSource(self.X_image, ptSize, res=16)
         return Sx
 
-    def getPtActor(self, pointSize):
+    def getPtActor(self, pointSize=None):
+        if pointSize is None:
+            pointSize = self.rad
         ptMapper = vtk.vtkPolyDataMapper()
         ptMapper.SetInputData(self.getSphereSource_Image(pointSize))
         ptActor = vtk.vtkActor()
