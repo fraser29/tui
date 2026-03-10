@@ -403,7 +403,6 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
     def ResliceCursorCallback(self, obj, event):
         if self.interactionView == 3:  # In 3D view
             self.interactionState = None
-            # print(self.interactionView, " exiting")
             obj.GetInteractor().ExitCallback()
             return
         # Check if interaction is within current renderer's viewport
@@ -413,8 +412,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
             obj.GetInteractor().ExitCallback()
             return
         
-        if self.interactionState and self.interactionState > 4:
-            obj.GetResliceCursorRepresentation().ComputeInteractionState(x, y, 1)
+        if self.interactionState and self.interactionState >= 4:
             self._updateMarkups()
 
     def ResliceCursorEndCallback(self, obj, event):
@@ -614,7 +612,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
                     X_world = iPt
                     X_image = self.worldCS_To_ImageCS_X(X_world)
                     norm = None # Possible it exists... 
-                    self.Markups.addPoint(X_image, X_world, k1, None, norm, None, ptColour=(0.5,0,1), ptSize=0.004)
+                    self.Markups.addPoint(X_image, X_world, k1, None, norm, None, ptColour=(1,1,0), ptSize=0.014)
         self._updateMarkups(ptSizeFactor=1.0)
 
 
@@ -652,7 +650,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
         for i in range(4):
             self.rendererArray[i].RemoveActor(actor)
 
-    def _updateMarkups(self, window=None, level=None, ptSizeFactor=1.0):
+    def _updateMarkups(self, window=None, level=None, ptSizeFactor=2.0):
         self.clearCurrentMarkups()
         ## POINTS
         # Calculate base point size

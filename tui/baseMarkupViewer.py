@@ -725,7 +725,6 @@ class BaseMarkupViewer:
                     print(f"baseMarkupViewer: No polydata loaded")
                 return
             else:
-                print(list(polydataDict.values())[0].GetNumberOfPoints())
                 self.polyDataToMarkups(polydataDict)
 
 
