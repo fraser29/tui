@@ -7,6 +7,7 @@
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from .baseMarkupUI import BaseMarkupUI
+from tui import tuiUtils
 
 
 class Ui_BASEUI(BaseMarkupUI):
@@ -46,10 +47,10 @@ class Ui_BASEUI(BaseMarkupUI):
         
         self.orientationComboBox = QtWidgets.QComboBox(self.imageManipulationGroupBox)
         self.orientationComboBox.setObjectName("orientationComboBox")
-        self.orientationComboBox.addItem("Axial")
-        self.orientationComboBox.addItem("Sagittal")
-        self.orientationComboBox.addItem("Coronal")
-        self.orientationComboBox.addItem("Custom")
+        self.orientationComboBox.addItem(tuiUtils.AXIAL)
+        self.orientationComboBox.addItem(tuiUtils.SAGITTAL)
+        self.orientationComboBox.addItem(tuiUtils.CORONAL)
+        self.orientationComboBox.addItem(tuiUtils.CUSTOM)
         self.imageManipulationButtonsLayout.addWidget(self.orientationComboBox)
         
         self.imManip_A = QtWidgets.QPushButton(self.imageManipulationGroupBox)

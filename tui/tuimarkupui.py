@@ -7,6 +7,7 @@
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from .baseMarkupUI import BaseMarkupUI
+from tui import tuiUtils
 
 
 class Ui_BASEUI(BaseMarkupUI):
@@ -124,14 +125,14 @@ class Ui_BASEUI(BaseMarkupUI):
         
         # Markup controls
         self.imMarkupButton_A.setText(_translate("BASEUI", "Send slice to PIWAKAWAKA"))
-        self.imMarkupButton_B.setText(_translate("BASEUI", "Nothing"))  # TODO
+        self.imMarkupButton_B.setText(_translate("BASEUI", "Send stack to PIWAKAWAKA"))  
         self.closedSplineCheck.setText(_translate("BASEUI", "Closed loop"))
         
         # Additional controls
-        self.axialButton.setText(_translate("BASEUI", "Ax"))
+        self.axialButton.setText(_translate("BASEUI", 'AX')) # Use abbreviation as small buttons
         self.threeDButton.setText(_translate("BASEUI", "3D"))
-        self.saggitalButton.setText(_translate("BASEUI", "Sag"))
-        self.coronalButton.setText(_translate("BASEUI", "Cor"))
+        self.saggitalButton.setText(_translate("BASEUI", 'SAG'))
+        self.coronalButton.setText(_translate("BASEUI", 'COR'))
         self.gridViewButton.setText(_translate("BASEUI", "Grid"))
         self.cursor3DCheck.setText(_translate("BASEUI", "Show 3D Cursor"))
         

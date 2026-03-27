@@ -15,10 +15,8 @@ Basic viewer for advanced image processing:
 import vtk
 import os
 import numpy as np
-from ngawari import fIO
 from ngawari import vtkfilters
-import spydcmtk
-from tui import tuiMarkups, tuiStyles, tuiUtils, tuimarkupui, baseMarkupViewer
+from tui import tuiStyles, tuiUtils, tuimarkupui, baseMarkupViewer
 
 from vtk.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor # type: ignore
 
@@ -113,6 +111,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
         
         # Markup mode connections
         self.imMarkupButton_A.clicked.connect(self.currentSliceToPiwakaka)
+        self.imMarkupButton_B.clicked.connect(self.resliceStackToPiwakaka)
 
         ##
         self.updatePushButtonDict()
@@ -295,7 +294,9 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
 
     # Markup mode methods inherited from base class
     def currentSliceToPiwakaka(self):
-        """Take current reslice from Axial view and open piwakawaka instance with all time points"""
+        """Take current reslice from Axial view and open piwakawaka instance with all time points
+         - use case - markup single double-oblique slice. Fast
+        """
         try:
             # Check if we're in axial view (view 2)
             if self.interactionView != 2:
@@ -303,53 +304,39 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
                 self.setGrossFrame(2)
                 self.interactionView = 2
             
-            # Get current reslice data for all time points
-            reslice_data_dict = {}
-            
             # Get the current reslice center and normal from axial view
             current_center = self.resliceCursor.GetCenter()
             axial_normal = self.getViewNormal(2)  # Axial view normal
-            
-            # Create reslice data for all time points
-            # THIS IS WRONG - NOT SURE - NEED OT THINK
-            matrix4x4 = np.eye(4)
-            # matrixVTK4x4 = vtk.vtkMatrix4x4()
-            # resliceMatrix = self.resliceCursorWidgetArray[2].GetRepresentation().GetReslice().GetResliceAxes()
-            # patMatrix = self.patientMeta._matrix
-            # vtk_mat = vtk.vtkMatrix4x4()
-            # for i in range(4):
-            #     for j in range(4):
-            #         vtk_mat.SetElement(i, j, float(patMatrix[i, j]))
-            # # vtk.vtkMatrix4x4.Multiply4x4(resliceMatrix, vtk_mat, matrixVTK4x4)
-            # vtk.vtkMatrix4x4.Multiply4x4(vtk_mat, resliceMatrix, matrixVTK4x4)
-            # matrix4x4 = np.zeros((4, 4), dtype=float)
-            # for i in range(4):
-            #     for j in range(4):
-            #         matrix4x4[i, j] = matrixVTK4x4.GetElement(i, j)
-            # print(f"DEBUG: tuiViewer: matrix4x4: {matrix4x4}")
-            # matrix4x4[0:3, 0:2] *= -1
-            # print(f"DEBUG: tuiViewer: matrix4x4: {matrix4x4}")
-            ##
-            for time_idx, time_val in enumerate(self.times):
-                self.moveTimeSlider(time_idx)
-                # Create a reslice for this time point using the current axial slice
-                reslice = self.resliceCursorWidgetArray[2].GetRepresentation().GetReslice()
-                vtiObj = reslice.GetOutput()
-                # Store the reslice output
-                thisReslice = vtkfilters.copyData(vtiObj)
-                flipY = vtkfilters.filterFlipImageData(thisReslice, 1)
-                flipX = vtkfilters.filterFlipImageData(flipY, 0)
-                reslice_data_dict[time_val] = flipX
-            
             # Launch piwakawaka with the reslice data
-            self._launchPiwakawakaWithResliceData(reslice_data_dict, current_center, axial_normal, matrix4x4)
-            
+            self._launchPiwakawakaWithResliceData([current_center], [axial_normal])
         except Exception as e:
             print(f"tuiViewer: Error launching piwakawaka: {e}")
             import traceback
             traceback.print_exc()
 
-    def _launchPiwakawakaWithResliceData(self, reslice_data_dict, center, normal, matrix4x4):
+
+    def resliceStackToPiwakaka(self):
+        """Take current reslice from Axial view and open piwakawaka instance with all time points
+         - use case - markup single double-oblique slice. Fast
+        """
+        pass
+        # try:
+        #     # Check if we're in axial view (view 2)
+        #     if self.interactionView != 2:
+        #         # Switch to axial view first
+        #         self.setGrossFrame(2)
+        #         self.interactionView = 2
+            
+        #     # Get the current reslice center and normal from axial view
+        #     current_center = self.resliceCursor.GetCenter()
+        #     axial_normal = self.getViewNormal(2)  # Axial view normal
+        #     # Launch piwakawaka with the reslice data
+        #     self._launchPiwakawakaWithResliceData([current_center], [axial_normal])
+        # except Exception as e:
+        #     print(f"tuiViewer: Error launching piwakawaka: {e}")
+
+
+    def _launchPiwakawakaWithResliceData(self, centers_list, normals_list):
         """Launch piwakawaka instance with reslice data from all time points"""
         try:
             from tui import piwakawakaViewer, piwakawakamarkupui
@@ -360,11 +347,17 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
                 app = piwakawakamarkupui.QtWidgets.QApplication(['PIWAKAWAKA Reslice Viewer'])
             # Create piwakawaka viewer instance
             piwakawaka_viewer = piwakawakaViewer.PIWAKAWAKAMarkupViewer(VERBOSE=self.VERBOSE)
+            piwakawaka_viewer.loadVTI_or_PVD(self.vtiDict)
+            piwakawaka_viewer.setCustomSliceCentersAndNormals(centers_list, normals_list)
             piwakawaka_viewer.setWorkingDirectory(self.workingDir)
-            # Load the reslice data directly from memory
-            piwakawaka_viewer.loadResliceDataFromMemory(reslice_data_dict, center, normal, matrix4x4)
+            piwakawaka_viewer.rotateCamera90()
+            piwakawaka_viewer.rotateCamera90()
+            piwakawaka_viewer.orientationComboBox.setCurrentText("Custom")
+            if len(centers_list) == 1:
+                piwakawaka_viewer.orientationComboBox.setEnabled(False)
+
             if self.VERBOSE:
-                print(f"tuiViewer: Launched piwakawaka with reslice data from {len(reslice_data_dict)} time points")
+                print(f"tuiViewer: Launched piwakawaka with reslice data from {len(self.times)} time points")
             
         except Exception as e:
             print(f"tuiViewer: Error in _launchPiwakawakaWithResliceData: {e}")

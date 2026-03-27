@@ -14,9 +14,14 @@ from tui import tuimarkupui
 
 import numpy as np
 import vtk
+from ngawari import vtkfilters, ftk
 colors = vtk.vtkNamedColors()
 
 
+
+# ==========================================================
+#   CONSTANTS
+# ==========================================================
 colours = [[1.0, 0.0, 0.0],
            [1.0, 1.0, 0.0],
            [1.0, 0.0, 1.0],
@@ -28,7 +33,15 @@ colours = [[1.0, 0.0, 0.0],
            [0.5, 0.0, 0.5],
            ]
 
+AXIAL = 'AXIAL'
+CORONAL = 'CORONAL'
+SAGITTAL = 'SAGITTAL'
+CUSTOM = 'Custom'
 
+
+# ==========================================================
+#   DIALOG FUNCTIONS
+# ==========================================================
 def dialogGetName(parent, prompt='Enter feature name:'):
     text, ok = tuimarkupui.QtWidgets.QInputDialog.getText(parent, 'Input Dialog',
                                           prompt)
@@ -60,6 +73,9 @@ def getApp(appName):
     return app
 
 
+# ==========================================================
+#   COLOR MAP FUNCTIONS
+# ==========================================================
 def buildColorMap(scalarRange, imageReslice):
     table = vtk.vtkLookupTable()
     table.SetRange(scalarRange[0], scalarRange[1])  # image intensity range
@@ -74,6 +90,9 @@ def buildColorMap(scalarRange, imageReslice):
     return colorM
 
 
+# ==========================================================
+#   RENDER FUNCTIONS
+# ==========================================================
 def renderPolyData3D(actorsList):
     ren = vtk.vtkRenderer()
     renWin = vtk.vtkRenderWindow()
@@ -137,6 +156,9 @@ def renderVolume3D(vtiObj):
     return ren1
 
 
+# ==========================================================
+#   IMAGE FUNCTIONS
+# ==========================================================
 def imageX_2_PointID(imageData, X):
     ptID = imageData.FindPoint(X)
     if ptID < 0:
@@ -158,6 +180,9 @@ def imageID_2_IJK(imageData, ID):
     return np.unravel_index(ID, shape=imageData.GetDimensions(), order='F')
 
 
+# ==========================================================
+#   POLYDATA FUNCTIONS
+# ==========================================================
 def polydataFromX(X):
     myVtkPoints = vtk.vtkPoints()
     vertices = vtk.vtkCellArray()
@@ -170,6 +195,9 @@ def polydataFromX(X):
     return polyData
 
 
+# ==========================================================
+#   SHOW NEW 3D WINDOW FUNCTIONS
+# ==========================================================
 def showNew3DWindow(listOfPolyData, listOfRGB=[]):
     renderer = vtk.vtkRenderer()
     renwin = vtk.vtkRenderWindow()
@@ -199,5 +227,82 @@ def showNew3DWindow(listOfPolyData, listOfRGB=[]):
     renwin.Render()
     interactor.Start()
 
+
+
+# ======================================================================================================================
+#   -- HELPERS --
+# ======================================================================================================================
+
+# ==========================================================
+#   ORIENTATION MATRIX FUNCTIONS
+# ==========================================================
+def _getOrientationMatrix(ORIENTATION, center):
+    ''' Matrices for axial, coronal, sagittal
+    '''
+    if ORIENTATION == AXIAL:
+        mat = vtk.vtkMatrix4x4()
+        mat.DeepCopy((1, 0, 0, center[0],
+                        0, 1, 0, center[1],
+                        0, 0, 1, center[2],
+                        0, 0, 0, 1))
+        # mat.DeepCopy((-1, 0, 0, center[0],
+        #                 0, -1, 0, center[1],
+        #                 0, 0, 1, center[2],
+        #                 0, 0, 0, 1))
+    elif ORIENTATION == CORONAL:
+        mat = vtk.vtkMatrix4x4()
+        mat.DeepCopy((1, 0, 0, center[0],
+                          0, 0, 1, center[1],
+                          0, -1, 0, center[2],
+                          0, 0, 0, 1))
+    elif ORIENTATION == SAGITTAL:
+        mat = vtk.vtkMatrix4x4()
+        mat.DeepCopy((0, 0,-1, center[0],
+                           1, 0, 0, center[1],
+                           0, -1, 0, center[2],
+                           0, 0, 0, 1))
+    return mat
+
+
+# ==========================================================
+#   RESLICE FUNCTIONS
+# ==========================================================
+def defineReslice(vtiObj, ORIENTATION, center, normalVector=None, guidingVector=None, slabNumberOfSlices=2):
+    # Extract a slice in the desired orientation
+    vtkfilters.ensureScalarsSet(vtiObj, possibleName='MRA')
+    reslice = vtk.vtkImageReslice()
+    reslice.SetInputData(vtiObj)
+    reslice.SetOutputDimensionality(2)
+    if normalVector is not None:
+        if guidingVector is None:
+            if (abs(normalVector[0]) >= abs(normalVector[1])):
+                factor = 1.0 / np.sqrt(normalVector[0] * normalVector[0] + normalVector[2] * normalVector[2])
+                u0 = -normalVector[2] * factor
+                u1 = 0.0
+                u2 = normalVector[0] * factor
+            else:
+                factor = 1.0 / np.sqrt(normalVector[1] * normalVector[1] + normalVector[2] * normalVector[2])
+                u0 = 0.0
+                u1 = normalVector[2] * factor
+                u2 = -normalVector[1] * factor
+            u = np.array([u0, u1, u2])
+        else:
+            u = ftk.getVectorComponentNormalToRefVec(guidingVector, normalVector)
+            if np.isnan(u[0]):
+                u = guidingVector
+            u = u / np.linalg.norm(u)
+        v = np.cross(normalVector, u)
+        reslice.SetResliceAxesDirectionCosines(u, v, normalVector)
+        reslice.SetResliceAxesOrigin(center)
+    else:
+        reslice.SetResliceAxes(_getOrientationMatrix(ORIENTATION, center))
+
+    # reslice.SetInterpolationModeToLinear()
+    reslice.SetInterpolationModeToNearestNeighbor()
+    # reslice.SetInterpolationModeToCubic()
+    reslice.SetSlabNumberOfSlices(slabNumberOfSlices)
+    reslice.SetSlabModeToMax()
+    reslice.Update()
+    return reslice
 
 

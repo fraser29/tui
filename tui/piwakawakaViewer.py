@@ -15,8 +15,8 @@ Basic viewer for advanced image processing:
 import vtk
 import os
 import numpy as np
-from ngawari import vtkfilters, ftk
-from tui import piwakawakamarkupui, piwakawakaStyles, baseMarkupViewer
+from ngawari import vtkfilters
+from tui import piwakawakamarkupui, piwakawakaStyles, baseMarkupViewer, tuiUtils
 import scipy.interpolate as interpolate
 
 from vtk.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor # type: ignore
@@ -28,77 +28,6 @@ outputWindow.SetGlobalWarningDisplay(0)
 vtk.vtkObject.SetGlobalWarningDisplay(0)
 vtk.vtkLogger.SetStderrVerbosity(vtk.vtkLogger.VERBOSITY_ERROR)
 
-
-
-# ======================================================================================================================
-#   -- HELPERS --
-# ======================================================================================================================
-
-def _defineReslice(vtiObj, ORIENTATION, center, normalVector=None, guidingVector=None, slabNumberOfSlices=2):
-    # Extract a slice in the desired orientation
-    vtkfilters.ensureScalarsSet(vtiObj, possibleName='MRA')
-    reslice = vtk.vtkImageReslice()
-    reslice.SetInputData(vtiObj)
-    reslice.SetOutputDimensionality(2)
-    if normalVector is not None:
-        if guidingVector is None:
-            if (abs(normalVector[0]) >= abs(normalVector[1])):
-                factor = 1.0 / np.sqrt(normalVector[0] * normalVector[0] + normalVector[2] * normalVector[2])
-                u0 = -normalVector[2] * factor
-                u1 = 0.0
-                u2 = normalVector[0] * factor
-            else:
-                factor = 1.0 / np.sqrt(normalVector[1] * normalVector[1] + normalVector[2] * normalVector[2])
-                u0 = 0.0
-                u1 = normalVector[2] * factor
-                u2 = -normalVector[1] * factor
-            u = np.array([u0, u1, u2])
-        else:
-            u = ftk.getVectorComponentNormalToRefVec(guidingVector, normalVector)
-            if np.isnan(u[0]):
-                u = guidingVector
-            u = u / np.linalg.norm(u)
-        v = np.cross(normalVector, u)
-        reslice.SetResliceAxesDirectionCosines(u, v, normalVector)
-        reslice.SetResliceAxesOrigin(center)
-    else:
-        reslice.SetResliceAxes(_getOrientationMatrix(ORIENTATION, center))
-
-    # reslice.SetInterpolationModeToLinear()
-    reslice.SetInterpolationModeToNearestNeighbor()
-    # reslice.SetInterpolationModeToCubic()
-    reslice.SetSlabNumberOfSlices(slabNumberOfSlices)
-    reslice.SetSlabModeToMax()
-    reslice.Update()
-    return reslice
-
-
-def _getOrientationMatrix(ORIENTATION, center):
-    ''' Matrices for axial, coronal, sagittal
-    '''
-    if ORIENTATION == 'AXIAL':
-        mat = vtk.vtkMatrix4x4()
-        mat.DeepCopy((1, 0, 0, center[0],
-                        0, 1, 0, center[1],
-                        0, 0, 1, center[2],
-                        0, 0, 0, 1))
-        # mat.DeepCopy((-1, 0, 0, center[0],
-        #                 0, -1, 0, center[1],
-        #                 0, 0, 1, center[2],
-        #                 0, 0, 0, 1))
-    elif ORIENTATION == 'CORONAL':
-        mat = vtk.vtkMatrix4x4()
-        mat.DeepCopy((1, 0, 0, center[0],
-                          0, 0, 1, center[1],
-                          0, -1, 0, center[2],
-                          0, 0, 0, 1))
-    elif ORIENTATION == 'SAGITTAL':
-        mat = vtk.vtkMatrix4x4()
-        mat.DeepCopy((0, 0,-1, center[0],
-                           1, 0, 0, center[1],
-                           0, -1, 0, center[2],
-                           0, 0, 0, 1))
-    return mat
 
 # ======================================================================================================================
 #   -- MAIN CLASS --
@@ -119,7 +48,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         # 2D-specific defaults
         self.currentSliceID = 0
         self.maxSliceID = 0
-        self.sliceOrientation = 'AXIAL'  # 'AXIAL', 'CORONAL', 'SAGITTAL'
+        self.sliceOrientation = tuiUtils.AXIAL  # 'AXIAL', 'CORONAL', 'SAGITTAL'
         self.resliceDict = {}  # Dictionary: {timestep: [list of reslices]}
         self.sliceCenters = []  # List of center points for slices
         self.sliceNormals = []  # List of normal vectors for slices
@@ -311,7 +240,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
 
     def orientationChanged(self, orientation):
         """Handle orientation change from dropdown"""
-        if orientation == "Custom":
+        if orientation == tuiUtils.CUSTOM:
             # For custom, we'll use the current custom slices if they exist, otherwise default to axial
             if hasattr(self, 'customSliceCenters') and hasattr(self, 'customSliceNormals'):
                 if len(self.customSliceCenters) > 0 and len(self.customSliceNormals) > 0:
@@ -320,14 +249,14 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
                         print(f"Using custom slices: {len(self.customSliceCenters)} slices")
                     return
             # If no custom slices defined, fall back to axial
-            orientation = "Axial"
-            self.orientationComboBox.setCurrentText("Axial")
+            orientation = tuiUtils.AXIAL
+            self.orientationComboBox.setCurrentText(orientation)
         
         # Convert title case to uppercase for the method
         orientation_upper = orientation.upper()
         
         # Set the orientation and rebuild everything
-        if orientation_upper in ['AXIAL', 'CORONAL', 'SAGITTAL']:
+        if orientation_upper in [tuiUtils.AXIAL, tuiUtils.CORONAL, tuiUtils.SAGITTAL]:
             self.sliceOrientation = orientation_upper
             self.buildResliceDictionary(orientation=orientation_upper)
             
@@ -354,34 +283,14 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.customSliceNormals = normals
         
         # If currently in custom mode, update the slices
-        if self.orientationComboBox.currentText() == "Custom":
-            self.setCustomSlices(centers, normals)
+        # if self.orientationComboBox.currentText() == "Custom":
+        self.setCustomSlices(centers, normals)
         
         if self.VERBOSE:
             print(f"Set custom slice data: {len(centers)} centers and {len(normals)} normals")
             print(f"piwakawakaViewer: Set custom slice centers and normals: 0={centers[0]}")
             print(f"piwakawakaViewer: Set custom slice normals: 0={normals[0]}")
 
-    def loadResliceDataFromMemory(self, reslice_data_dict, center, normal, matrix4x4):
-        """Load reslice data directly from memory instead of from files
-        
-        Args:
-            reslice_data_dict: Dictionary with time values as keys and vtkImageData as values
-            center: Center point of the reslice
-            normal: Normal vector of the reslice
-        """
-        if self.VERBOSE:
-            print(f"piwakawakaViewer: Loading reslice data from memory: {len(reslice_data_dict)} time points")
-        
-        self.vtiDict = reslice_data_dict.copy()
-        self.times = sorted(reslice_data_dict.keys())
-        
-        # Use existing method to set custom slice parameters
-        self.setCustomSliceCentersAndNormals([center], [normal])
-        
-        self._setupAfterLoad()
-        # OVERWRITE PATIENT METADATA WITH THE ONE FROM THE TUI VIEWER
-        self.patientMeta._matrix = matrix4x4
 
     # Array selection methods inherited from base class
 
@@ -395,7 +304,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
     def _setupViewerSpecificData(self):
         """2D-specific setup after data load"""
         # Set default orientation to Axial
-        self.orientationComboBox.setCurrentText("Axial")
+        self.orientationComboBox.setCurrentText(tuiUtils.AXIAL)
         
         # Get image dimensions and build reslice dictionary BEFORE setting up image data
         ii = list(self.vtiDict.values())[0]
@@ -403,11 +312,11 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         ii.GetDimensions(dims)
         
         # Set max slice ID based on orientation
-        if self.sliceOrientation == 'AXIAL':
+        if self.sliceOrientation == tuiUtils.AXIAL:
             self.maxSliceID = dims[2] - 1
-        elif self.sliceOrientation == 'CORONAL':
+        elif self.sliceOrientation == tuiUtils.CORONAL:
             self.maxSliceID = dims[1] - 1
-        elif self.sliceOrientation == 'SAGITTAL':
+        elif self.sliceOrientation == tuiUtils.SAGITTAL:
             self.maxSliceID = dims[0] - 1
         
         # Build reslice dictionary with default orientation
@@ -458,19 +367,19 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
             self.maxSliceID = len(customCenters) - 1
         else:
             # Generate default slices based on orientation
-            if orientation == 'AXIAL':
+            if orientation == tuiUtils.AXIAL:
                 self.maxSliceID = dims[2] - 1
                 for k in range(dims[2]):
                     sliceCenter = [center[0], center[1], origin[2] + k * spacing[2]]
                     self.sliceCenters.append(sliceCenter)
                     self.sliceNormals.append([0, 0, 1])
-            elif orientation == 'CORONAL':
+            elif orientation == tuiUtils.CORONAL:
                 self.maxSliceID = dims[1] - 1
                 for j in range(dims[1]):
                     sliceCenter = [center[0], origin[1] + j * spacing[1], center[2]]
                     self.sliceCenters.append(sliceCenter)
                     self.sliceNormals.append([0, 1, 0])
-            elif orientation == 'SAGITTAL':
+            elif orientation == tuiUtils.SAGITTAL:
                 self.maxSliceID = dims[0] - 1
                 for i in range(dims[0]):
                     sliceCenter = [origin[0] + i * spacing[0], center[1], center[2]]
@@ -483,7 +392,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
             resliceList = []
             
             for i, (sliceCenter, sliceNormal) in enumerate(zip(self.sliceCenters, self.sliceNormals)):
-                reslice = _defineReslice(vtiObj, orientation, sliceCenter, normalVector=sliceNormal)
+                reslice = tuiUtils.defineReslice(vtiObj, orientation, sliceCenter, normalVector=sliceNormal)
                 resliceList.append(reslice)
             
             self.resliceDict[timeStep] = resliceList
@@ -492,7 +401,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
     
     def setSliceOrientation(self, orientation):
         """Change the slice orientation and rebuild reslice dictionary"""
-        if orientation in ['AXIAL', 'CORONAL', 'SAGITTAL']:
+        if orientation in [tuiUtils.AXIAL, tuiUtils.CORONAL, tuiUtils.SAGITTAL]:
             self.sliceOrientation = orientation
             self.buildResliceDictionary(orientation=orientation)
             

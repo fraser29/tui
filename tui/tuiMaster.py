@@ -38,8 +38,9 @@ class _TUIProj(object):
         elif inputPath.lower().endswith('.dcm'): # DICOM file
             srcDir = os.path.split(inputPath)[0]
             self.ex.loadDicomDir(inputPath)
-        else: # VTI or PVD file
-            srcDir = os.path.split(inputPath)[0]
+        else: # VTI or PVD file or VTI-DICT
+            if isinstance(inputPath, str):
+                srcDir = os.path.split(inputPath)[0]
             self.ex.loadVTI_or_PVD(inputPath)
 
         if workDir is None:
