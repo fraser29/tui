@@ -319,21 +319,32 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
         """Take current reslice from Axial view and open piwakawaka instance with all time points
          - use case - markup single double-oblique slice. Fast
         """
-        pass
-        # try:
-        #     # Check if we're in axial view (view 2)
-        #     if self.interactionView != 2:
-        #         # Switch to axial view first
-        #         self.setGrossFrame(2)
-        #         self.interactionView = 2
+        try:
+            # Check if we're in axial view (view 2)
+            if self.interactionView != 2:
+                # Switch to axial view first
+                self.setGrossFrame(2)
+                self.interactionView = 2
             
-        #     # Get the current reslice center and normal from axial view
-        #     current_center = self.resliceCursor.GetCenter()
-        #     axial_normal = self.getViewNormal(2)  # Axial view normal
-        #     # Launch piwakawaka with the reslice data
-        #     self._launchPiwakawakaWithResliceData([current_center], [axial_normal])
-        # except Exception as e:
-        #     print(f"tuiViewer: Error launching piwakawaka: {e}")
+            # Get the current reslice center and normal from axial view
+            bounds = self.getCurrentVTIObject().GetBounds()
+            bound_max = max([bounds[1]-bounds[0], bounds[3]-bounds[2], bounds[5]-bounds[4]])
+            spacing = np.mean(self.getCurrentVTIObject().GetSpacing())
+            axial_normal = self.getViewNormal(2)  # Axial view normal
+            axial_normal_np = np.array(axial_normal)
+            center_image = np.array(self.getCurrentVTIObject().GetCenter())
+            oo = center_image - (0.5*bound_max) * axial_normal_np
+            nSlice = int(bound_max / spacing)
+            centers = []
+            normals = []
+            for i in range(nSlice):
+                center = [oo + axial_normal_np * spacing * i]
+                centers.append(center[0])
+                normals.append(axial_normal)
+            # Launch piwakawaka with the reslice data
+            self._launchPiwakawakaWithResliceData(centers, normals)
+        except Exception as e:
+            print(f"tuiViewer: Error launching piwakawaka: {e}")
 
 
     def _launchPiwakawakaWithResliceData(self, centers_list, normals_list):
