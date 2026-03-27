@@ -1,8 +1,11 @@
+import logging
 import os
 import vtk
 
 from ngawari import fIO
 from ngawari import vtkfilters
+
+logger = logging.getLogger(__name__)
 
 
 ### ====================================================================================================================
@@ -90,19 +93,18 @@ class SinglePaneImageInteractor(vtk.vtkInteractorStyleImage):
         key = self.GetInteractor().GetKeyCode()
         keySym = self.GetInteractor().GetKeySym()
         if key == "h":
-            print(' . = add point (or spline point if in spline mode)')
-            print(' u = remove last point')
-            print(' f = finish current spline (spline mode only)')
-            print(' x = cancel current spline (spline mode only)')
-            print(' r = reset view')
-            print(' R = reset view and window level')
-            print(' m = print patient meta')
-            print(' p = save screenshot')
-            print(' W = write all markups as points_%time.vtp')
-            print(' w = reset window level')
-            print(' V = toggle verbose mode')
-            print(' Use UI controls to switch between Point and Spline modes')
-            print('pressed help (%s)'%(key))
+            logger.info(' . = add point (or spline point if in spline mode)')
+            logger.info(' u = remove last point')
+            logger.info(' f = finish current spline (spline mode only)')
+            logger.info(' x = cancel current spline (spline mode only)')
+            logger.info(' r = reset view')
+            logger.info(' R = reset view and window level')
+            logger.info(' m = print patient meta')
+            logger.info(' p = save screenshot')
+            logger.info(' W = write all markups as points_%%time.vtp')
+            logger.info(' w = reset window level')
+            logger.info(' Use UI controls to switch between Point and Spline modes')
+            logger.info('pressed help (%s)', key)
         elif key == ".":
             X = self.getXAtMouse()
             norm = self.parentImageViewer.getCurrentViewNormal()
@@ -122,7 +124,7 @@ class SinglePaneImageInteractor(vtk.vtkInteractorStyleImage):
         elif key == "r":
             self.parentImageViewer.cameraReset()
         elif key == "m":
-            print(self.parentImageViewer.patientMeta)
+            logger.info("%s", self.parentImageViewer.patientMeta)
         elif key == "p": # SCREENSHOT
             ffOut = os.path.join(self.parentImageViewer.workingDirLineEdit.text(), 'screenshot.png')
             windowToImageFilter = vtk.vtkWindowToImageFilter()
@@ -133,13 +135,14 @@ class SinglePaneImageInteractor(vtk.vtkInteractorStyleImage):
             writer.SetFileName(ffOut)
             writer.SetInputConnection(windowToImageFilter.GetOutputPort())
             writer.Write()
-            print(f"Screenshot saved to {ffOut}")
+            logger.info("Screenshot saved to %s", ffOut)
         elif key == "W":
             ## WRITE OUT MARKUPS
             allMarkupPointsThisTime = self.parentImageViewer.Markups.getAllPointsForTime(self.parentImageViewer.currentTimeID)
             if len(allMarkupPointsThisTime) > 0:
                 pointsPP = vtkfilters.buildPolydataFromXYZ([i.xyz for i in allMarkupPointsThisTime])
-                print(fIO.writeVTKFile(pointsPP, os.path.join(self.parentImageViewer.workingDirLineEdit.text(), 'points_%d.vtp'%(self.parentImageViewer.currentTimeID))))
+                fOut = fIO.writeVTKFile(pointsPP, os.path.join(self.parentImageViewer.workingDirLineEdit.text(), 'points_%d.vtp'%(self.parentImageViewer.currentTimeID)))
+                logger.info("Written markups to %s", fOut)
         elif key == "c":
             val = input("Give the contour level")
             try:
@@ -149,12 +152,11 @@ class SinglePaneImageInteractor(vtk.vtkInteractorStyleImage):
                 pass
         elif key == "w":
             w,l = self.parentImageViewer.getWindowLevel()
-            print(f"Old window level: {w}, {l}")
+            logger.info("Old window level: %s, %s", w, l)
             self.parentImageViewer.resetWindowLevel()
-            print(f"New window level: {w}, {l}")
-        elif key == "V":
-            self.parentImageViewer.VERBOSE = not self.parentImageViewer.VERBOSE
-            print(f"VERBOSE mode is now {self.parentImageViewer.VERBOSE}")
+            w,l = self.parentImageViewer.getWindowLevel()
+            logger.info("New window level: %s, %s", w, l)
+
 
         elif keySym == 'Left':
             # Previous time step

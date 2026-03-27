@@ -13,7 +13,6 @@ KEYBOARD SHORTCUTS:
 • r - Reset view
 • p - Save screenshot
 • w - Reset window level
-• V - Toggle verbose mode
 
 ARROW KEY NAVIGATION:
 • Left Arrow - Previous time step

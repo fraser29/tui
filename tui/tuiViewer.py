@@ -12,11 +12,14 @@ Basic viewer for advanced image processing:
 
 
 # import argparse
+import logging
 import vtk
 import os
 import numpy as np
 from ngawari import vtkfilters
 from tui import tuiStyles, tuiUtils, tuimarkupui, baseMarkupViewer
+
+logger = logging.getLogger(__name__)
 
 from vtk.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor # type: ignore
 
@@ -41,7 +44,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
         super(TUIMarkupViewer, self).__init__()
         self.setupUi(self)
         # Initialize base class
-        baseMarkupViewer.BaseMarkupViewer.__init__(self, VERBOSE=False)
+        baseMarkupViewer.BaseMarkupViewer.__init__(self)
         
         # 3D-specific defaults
         self.currentSliceID = 0
@@ -213,24 +216,21 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
         else:
             w = 255
             l = 127.5
-            if self.VERBOSE:
-                print(f"WARNING - returning default w,l = {w},{l}. ViewID={viewID}")
+            logger.warning("Returning default w,l = %s,%s. ViewID=%s", w, l, viewID)
         return w, l
 
     def setWindowLevel(self, w, l):
-        if self.VERBOSE:
-            old_w, old_l = self.getWindowLevel()
-            print(f"tuiViewer: SetWindowLevel: Old window level: window={old_w:.2f}, level={old_l:.2f}")
-            print(f"tuiViewer: SetWindowLevel: Change to: window={w:.2f}, level={l:.2f}")
+        old_w, old_l = self.getWindowLevel()
+        logger.info("SetWindowLevel: Old window level: window=%.2f, level=%.2f", old_w, old_l)
+        logger.info("SetWindowLevel: Change to: window=%.2f, level=%.2f", w, l)
         for i in range(1,3):
             resA = self.resliceCursorWidgetArray[i].GetRepresentation().SetWindowLevel(w, l)
         for i in range(1,3):
             resB = self.resliceCursorWidgetArray[i].GetRepresentation().SetLookupTable(self.resliceCursorWidgetArray[0].GetRepresentation().GetLookupTable())
         self.renderWindow.Render()
-        if self.VERBOSE:
-            new_w, new_l = self.getWindowLevel()
-            print(f"tuiViewer: SetWindowLevel: New window level: window={new_w:.2f}, level={new_l:.2f}")
-            print(f"tuiViewer: SetWindowLevel: resA={resA}, resB={resB}")
+        new_w, new_l = self.getWindowLevel()
+        logger.info("SetWindowLevel: New window level: window=%.2f, level=%.2f", new_w, new_l)
+        logger.info("SetWindowLevel: resA=%s, resB=%s", resA, resB)
 
 
 
@@ -310,9 +310,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
             # Launch piwakawaka with the reslice data
             self._launchPiwakawakaWithResliceData([current_center], [axial_normal])
         except Exception as e:
-            print(f"tuiViewer: Error launching piwakawaka: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error("Error launching piwakawaka: %s", e, exc_info=True)
 
 
     def resliceStackToPiwakaka(self):
@@ -344,7 +342,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
             # Launch piwakawaka with the reslice data
             self._launchPiwakawakaWithResliceData(centers, normals)
         except Exception as e:
-            print(f"tuiViewer: Error launching piwakawaka: {e}")
+            logger.error("Error launching piwakawaka: %s", e, exc_info=True)
 
 
     def _launchPiwakawakaWithResliceData(self, centers_list, normals_list):
@@ -357,7 +355,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
             if app is None:
                 app = piwakawakamarkupui.QtWidgets.QApplication(['PIWAKAWAKA Reslice Viewer'])
             # Create piwakawaka viewer instance
-            piwakawaka_viewer = piwakawakaViewer.PIWAKAWAKAMarkupViewer(VERBOSE=self.VERBOSE)
+            piwakawaka_viewer = piwakawakaViewer.PIWAKAWAKAMarkupViewer()
             piwakawaka_viewer.loadVTI_or_PVD(self.vtiDict)
             piwakawaka_viewer.setCustomSliceCentersAndNormals(centers_list, normals_list)
             piwakawaka_viewer.setWorkingDirectory(self.workingDir)
@@ -367,13 +365,10 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
             if len(centers_list) == 1:
                 piwakawaka_viewer.orientationComboBox.setEnabled(False)
 
-            if self.VERBOSE:
-                print(f"tuiViewer: Launched piwakawaka with reslice data from {len(self.times)} time points")
+            logger.info("Launched piwakawaka with reslice data from %d time points", len(self.times))
             
         except Exception as e:
-            print(f"tuiViewer: Error in _launchPiwakawakaWithResliceData: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error("Error in _launchPiwakawakaWithResliceData: %s", e, exc_info=True)
     
 
     # Array selection methods inherited from base class
@@ -587,18 +582,15 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
         self.getCurrentVTIObject().GetDimensions(dims)
         try:
             if np.prod(dims) < 60e+6: # For very large data - don't want to do this
-                if self.VERBOSE:
-                    print(f"tuiViewer: Working with current array: {self.currentArray}")
+                logger.info("Working with current array: %s", self.currentArray)
                 A = vtkfilters.getArrayAsNumpy(self.getCurrentVTIObject(), self.currentArray)
                 A[np.isnan(A)] = 0.0
                 A = A[A>1.0]
                 contourVal = np.mean(A) * 2.0
-                if self.VERBOSE:
-                    print(f"tuiViewer: Made contour at value: {int(contourVal)}")
+                logger.info("Made contour at value: %d", int(contourVal))
                 self.setContourVal(contourVal)
         except Exception as e:
-            if self.VERBOSE:
-                print(f"tuiViewer: Error setting contour value: {e}")
+            logger.error("Error setting contour value: %s", e)
         ##
         # Render
         self.__frameReset()
@@ -711,8 +703,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
         ## SPLINE - splines disabled in TUI
         # self.Markups.showSplines_timeID_CP(self.currentTimeID, self.resliceCursor.GetCenter(), self.getViewNormal(2), pointSize*0.9)
         if (window is not None) and (level is not None):
-            if self.VERBOSE:
-                print(f"tuiViewer: UpdateMarkups: Setting window level: window={window:.2f}, level={level:.2f}")
+            logger.info("UpdateMarkups: Setting window level: window=%.2f, level=%.2f", window, level)
             self.setWindowLevel(window, level)
         self.renderWindow.Render()
 
@@ -769,7 +760,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
         from PIL import Image
         fileOutList = []
         w, l = self.getWindowLevel(viewID)
-        print(f"Running saveImages - w={w}, l={l}")
+        logger.info("Running saveImages - w=%s, l=%s", w, l)
         lowP, highP = l-(w/2.), l+(w/2.)
         imageLine = vtkfilters.buildPolyLineBetweenTwoPoints(startPt, endPt, nImages)
         allCP = vtkfilters.getPtsAsNumpy(imageLine)
@@ -843,7 +834,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
 
 ### ====================================================================================================================
 def dummyModButtonAction():
-    print('Nothing implemented')
+    logger.info("Nothing implemented")
 
 
 def probeData(vtkObj, probeLocation, arrayName):

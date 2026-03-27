@@ -11,6 +11,7 @@ Super classes for customised use of tui viewer.
 
 import sys
 import os
+import logging
 import argparse
 from ngawari import fIO
 from ngawari import vtkfilters
@@ -19,6 +20,9 @@ from tui import tuiViewer
 from tui import tuimarkupui
 from tui import piwakawakamarkupui
 from tui import piwakawakaViewer
+import tui as _tui_pkg
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -50,8 +54,7 @@ class _TUIProj(object):
                 workDir = os.getcwd()
         
         self.ex.setWorkingDirectory(workDir)
-        if self.ex.VERBOSE:
-            print("WORK-DIR set to :", workDir)
+        logger.info("WORK-DIR set to: %s", workDir)
         if scalar is not None:
             self.ex.setCurrentArray(scalar) # Example to set shown array (else take scalar)
 
@@ -96,16 +99,15 @@ class TUIProject(_TUIProj):
         mask = my_segmentation_from_landmarks(landmarks)
 
     """
-    def __init__(self, app=None, VERBOSE=False):
+    def __init__(self, app=None):
         if app is None:
             app = tuimarkupui.QtWidgets.QApplication(['TUI Image Viewer'])
         super().__init__(app)
         self.ex = tuiViewer.TUIMarkupViewer()
-        self.ex.VERBOSE = VERBOSE
-        
+        logger.info("TUIProject initialized")
 
     def alignBy_X_Norm(self, X, Norm):
-        print(f"This is centering but not aligning. ")
+        logger.info("This is centering but not aligning.")
         norm0 = Norm / vtkfilters.np.linalg.norm(Norm)
         norm1, norm2 = [0, 0, 0], [0, 0, 0]
         vtkfilters.vtk.vtkMath.Perpendiculars(norm0, norm1, norm2, 0.3)
@@ -126,8 +128,11 @@ class TUIProject(_TUIProj):
         self.ex.resliceCursor.SetZAxis(norm2[0], norm2[1], norm2[2])
         self.ex.resliceCursor.Update()
         self.ex.renderWindow.Render()
-        print(norm0, norm1, norm2, self.ex.getViewNormal(0))
-        print(self.ex.resliceCursor.GetXAxis(), self.ex.resliceCursor.GetYAxis(), self.ex.resliceCursor.GetZAxis())
+        logger.info("Norms: %s %s %s viewNormal=%s", norm0, norm1, norm2, self.ex.getViewNormal(0))
+        logger.info("Cursor axes: X=%s Y=%s Z=%s",
+                    self.ex.resliceCursor.GetXAxis(),
+                    self.ex.resliceCursor.GetYAxis(),
+                    self.ex.resliceCursor.GetZAxis())
 
 
 
@@ -138,12 +143,12 @@ class TUI2DProject(_TUIProj):
     TUI2DProject super class.
 
     """
-    def __init__(self, app=None, VERBOSE=False):
+    def __init__(self, app=None):
         if app is None:
             app = piwakawakamarkupui.QtWidgets.QApplication(['PIWAKAWAKA Image Viewer'])
         super().__init__(app)
         self.ex = piwakawakaViewer.PIWAKAWAKAMarkupViewer()
-        self.ex.VERBOSE = VERBOSE
+        logger.info("TUI2DProject initialized")
 
 
 
@@ -161,8 +166,9 @@ class TUIBasic(TUIProject):
     Basic TUI for project based work. 
     Illustrates basic setup and modification of push buttons.
     """
-    def __init__(self, app=None, VERBOSE=False):
-        TUIProject.__init__(self, app, VERBOSE)
+    def __init__(self, app=None):
+        TUIProject.__init__(self, app)
+        logger.info("TUIBasic initialized")
         self.pushButtonDict = {}
 
 
@@ -180,23 +186,21 @@ class TUIBasic(TUIProject):
 
     def saveVOI_(self):
         fOut = self.ex.saveVOI()
-        if (fOut is not None) and self.ex.VERBOSE:
-            print(f"Written VOI to {fOut}")
+        if fOut is not None:
+            logger.info("Written VOI to %s", fOut)
 
     def savePolyPts_(self):
         fOut = self.ex.savePoints()
-        if (fOut is not None) and self.ex.VERBOSE:
-            print(f"Written points to {fOut}")
-
+        if fOut is not None:
+            logger.info("Written points to %s", fOut)
 
     def savePolyLine_(self):
         fOut = self.ex.saveLine(LINE_LOOP=self.ex.splineClosed)
-        if (fOut is not None) and self.ex.VERBOSE:
-            print(f"Written line to {fOut}")
-    
+        if fOut is not None:
+            logger.info("Written line to %s", fOut)
 
     def testMask(self):
-        print("Does nothing")
+        logger.info("Does nothing")
 
 
     def saveImages_(self):
@@ -213,7 +217,7 @@ class TUIBasic(TUIProject):
         endPt = pts[0] + dd * nn
         #
         self.ex.saveImages(self.ex.workingDir, pts[0], endPt, 50, VIEW_ID, outputPrefix='DCM', size=256)
-        print(f'Saved images to {self.ex.workingDir}')
+        logger.info("Saved images to %s", self.ex.workingDir)
 
     # def alignRandom(self):
     #     # NOT WORKING
@@ -228,8 +232,9 @@ class TUI2D(TUI2DProject):
     Basic TUI for project based work. 
     Illustrates basic setup and modification of push buttons.
     """
-    def __init__(self, app=None, VERBOSE=False):
-        super().__init__(app, VERBOSE)
+    def __init__(self, app=None):
+        super().__init__(app)
+        logger.info("TUI2D initialized")
         self.pushButtonDict = {}
 
 
@@ -246,44 +251,43 @@ class TUI2D(TUI2DProject):
 
     def saveVOI_(self):
         fOut = self.ex.saveVOI()
-        if (fOut is not None) and self.ex.VERBOSE:
-            print(f"Written VOI to {fOut}")
+        if fOut is not None:
+            logger.info("Written VOI to %s", fOut)
 
     def savePolyPts_(self):
         fOut = self.ex.savePoints()
-        if (fOut is not None) and self.ex.VERBOSE:
-            print(f"Written points to {fOut}")
-
+        if fOut is not None:
+            logger.info("Written points to %s", fOut)
 
     def savePolyLine_(self):
         fOut = self.ex.saveLine(LINE_LOOP=self.ex.splineClosed)
-        if (fOut is not None) and self.ex.VERBOSE:
-            print(f"Written line to {fOut}")
+        if fOut is not None:
+            logger.info("Written line to %s", fOut)
     
 
 
 
 ### ====================================================================================================================
 ### ====================================================================================================================
-def launchBasic(inputPath, scalar, workDir, VERBOSE=False):
+def launchBasic(inputPath, scalar, workDir):
     app = tuimarkupui.QtWidgets.QApplication(['TUI Image Viewer'])
-    OBJ = TUIBasic(app, VERBOSE)
+    OBJ = TUIBasic(app)
     OBJ.setup(inputPath=inputPath, workDir=workDir, scalar=scalar)
     sys.exit(app.exec_())
 
 
-def launch2D(inputPath, scalar, workDir, VERBOSE=False):
+def launch2D(inputPath, scalar, workDir):
     app = piwakawakamarkupui.QtWidgets.QApplication(['PIWAKAWAKA Image Viewer'])
-    OBJ = TUI2D(app, VERBOSE)
-    print("Launching 2D viewer")
+    OBJ = TUI2D(app)
+    logger.info("Launching 2D viewer")
     OBJ.setup(inputPath=inputPath, workDir=workDir, scalar=scalar)
     sys.exit(app.exec_())
 
 
-def LaunchCustomApp(TUIApp, subjObj, VERBOSE=False):
+def LaunchCustomApp(TUIApp, subjObj):
     app = tuimarkupui.QtWidgets.QApplication(['TUI Image Viewer'])
     try:
-        OBJ = TUIApp(app, VERBOSE)
+        OBJ = TUIApp(app)
     except TypeError:
         OBJ = TUIApp(app)
     OBJ.setup(subjObj)
@@ -292,25 +296,39 @@ def LaunchCustomApp(TUIApp, subjObj, VERBOSE=False):
 
 ### ====================================================================================================================
 ### ====================================================================================================================
-def run(inputFileName, scalar=None, workDir=None, TwoD=False, VERBOSE=False):
+def run(inputFileName, logLevel, scalar=None, workDir=None, TwoD=False):
+    """Launch the TUI viewer.
+
+    Args:
+        inputFileName: Full filename [.pvd, .vti, .png/jpg, .dcm, directory of DICOM files]
+        logLevel: Logging level (e.g. DEBUG, INFO, WARNING, ERROR)
+        scalar: Scalar to display
+        workDir: Working directory to save markups
+        TwoD: Open 2D viewer
+    """
+    _tui_pkg.configure_logging(level=logLevel)
+
     if TwoD:
-        launch2D(inputFileName, scalar, workDir, VERBOSE)
+        launch2D(inputFileName, scalar, workDir)
     else:
-        launchBasic(inputFileName, scalar, workDir, VERBOSE)
+        launchBasic(inputFileName, scalar, workDir)
 
 def main():
     ap = argparse.ArgumentParser(description='Master', formatter_class=argparse.RawTextHelpFormatter)
     groupR = ap.add_argument_group('Run parameters')
     groupR.add_argument('-in', dest='inputFile', help='full filename [.pvd, .vti, .png/jpg, .dcm]', type=str, default=None)
-    groupR.add_argument('-Scalar',dest='Scalar',help='Set scalar', type=str, default=None)
-    groupR.add_argument('-workDir',dest='workDir',help='Working directory to save markups', type=str, default=None)
-    groupR.add_argument('-2D',dest='TwoD',help='Open 2D viewer', action='store_true')
-    groupR.add_argument('-VERBOSE',dest='VERBOSE',help='Run in verbose mode',action='store_true')
-    # groupR.add_argument('-DEV',dest='DEV',help='Run in development mode',action='store_true')
+    groupR.add_argument('-Scalar', dest='Scalar', help='Set scalar', type=str, default=None)
+    groupR.add_argument('-workDir', dest='workDir', help='Working directory to save markups', type=str, default=None)
+    groupR.add_argument('-2D', dest='TwoD', help='Open 2D viewer', action='store_true')
+    groupR.add_argument('-logLevel', dest='logLevel',
+                        help='Set log level: DEBUG, INFO, WARNING, ERROR (default: INFO)',
+                        type=str, default='INFO',
+                        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'])
 
     args = ap.parse_args()
     if args.inputFile is not None:
-        run(args.inputFile, args.Scalar, args.workDir, args.TwoD, args.VERBOSE)
+        log_level = getattr(logging, args.logLevel.upper())
+        run(args.inputFile, log_level, args.Scalar, args.workDir, args.TwoD)
     else:
         ap.print_help(sys.stderr)
 

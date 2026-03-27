@@ -8,6 +8,7 @@ Classes and mini applications to interact with 3D data via VTK
 '''
 
 from __future__ import print_function
+import logging
 import vtk
 import sys
 import os
@@ -15,6 +16,8 @@ import numpy as np
 from ngawari import fIO
 from ngawari import vtkfilters
 from tui.tuiUtils import renderVolume3D
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -86,21 +89,21 @@ class FCStyleMaster():
                 if (self.NewPickedActor not in self.parent.pickedActorsListA) & \
                         (self.NewPickedActor not in self.parent.pickedActorsListB):
                     self.parent.pickedActorsListA.append(self.NewPickedActor)
-                    print('Added actor to list A (%d)'%(len(self.parent.pickedActorsListA)))
+                    logger.info("Added actor to list A (%d)", len(self.parent.pickedActorsListA))
         elif key == "d":
             if self.NewPickedActor:
                 if (self.NewPickedActor not in self.parent.pickedActorsListA) & \
                         (self.NewPickedActor not in self.parent.pickedActorsListB):
                     self.parent.pickedActorsListB.append(self.NewPickedActor)
-                    print('Added actor to list B (%d)'%(len(self.parent.pickedActorsListB)))
+                    logger.info("Added actor to list B (%d)", len(self.parent.pickedActorsListB))
         elif key == "h":
-            print(self.__helpStr)
+            logger.info("%s", self.__helpStr)
         elif key == 'e':
-            print('WILL EXIT')
+            logger.info("WILL EXIT")
         elif key == 'i':
-            print('INFO: ')
-            print('    Picked list A:  %d'%(len(self.parent.pickedActorsListA)))
-            print('    Picked list B:  %d'%(len(self.parent.pickedActorsListB)))
+            logger.info("INFO: Picked list A: %d, Picked list B: %d",
+                        len(self.parent.pickedActorsListA),
+                        len(self.parent.pickedActorsListB))
         elif key == "x":
             self.parent.execute()
         elif key == "1":
@@ -222,7 +225,7 @@ class TUI3DInteractor(object):
 
 
     def execute(self):
-        print('Running execution')
+        logger.info("Running execution")
 
     def __buildRenderer(self):
         # A renderer and render window
@@ -347,7 +350,8 @@ class TUI3DBasic_A(TUI3DInteractor):
 
     def execute(self): # SAVE
         appendPoly = vtkfilters.appendPolyDataList(self.unpickablePolydataList)
-        print(fIO.writeVTKFile(appendPoly, f'{HOME}/temp/temp.vtp'))
+        fOut = fIO.writeVTKFile(appendPoly, f'{HOME}/temp/temp.vtp')
+        logger.info("Saved to %s", fOut)
 
     def setupStyleInteractor(self):
         # add the custom style
@@ -374,7 +378,7 @@ class TUI3DBasic_A(TUI3DInteractor):
 
 def main(args):
     ff = args[1]
-    print(ff)
+    logger.info("Input file: %s", ff)
     if ff[-4:] == '.vti':
         renderVolume3D(fIO.readVTKFile(ff))
     else:
@@ -385,11 +389,13 @@ def main(args):
         # ccList = [vtkfilters.tubeFilter(i, 0.0005) for i in ccList]
         # ccList = [vtkfilters.tubeFilter(vtkfilters.filterTransformPolyData(i, 100.0), 0.1) for i in ccList]
         OBJ = TUI3DBasic_A(ccList, [])
-        print('TUI3DBasic set up')
+        logger.info("TUI3DBasic set up")
         OBJ.show()
-        print('DONE')
+        logger.info("DONE")
 
 
 if __name__ == '__main__':
-    print(sys.argv)
+    import tui as _tui_pkg
+    _tui_pkg.configure_logging()
+    logger.info("sys.argv: %s", sys.argv)
     main(sys.argv)

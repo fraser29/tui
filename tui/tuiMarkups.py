@@ -10,10 +10,13 @@ Change to ResliceCursorWidget and Markups in 3D space (rather than sliceID etc)
 @email: callaghan.fm@gmail.com
 """
 
+import logging
 import vtk
 import numpy as np
 from ngawari import vtkfilters
 from scipy import ndimage
+
+logger = logging.getLogger(__name__)
 
 
 ### ====================================================================================================================
@@ -115,8 +118,7 @@ class Markups(object):
         except Exception as e:
             # If there's an error disabling the widget, just continue
             # This prevents crashes if the widget is already destroyed
-            if hasattr(self.parentImageViewer, 'VERBOSE') and self.parentImageViewer.VERBOSE:
-                print(f"Warning: Error disabling spline widget: {e}")
+            logger.warning("Error disabling spline widget: %s", e)
 
 
     # ============ POINTS ==============================================================================================
@@ -148,11 +150,11 @@ class Markups(object):
 
     def _addSplinePoint(self, X_image, X_world, timeID, sliceID, norm=None, orientation=None):
         if self.markupsDict[Splines][timeID].isSplineOnThisSlice(sliceID):
-            print("Interact with the spline widget to add a point")
-            print("    Shift+LMB: move a spline handle")
-            print("    CTRL+RMB: remove a spline handle")
-            print("    MMB: translate spline")
-            print("    RMB: scale spline")
+            logger.info("Interact with the spline widget to add a point")
+            logger.info("    Shift+LMB: move a spline handle")
+            logger.info("    CTRL+RMB: remove a spline handle")
+            logger.info("    MMB: translate spline")
+            logger.info("    RMB: scale spline")
         elif len(self.markupsDict[Points][timeID]) == 2:
             self._addPoint(X_image, X_world, timeID, sliceID, norm)
             self.convertPointsToSpline(timeID, sliceID, orientation)
@@ -411,7 +413,7 @@ class MarkupSpline(Markup, vtk.vtkSplineWidget):
 
     @property
     def isHandDrawn(self):
-        print("Getting value...")
+        logger.info("Getting isHandDrawn value")
         return self._isHandDrawn
 
     @isHandDrawn.setter

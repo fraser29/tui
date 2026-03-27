@@ -11,12 +11,15 @@ Basic viewer for advanced image processing:
 """
 
 
+import logging
 import os
 import vtk
 
 from ngawari import fIO
 
 from tui import tuiUtils
+
+logger = logging.getLogger(__name__)
 
 
 class ImageInteractor(vtk.vtkInteractorStyleTrackballCamera):
@@ -73,7 +76,7 @@ class ImageInteractor(vtk.vtkInteractorStyleTrackballCamera):
     def lMButtonReleaseCallback(self, obj, event):
         if self.LMB_ShiftPressed:
             self.LMB_ShiftPressed = False
-            print(len(self.capturedPts))
+            logger.info("Captured points count: %d", len(self.capturedPts))
         else:
             self.interactorWindowLevelEndEvent(obj, event)
             self.OnLeftButtonUp()
@@ -149,20 +152,20 @@ class ImageInteractor(vtk.vtkInteractorStyleTrackballCamera):
         key = self.GetInteractor().GetKeyCode()
         keySym = self.GetInteractor().GetKeySym()
         if key == "h":
-            print(' . = add point (or spline point if in spline mode)')
-            print(' x = align to primary direction')
-            print(' u = remove last point')
-            print(' r = reset 3D view')
-            print(' R = reset all views')
-            print(' m = print patient meta')
-            print(' p = save screenshot(s)')
-            print(' P = save plane plane.vtp')
-            print(' c = set contour level')
-            print(' o = switch limitContourToOne')
-            print(' L = set contour min length - INACTIVE')
-            print(' l = set multipoint factor')
-            print(' Use UI controls to switch between Point and Spline modes')
-            print('pressed help (%s)'%(key))
+            logger.info(' . = add point (or spline point if in spline mode)')
+            logger.info(' x = align to primary direction')
+            logger.info(' u = remove last point')
+            logger.info(' r = reset 3D view')
+            logger.info(' R = reset all views')
+            logger.info(' m = print patient meta')
+            logger.info(' p = save screenshot(s)')
+            logger.info(' P = save plane plane.vtp')
+            logger.info(' c = set contour level')
+            logger.info(' o = switch limitContourToOne')
+            logger.info(' L = set contour min length - INACTIVE')
+            logger.info(' l = set multipoint factor')
+            logger.info(' Use UI controls to switch between Point and Spline modes')
+            logger.info('pressed help (%s)', key)
         elif key == ".":
             X = self.getXAtMouse()
             norm = self.parentImageViewer.getCurrentViewNormal()
@@ -200,7 +203,8 @@ class ImageInteractor(vtk.vtkInteractorStyleTrackballCamera):
 
         elif key == "P": # SAVE PLANE
             plane = self.parentImageViewer.getCurrentResliceAsVTP()
-            print(fIO.writeVTKFile(plane, os.path.join(self.parentImageViewer.workingDirLineEdit.text(), "plane.vtp")))
+            fOut = fIO.writeVTKFile(plane, os.path.join(self.parentImageViewer.workingDirLineEdit.text(), "plane.vtp"))
+            logger.info("Saved plane to %s", fOut)
 
         elif key == "c":
             val = input('Enter contour level: ')
@@ -208,7 +212,7 @@ class ImageInteractor(vtk.vtkInteractorStyleTrackballCamera):
                 val_float = float(val)
                 self.parentImageViewer.setContourVal(val_float)
             except ValueError:
-                print('Invalid contour level')
+                logger.warning("Invalid contour level")
                 return
 
         elif key == "L":
@@ -216,13 +220,13 @@ class ImageInteractor(vtk.vtkInteractorStyleTrackballCamera):
             try:
                 val = float(val)
                 self.parentImageViewer.minContourLength = val
-                print('Change minContourLength to %f'%(self.parentImageViewer.minContourLength))
+                logger.info("Changed minContourLength to %f", self.parentImageViewer.minContourLength)
             except ValueError:
                 pass
 
         elif key == "o":
             self.parentImageViewer.limitContourToOne = not self.parentImageViewer.limitContourToOne
-            print('limitContourToOne == %s'%(self.parentImageViewer.limitContourToOne))
+            logger.info("limitContourToOne == %s", self.parentImageViewer.limitContourToOne)
 
 
         elif key == "l":
@@ -230,23 +234,19 @@ class ImageInteractor(vtk.vtkInteractorStyleTrackballCamera):
             try:
                 val = float(val)
                 self.parentImageViewer.multiPointFactor = val
-                print('Change multipoint factor  to %f'%(self.parentImageViewer.multiPointFactor))
+                logger.info("Changed multipoint factor to %f", self.parentImageViewer.multiPointFactor)
             except ValueError:
                 pass
 
         elif key == "w":
             w,l = self.parentImageViewer.getWindowLevel()
-            print(f"Old window level: {w}, {l}")
+            logger.info("Old window level: %s, %s", w, l)
             self.parentImageViewer.resetWindowLevel()
             w,l = self.parentImageViewer.getWindowLevel()
-            print(f"New window level: {w}, {l}")
+            logger.info("New window level: %s, %s", w, l)
 
         elif key == "W":
             self.parentImageViewer.hardReset()
-
-        elif key == "V":
-            self.parentImageViewer.VERBOSE = not self.parentImageViewer.VERBOSE
-            print(f"VERBOSE mode is now {self.parentImageViewer.VERBOSE}")
 
         elif keySym == 'Left':
             # Previous time step
