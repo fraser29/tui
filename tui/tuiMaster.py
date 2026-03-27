@@ -107,7 +107,7 @@ class TUIProject(_TUIProj):
         logger.info("TUIProject initialized")
 
     def alignBy_X_Norm(self, X, Norm):
-        logger.info("This is centering but not aligning.")
+        logger.debug("This is centering but not aligning.")
         norm0 = Norm / vtkfilters.np.linalg.norm(Norm)
         norm1, norm2 = [0, 0, 0], [0, 0, 0]
         vtkfilters.vtk.vtkMath.Perpendiculars(norm0, norm1, norm2, 0.3)
@@ -128,8 +128,8 @@ class TUIProject(_TUIProj):
         self.ex.resliceCursor.SetZAxis(norm2[0], norm2[1], norm2[2])
         self.ex.resliceCursor.Update()
         self.ex.renderWindow.Render()
-        logger.info("Norms: %s %s %s viewNormal=%s", norm0, norm1, norm2, self.ex.getViewNormal(0))
-        logger.info("Cursor axes: X=%s Y=%s Z=%s",
+        logger.debug("Norms: %s %s %s viewNormal=%s", norm0, norm1, norm2, self.ex.getViewNormal(0))
+        logger.debug("Cursor axes: X=%s Y=%s Z=%s",
                     self.ex.resliceCursor.GetXAxis(),
                     self.ex.resliceCursor.GetYAxis(),
                     self.ex.resliceCursor.GetZAxis())

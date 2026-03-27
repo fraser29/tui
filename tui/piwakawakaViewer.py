@@ -116,7 +116,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
     def setupSliceSlider(self):
         self.sliceSlider.setMinimum(0)
         self.sliceSlider.setMaximum(self.maxSliceID)
-        logger.info("Slice slider range: 0 to %d", self.maxSliceID)
+        logger.debug("Slice slider range: 0 to %d", self.maxSliceID)
         self.updateSliceLabel()
 
     def updateSliceLabel(self):
@@ -246,7 +246,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
             if hasattr(self, 'customSliceCenters') and hasattr(self, 'customSliceNormals'):
                 if len(self.customSliceCenters) > 0 and len(self.customSliceNormals) > 0:
                     self.setCustomSlices(self.customSliceCenters, self.customSliceNormals)
-                    logger.info("Using custom slices: %d slices", len(self.customSliceCenters))
+                    logger.debug("Using custom slices: %d slices", len(self.customSliceCenters))
                     return
             # If no custom slices defined, fall back to axial
             orientation = tuiUtils.AXIAL
@@ -284,9 +284,9 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         # if self.orientationComboBox.currentText() == "Custom":
         self.setCustomSlices(centers, normals)
         
-        logger.info("Set custom slice data: %d centers and %d normals", len(centers), len(normals))
-        logger.info("Custom slice centers[0]=%s", centers[0])
-        logger.info("Custom slice normals[0]=%s", normals[0])
+        logger.debug("Set custom slice data: %d centers and %d normals", len(centers), len(normals))
+        logger.debug("Custom slice centers[0]=%s", centers[0])
+        logger.debug("Custom slice normals[0]=%s", normals[0])
 
 
     # Array selection methods inherited from base class
@@ -323,10 +323,10 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.__setupNewImageData() ## MAIN SETUP HERE ##
         self.currentSliceID = int(self.maxSliceID / 2)
         
-        logger.info("Image dimensions: %s", dims)
-        logger.info("Orientation: %s", self.sliceOrientation)
-        logger.info("Max slice ID: %d", self.maxSliceID)
-        logger.info("Starting at slice: %d", self.currentSliceID)
+        logger.debug("Image dimensions: %s", dims)
+        logger.debug("Orientation: %s", self.sliceOrientation)
+        logger.debug("Max slice ID: %d", self.maxSliceID)
+        logger.debug("Starting at slice: %d", self.currentSliceID)
         self.moveSliceSlider(self.currentSliceID)
     
     def buildResliceDictionary(self, orientation=None, customCenters=None, customNormals=None):
@@ -344,7 +344,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.sliceCenters = []
         self.sliceNormals = []
         
-        logger.info("Building reslice dictionary with orientation: %s", orientation)
+        logger.debug("Building reslice dictionary with orientation: %s", orientation)
         
         # Get image dimensions for default slice generation
         ii = list(self.vtiDict.values())[0]
@@ -391,7 +391,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
                 resliceList.append(reslice)
             
             self.resliceDict[timeStep] = resliceList
-        logger.info("Reslice dictionary built with %d slices", len(self.sliceCenters))
+        logger.debug("Reslice dictionary built with %d slices", len(self.sliceCenters))
     
     def setSliceOrientation(self, orientation):
         """Change the slice orientation and rebuild reslice dictionary"""
@@ -407,7 +407,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
             self.updateImageSlice()
             self.updateViewAfterSliceChange()
             
-            logger.info("Changed orientation to %s, max slice: %d", orientation, self.maxSliceID)
+            logger.debug("Changed orientation to %s, max slice: %d", orientation, self.maxSliceID)
     
     def setCustomSlices(self, centers, normals):
         """Set custom slice centers and normals and rebuild reslice dictionary"""
@@ -424,26 +424,26 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.updateImageSlice()
         self.updateViewAfterSliceChange()
         
-        logger.info("Set %d custom slices", len(centers))
+        logger.debug("Set %d custom slices", len(centers))
     
     def getCurrentReslice(self):
         """Get the current reslice for the current timestep and slice"""
         if not hasattr(self, 'resliceDict') or not self.resliceDict:
-            logger.info("Reslice dictionary not initialized")
+            logger.warning("Reslice dictionary not initialized")
             return None
             
         if self.currentTimeID >= len(self.times):
-            logger.info("Current time ID %d out of range", self.currentTimeID)
+            logger.warning("Current time ID %d out of range", self.currentTimeID)
             return None
             
         currentTime = self.times[self.currentTimeID]
         if currentTime not in self.resliceDict:
-            logger.info("Time %s not found in reslice dictionary", currentTime)
+            logger.warning("Time %s not found in reslice dictionary", currentTime)
             return None
             
         resliceList = self.resliceDict[currentTime]
         if self.currentSliceID >= len(resliceList):
-            logger.info("Current slice ID %d out of range", self.currentSliceID)
+            logger.warning("Current slice ID %d out of range", self.currentSliceID)
             return None
             
         return resliceList[self.currentSliceID]
@@ -563,14 +563,14 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
     def updateImageSlice(self):
         """Update the image actor to show the current slice using pre-built reslices"""
         if not hasattr(self, 'imageActor') or not self.imageActor:
-            logger.info("Image actor not initialized")
+            logger.warning("Image actor not initialized")
             return
         currentReslice = self.getCurrentReslice()
         if currentReslice is not None:
             thisImageSlice = currentReslice.GetOutput()
             self.imageActor.SetInputData(thisImageSlice)
         else:
-            logger.info("No reslice available for slice %d", self.currentSliceID)
+            logger.warning("No reslice available for slice %d", self.currentSliceID)
 
 
     def updateAllActorsToCurrentSlice(self):

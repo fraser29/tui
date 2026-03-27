@@ -221,16 +221,16 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
 
     def setWindowLevel(self, w, l):
         old_w, old_l = self.getWindowLevel()
-        logger.info("SetWindowLevel: Old window level: window=%.2f, level=%.2f", old_w, old_l)
-        logger.info("SetWindowLevel: Change to: window=%.2f, level=%.2f", w, l)
+        logger.debug("SetWindowLevel: Old window level: window=%.2f, level=%.2f", old_w, old_l)
+        logger.debug("SetWindowLevel: Change to: window=%.2f, level=%.2f", w, l)
         for i in range(1,3):
             resA = self.resliceCursorWidgetArray[i].GetRepresentation().SetWindowLevel(w, l)
         for i in range(1,3):
             resB = self.resliceCursorWidgetArray[i].GetRepresentation().SetLookupTable(self.resliceCursorWidgetArray[0].GetRepresentation().GetLookupTable())
         self.renderWindow.Render()
         new_w, new_l = self.getWindowLevel()
-        logger.info("SetWindowLevel: New window level: window=%.2f, level=%.2f", new_w, new_l)
-        logger.info("SetWindowLevel: resA=%s, resB=%s", resA, resB)
+        logger.debug("SetWindowLevel: New window level: window=%.2f, level=%.2f", new_w, new_l)
+        logger.debug("SetWindowLevel: resA=%s, resB=%s", resA, resB)
 
 
 

@@ -180,7 +180,7 @@ class BaseMarkupViewer:
     def _save(self, polyDataDict, featureName=None, prefix='', extn='vtp', FORCE_PVD_EVEN_IF_SINGLE=False):
         """Save polydata dictionary to files"""
         if polyDataDict is None or len(polyDataDict) == 0:
-            logger.info("No data to save")
+            logger.warning("No data to save")
             return None
             
         if featureName is None:
@@ -287,9 +287,9 @@ class BaseMarkupViewer:
                 # Center the window level
                 windowLevel = (p2 + p98) / 2.0
                 
-                logger.info("Optimal window level (percentile-based): window=%.2f, level=%.2f", windowWidth, windowLevel)
-                logger.info("Data range: %.2f to %.2f", np.min(arrayData), np.max(arrayData))
-                logger.info("Percentile range: %.2f to %.2f", p2, p98)
+                logger.debug("Optimal window level (percentile-based): window=%.2f, level=%.2f", windowWidth, windowLevel)
+                logger.debug("Data range: %.2f to %.2f", np.min(arrayData), np.max(arrayData))
+                logger.debug("Percentile range: %.2f to %.2f", p2, p98)
                 
                 return windowWidth, windowLevel
         except Exception as e:
@@ -423,7 +423,7 @@ class BaseMarkupViewer:
     def startAnimation(self):
         """Start the animation loop"""
         if len(self.times) <= 1:
-            logger.info("Cannot animate: only one time step available")
+            logger.warning("Cannot animate: only one time step available")
             return
             
         self.isAnimating = True
@@ -441,7 +441,7 @@ class BaseMarkupViewer:
         interval = self.speedIntervals[self.animationSpeed]
         self.animationTimer.start(interval)
         
-        logger.info("Animation started at speed %d (interval: %dms)", self.animationSpeed, interval)
+        logger.debug("Animation started at speed %d (interval: %dms)", self.animationSpeed, interval)
 
     def stopAnimation(self):
         """Stop the animation"""
@@ -453,7 +453,7 @@ class BaseMarkupViewer:
         if self.animationTimer:
             self.animationTimer.stop()
         
-        logger.info("Animation stopped")
+        logger.debug("Animation stopped")
 
     def animateNextFrame(self):
         """Move to next frame in animation loop"""
@@ -480,7 +480,7 @@ class BaseMarkupViewer:
             self.animationTimer.start(interval)
         
         speedNames = ["Slowest", "Slow", "Fast", "Fastest"]
-        logger.info("Animation speed set to: %s (interval: %dms)", speedNames[speed], self.speedIntervals[speed])
+        logger.debug("Animation speed set to: %s (interval: %dms)", speedNames[speed], self.speedIntervals[speed])
 
     # MARKUP MODE CONTROLS
     def markupModeChanged(self, mode):
@@ -491,7 +491,7 @@ class BaseMarkupViewer:
     def splineClosedChanged(self, state):
         """Handle spline closed setting change"""
         self.splineClosed = state == 2  # Qt.Checked = 2
-        logger.info("Spline closed setting changed to: %s", self.splineClosed)
+        logger.debug("Spline closed setting changed to: %s", self.splineClosed)
 
     # DATA ACCESS METHODS
     def getCurrentTime(self):
@@ -578,7 +578,7 @@ class BaseMarkupViewer:
         """Load DICOM directory"""
         dcmSeries = spydcmtk.dcmTK.DicomSeries.setFromDirectory(dicomDir)
         self.vtiDict = dcmSeries.buildVTIDict()
-        logger.info("Have VTI dict. Times (ms): %s", [int(i*1000.0) for i in sorted(self.vtiDict.keys())])
+        logger.debug("Have VTI dict. Times (ms): %s", [int(i*1000.0) for i in sorted(self.vtiDict.keys())])
         self.setWorkingDirectory(os.path.split(dicomDir)[0])
         self._setupAfterLoad()
 
