@@ -358,7 +358,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
             piwakawaka_viewer = piwakawakaViewer.PIWAKAWAKAMarkupViewer()
             piwakawaka_viewer.loadVTI_or_PVD(self.vtiDict)
             piwakawaka_viewer.setCustomSliceCentersAndNormals(centers_list, normals_list)
-            piwakawaka_viewer.setWorkingDirectory(self.workingDir)
+            piwakawaka_viewer.workingDir = self.workingDir
             piwakawaka_viewer.rotateCamera90()
             piwakawaka_viewer.rotateCamera90()
             piwakawaka_viewer.orientationComboBox.setCurrentText("Custom")

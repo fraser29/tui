@@ -293,7 +293,7 @@ class BaseMarkupUI(object):
     
     def _setupConnections(self):
         """Setup common connections."""
-        self.workingDirToolButton.clicked.connect(self.selectWorkingDirectory)
+        pass
     
     def _setupSubclassSpecific(self, BASEUI):
         """Override in subclasses for specific setup."""
@@ -353,6 +353,3 @@ class BaseMarkupUI(object):
         """Override in subclasses for specific translations."""
         pass
     
-    def selectWorkingDirectory(self):
-        """Override in subclasses to implement directory selection."""
-        pass

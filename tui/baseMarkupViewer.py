@@ -49,7 +49,7 @@ class BaseMarkupViewer:
         self.scalarRange = {'Default':[0,255]}
         self.boundingDist = 0.0
         self.multiPointFactor = 0.0001
-        self.workingDir = os.getcwd()
+        self._workingDir = os.getcwd()
         
         # Markup mode settings
         self.markupMode = 'Point'  # 'Point' or 'Spline'
@@ -76,6 +76,21 @@ class BaseMarkupViewer:
 
         # Abstract:
         self.sliceOrientation = None # Used by PIWAKAWAKA
+
+    @property
+    def workingDir(self):
+        """Working directory, kept in sync with workingDirLineEdit when the widget exists."""
+        if hasattr(self, 'workingDirLineEdit') and self.workingDirLineEdit is not None:
+            text = str(self.workingDirLineEdit.text()).strip()
+            if text:
+                return text
+        return self._workingDir
+
+    @workingDir.setter
+    def workingDir(self, value):
+        self._workingDir = value
+        if hasattr(self, 'workingDirLineEdit') and self.workingDirLineEdit is not None:
+            self.workingDirLineEdit.setText(value)
 
     def _setupDefaultButtons(self):
         """Setup default customized buttons that can be overridden by subclasses"""
@@ -243,16 +258,9 @@ class BaseMarkupViewer:
         return os.path.join(str(self.workingDir), fileName)
 
     def getWorkingDirectory(self):
-        """Get working directory"""
+        """Get working directory."""
         try:
-            if hasattr(self, 'workingDirLineEdit') and self.workingDirLineEdit:
-                text = str(self.workingDirLineEdit.text())
-                if text:
-                    return text
-            # Fallback to workingDir attribute or current directory
-            if hasattr(self, 'workingDir') and self.workingDir:
-                return self.workingDir
-            return os.getcwd()
+            return self.workingDir
         except Exception:
             return os.getcwd()
 
@@ -530,19 +538,19 @@ class BaseMarkupViewer:
 
     
     # FILE LOADING METHODS
-    def setWorkingDirectory(self, workingDir):
+    def setWorkingDirectory(self, workingDir): # Deprecated - use workingDir property instead
         """Set working directory"""
         self.workingDir = workingDir
-        self.workingDirLineEdit.setText(workingDir)
 
     def selectWorkingDirectory(self):
         """Open directory selector and update working directory"""
         try:
+            logger.debug("Selecting working directory")
             currentDir = self.getWorkingDirectory()
             dirName = QtWidgets.QFileDialog.getExistingDirectory(
                 self, "Select Working Directory", currentDir)
             if dirName:
-                self.setWorkingDirectory(dirName)
+                self.workingDir = dirName
                 logger.info("Working directory set to: %s", dirName)
         except Exception as e:
             logger.error("Error selecting working directory: %s", e)
@@ -579,7 +587,7 @@ class BaseMarkupViewer:
         dcmSeries = spydcmtk.dcmTK.DicomSeries.setFromDirectory(dicomDir)
         self.vtiDict = dcmSeries.buildVTIDict()
         logger.debug("Have VTI dict. Times (ms): %s", [int(i*1000.0) for i in sorted(self.vtiDict.keys())])
-        self.setWorkingDirectory(os.path.split(dicomDir)[0])
+        self.workingDir = os.path.split(dicomDir)[0]
         self._setupAfterLoad()
 
     def loadVTI_or_PVD(self, fileName=None):
@@ -610,10 +618,10 @@ class BaseMarkupViewer:
             vtkfilters.ensureScalarsSet(self.vtiDict[iTime])
         logger.info("Data loaded")
         try:
-            self.setWorkingDirectory(os.path.split(fileName)[0])
+            self.workingDir = os.path.split(fileName)[0]
         except TypeError:
             # probably as passed a vti dict
-            self.setWorkingDirectory(os.path.expanduser('~'))
+            self.workingDir = os.path.expanduser('~')
         self._setupAfterLoad()
 
     def _setupAfterLoad(self):
@@ -686,6 +694,11 @@ class BaseMarkupViewer:
         if hasattr(self, 'closedSplineCheck'):
             self.closedSplineCheck.stateChanged.connect(self.splineClosedChanged)
         
+        # Working directory selector button
+        if hasattr(self, 'workingDirToolButton'):
+            logger.debug("Working directory tool button connected")
+            self.workingDirToolButton.clicked.connect(self.selectWorkingDirectory)
+
         # Help button
         if hasattr(self, 'helpButton'):
             self.helpButton.clicked.connect(self.showHelpWindow)

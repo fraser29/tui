@@ -31,9 +31,13 @@ logger = logging.getLogger(__name__)
 
 class _TUIProj(object):
 
-    def __init__(self, app):
+    def __init__(self, app, VERBOSE=False):
         self.app = app
-
+        self.VERBOSE = VERBOSE
+        if self.VERBOSE:
+            logger.setLevel(logging.DEBUG)
+        else:
+            logger.setLevel(logging.INFO)
     
     def setup(self, inputPath, workDir=None, scalar=None):
         if os.path.isdir(inputPath): # DICOM directory
@@ -99,12 +103,17 @@ class TUIProject(_TUIProj):
         mask = my_segmentation_from_landmarks(landmarks)
 
     """
-    def __init__(self, app=None):
+    def __init__(self, app=None, VERBOSE=False):
         if app is None:
             app = tuimarkupui.QtWidgets.QApplication(['TUI Image Viewer'])
         super().__init__(app)
         self.ex = tuiViewer.TUIMarkupViewer()
         logger.info("TUIProject initialized")
+        self.VERBOSE = VERBOSE
+        if self.VERBOSE:
+            logger.setLevel(logging.DEBUG)
+        else:
+            logger.setLevel(logging.INFO)
 
     def alignBy_X_Norm(self, X, Norm):
         logger.debug("This is centering but not aligning.")
@@ -143,13 +152,17 @@ class TUI2DProject(_TUIProj):
     TUI2DProject super class.
 
     """
-    def __init__(self, app=None):
+    def __init__(self, app=None, VERBOSE=False):
         if app is None:
             app = piwakawakamarkupui.QtWidgets.QApplication(['PIWAKAWAKA Image Viewer'])
         super().__init__(app)
         self.ex = piwakawakaViewer.PIWAKAWAKAMarkupViewer()
         logger.info("TUI2DProject initialized")
-
+        self.VERBOSE = VERBOSE
+        if self.VERBOSE:
+            logger.setLevel(logging.DEBUG)
+        else:
+            logger.setLevel(logging.INFO)
 
 
 
