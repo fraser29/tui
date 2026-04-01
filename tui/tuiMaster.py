@@ -57,7 +57,7 @@ class _TUIProj(object):
             else:
                 workDir = os.getcwd()
         
-        self.ex.setWorkingDirectory(workDir)
+        self.ex.workingDir = workDir
         logger.info("WORK-DIR set to: %s", workDir)
         if scalar is not None:
             self.ex.setCurrentArray(scalar) # Example to set shown array (else take scalar)
