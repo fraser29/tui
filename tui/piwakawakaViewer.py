@@ -18,7 +18,7 @@ import os
 import numpy as np
 from ngawari import vtkfilters
 from tui import piwakawakamarkupui, piwakawakaStyles, baseMarkupViewer, tuiUtils
-import scipy.interpolate as interpolate
+from PyQt5 import QtWidgets
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +30,36 @@ outputWindow = vtk.vtkOutputWindow()
 outputWindow.SetGlobalWarningDisplay(0)
 vtk.vtkObject.SetGlobalWarningDisplay(0)
 vtk.vtkLogger.SetStderrVerbosity(vtk.vtkLogger.VERBOSITY_ERROR)
+
+
+def _time_series_period(times_all):
+    """Length of one temporal cycle: last time to first time plus one frame step (uniform cine)."""
+    ta = np.asarray(times_all, dtype=float)
+    if ta.size < 2:
+        return None
+    ta = np.sort(ta)
+    dt = float(ta[1] - ta[0])
+    return float(ta[-1] - ta[0] + dt)
+
+
+def _interp_scalar_in_time(t_eval, t_key, vals, times_all, periodic):
+    """Linear interpolation in time; if periodic, wrap using _time_series_period(times_all)."""
+    t_eval = float(t_eval)
+    t_key = np.asarray(t_key, dtype=float)
+    vals = np.asarray(vals, dtype=float)
+    order = np.argsort(t_key)
+    t_key = t_key[order]
+    vals = vals[order]
+    if not periodic:
+        return float(np.interp(t_eval, t_key, vals))
+    period = _time_series_period(times_all)
+    if period is None or period <= 0:
+        return float(np.interp(t_eval, t_key, vals))
+    t0 = float(np.min(times_all))
+    te = t0 + ((t_eval - t0) % period)
+    t_ext = np.concatenate([t_key - period, t_key, t_key + period])
+    v_ext = np.concatenate([vals, vals, vals])
+    return float(np.interp(te, t_ext, v_ext))
 
 
 # ======================================================================================================================
@@ -108,6 +138,7 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         self.imManip_B.clicked.connect(self.rotateCamera90)
         ##
         self.updatePushButtonDict()
+        self.imMarkupButton_A.clicked.connect(self.interpolateSplinesFromManualKeyframes)
 
     # Push button and time slider methods inherited from base class
 
@@ -552,11 +583,6 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
 
 
     # ======================== RENDERING ===============================================================================
-    def updateViewAfterTimeChange(self): # NEED TO TRIGGER ON A TIME CHANGE
-        # Update image data for current time
-        self.updateImageSlice()
-        self.updateViewAfterSliceChange()
-
     def updateViewAfterSliceChange(self):
         self.renderWindow.Render()
     
@@ -624,6 +650,80 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
             self.setWindowLevel(window, level)
         self.renderWindow.Render()
 
+    def interpolateSplinesFromManualKeyframes(self):
+        """Replace missing splines and automatic (interpolated) splines using linear interpolation in time between manual keyframes."""
+        try:
+            n_pts_i = 50
+            periodic_time = self.temporalPeriodicSplineCheck.isChecked()
+            splines_list = self.Markups.getSplinesTimeIDList()
+            times = self.times
+            n_times = len(times)
+            counts = [len(splines_list[t]) for t in range(n_times)]
+            if any(c > 1 for c in counts):
+                raise ValueError("Interpolation expects at most one spline per time step.")
+
+            def spline_at(tidx):
+                return splines_list[tidx][0] if counts[tidx] else None
+
+            kf = [t for t in range(n_times) if counts[t] and spline_at(t).isManual]
+            if len(kf) < 2:
+                raise ValueError(
+                    "Need manual splines at at least two time points.\n"
+                    "(Orange = manual keyframe; cyan = automatic.)")
+
+            slice_id = spline_at(kf[0]).sliceID
+            t_kf = np.array([times[i] for i in kf], dtype=float)
+            P_kf = []
+            for t in kf:
+                P = spline_at(t).getPoints(nSplinePts=n_pts_i)
+                if P.shape[1] != 3:
+                    raise ValueError("Spline geometry must be planar (3xN sampled points).")
+                P_kf.append(P.T)
+
+            # n_curve = P_kf[0].shape[0]
+            n_curve = 12
+            curve_IDs = [int(i) for i in np.linspace(0, n_pts_i-1, n_curve-1)]
+            curve_IDs.append(0)
+            targets = []
+            for ti in range(n_times):
+                if counts[ti] == 0:
+                    targets.append(ti)
+                elif not spline_at(ti).isManual:
+                    targets.append(ti)
+
+            if not targets:
+                QtWidgets.QMessageBox.information(
+                    self, "Interpolate splines",
+                    "No automatic or missing splines to update; all time steps are manual keyframes.")
+                return
+
+            for ti in targets:
+                self.Markups.clearSplinesAtTime(ti)
+                t_eval = float(times[ti])
+                x_row = np.zeros(n_curve)
+                y_row = np.zeros(n_curve)
+                for k in range(n_curve):
+                    xs = np.array([P_kf[j][0, curve_IDs[k]] for j in range(len(kf))])
+                    ys = np.array([P_kf[j][1, curve_IDs[k]] for j in range(len(kf))])
+                    x_row[k] = _interp_scalar_in_time(t_eval, t_kf, xs, times, periodic_time)
+                    y_row[k] = _interp_scalar_in_time(t_eval, t_kf, ys, times, periodic_time)
+                new_pts = [[float(x_row[k]), float(y_row[k]), 0.0] for k in range(n_curve)]
+                time_val = times[ti]
+                reslice = self.resliceDict[time_val][slice_id]
+                self.Markups.addSpline(
+                    new_pts,
+                    reslice,
+                    self.renderer,
+                    self.graphicsViewVTK,
+                    timeID=ti,
+                    sliceID=slice_id,
+                    LOOP=self.splineClosed,
+                    is_manual=False,
+                )
+            self._updateMarkups()
+            logger.info("Interpolated %d automatic spline(s) from %d manual keyframes.", len(targets), len(kf))
+        except ValueError as e:
+            QtWidgets.QMessageBox.warning(self, "Interpolate splines", str(e))
 
 
     # ======================== Markups - 2D specific implementations ================================================
@@ -702,90 +802,3 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         return fileOutList
         # os.system('convert %s -resize 400x400 %s'%(fOut, fOut))
 
-# ======================================================================================================================
-# ======================================================================================================================
-# ======================================================================================================================
-def interpolateSplinesOverTime(piwakawakaViewer): 
-    """
-    Takes care of interpolation between all ROIs to permit tracking
-    
-    """
-    # TODO - might need ot fix so same start point - just use ROI 0 and then all others start at closest pt
-    # this will be needed once change npts in ROIs etc
-    nSplinePts_i = 50
-    splinesList = piwakawakaViewer.Markups.getSplinesTimeIDList()
-    times = piwakawakaViewer.times
-    counts = [len(splinesList[timeID]) for timeID in range(len(times))]
-    countstf = [i>1 for i in counts]
-    if any(countstf):
-        raise ValueError("Must have one (or no) splines per time step")
-    if sum(counts) < 2:
-        raise ValueError("Must have splines at at least two time steps")
-    ID_FIRST_SPLINE = countstf.index(True)
-    XY = np.nan * np.ones((nSplinePts_i, len(times)+1, 2))
-    handDrawntf = [False] * len(times)
-    for iTimeID in range(len(times)):
-        if counts[iTimeID] > 0:
-            handDrawntf[iTimeID] = splinesList[iTimeID][0].isHandDrawn
-    handDrawntf = handDrawntf[ID_FIRST_SPLINE:] + handDrawntf[:ID_FIRST_SPLINE]
-    # Build XY matrix of spline points to interpolate between
-    for iTimeID in range(len(times)):
-        if handDrawntf[iTimeID]:
-            pts = splinesList[iTimeID][0].getPoints(nSplinePts=nSplinePts_i)
-            XY[:, iTimeID, :] = [i[:2] for i in pts]
-    if piwakawakaViewer.TIME_PERIODIC:
-        XY[:, -1, :] = XY[:, 0, :]
-    u = [i - ID_FIRST_SPLINE for i in range(len(times)) if handDrawntf[i]] + [len(times) + 1]
-    XY2 = splineRoisOverTime(XY, [float(i) / u[-1] for i in u])
-    for iTimeID in range(len(times)):
-        if not handDrawntf[iTimeID]:
-            colID = iTimeID - ID_FIRST_SPLINE
-            if ID_FIRST_SPLINE > iTimeID: colID -= 1
-            newPts = np.squeeze(XY2[:, colID, :])
-            newPts = [[i[0],i[1],0.0] for i in newPts]
-            piwakawakaViewer.Markups.addSpline(newPts, 
-                                                piwakawakaViewer.resliceDict[times[iTimeID]], 
-                                                piwakawakaViewer.renderer, 
-                                                piwakawakaViewer.graphicsViewVTK, 
-                                                timeID=iTimeID,
-                                                sliceID=piwakawakaViewer.getCurrentSliceID(),
-                                                LOOP=piwakawakaViewer.splineClosed, 
-                                                isHandDrawn=False)
-
-
-def interpolateSplinesOverSlices(self):
-    pass
-
-def splineRoisOverTime(XYmat, u):
-    """
-
-    :param XYmat: should be shape nPts_per_ROI x nTimeSteps+1 x 2
-        nans where not known. timeStep 0 must be known. timeStep -1 == 0
-                                XY[:, -1, :] = XY[:, 0, :]
-    :param u:
-    :return:
-    """
-    XYmat = XYmat * 10000.0
-    m, n, TWO = XYmat.shape
-    XYout = np.zeros((m, n, TWO))
-    newParams = np.linspace(0, 1, n)
-    for k1 in range(m):
-        xy = XYmat[k1, ~np.isnan(XYmat[k1, :, 0]), :].T
-        tck, _ = interpolate.splprep(xy, u=u, k=1, per=1)
-        newPts = interpolate.splev(newParams, tck)
-        XYout[k1, :, 0] = newPts[0]
-        XYout[k1, :, 1] = newPts[1]
-    return XYout / 10000.0
-
-
-
-### ====================================================================================================================
-def dummyModButtonAction():
-    logger.info("Nothing implemented")
-
-
-
-### ====================================================================================================================
-### ====================================================================================================================
-### ====================================================================================================================
-### ====================================================================================================================

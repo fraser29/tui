@@ -497,9 +497,14 @@ class BaseMarkupViewer:
         logger.info("Markup mode changed to: %s", mode)
 
     def splineClosedChanged(self, state):
-        """Handle spline closed setting change"""
+        """Closed loop vs open spline in the slice plane; applies to new markups and updates all existing splines."""
         self.splineClosed = state == 2  # Qt.Checked = 2
-        logger.debug("Spline closed setting changed to: %s", self.splineClosed)
+        logger.debug("Spline closed-loop setting changed to: %s", self.splineClosed)
+        try:
+            self.Markups.set_all_splines_loop(self.splineClosed)
+        except AttributeError:
+            pass
+        self._updateMarkups()
 
     # DATA ACCESS METHODS
     def getCurrentTime(self):

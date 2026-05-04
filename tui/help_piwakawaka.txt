@@ -31,7 +31,14 @@ Once created (3 points in spline mode):
 MARKUP MODES:
 • Point Mode: Add individual points
 • Spline Mode: Create spline curve
-• Closed Spline: Create closed spline curves
+• Closed Spline: Closed loop in the slice plane vs open polyline (not related to time).
+
+SPLINE TIME INTERPOLATION (4D cine):
+• Build manual splines on the slice you need at two or more time steps (orange curve = manual keyframe).
+• Click "Interpolate splines" to fill every other time step; new curves are automatic (cyan) and are replaced on the next interpolate.
+• Adjusting an automatic spline (move handle, etc.) promotes it to manual (orange) so it is never overwritten by interpolation.
+• Only manual keyframes are used to compute the in-between splines (linear interpolation in time per curve sample).
+• "Periodic temporal interpolation": time wraps over one cine cycle (last frame connects to first) when interpolating; leave off for acyclic time (e.g. breath-hold).
 
 VIEW CONTROLS:
 • Use slice orientation to switch between views

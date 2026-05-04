@@ -134,7 +134,7 @@ class Markups(object):
                                                     reslice=self.parentImageViewer.getCurrentReslice(), 
                                                     renderer=self.parentImageViewer.getCurrentRenderer(), 
                                                     interactor=self.parentImageViewer.graphicsViewVTK, 
-                                                    handDrawn=True,
+                                                    is_manual=True,
                                                     LOOP=self.parentImageViewer.splineClosed,
                                                     timeID=timeID, 
                                                     sliceID=sliceID,
@@ -167,8 +167,23 @@ class Markups(object):
         except IndexError:
             pass
     # ============ SPLINES =============================================================================================
-    def addSpline(self, pts, reslice, renderer, interactor, timeID, sliceID, LOOP, isHandDrawn=True):
-        self.markupsDict[Splines][timeID].addSpline(pts, reslice, renderer, interactor, handDrawn=isHandDrawn, LOOP=LOOP, timeID=timeID, sliceID=sliceID)
+    def addSpline(self, pts, reslice, renderer, interactor, timeID, sliceID, LOOP, is_manual=True):
+        self.markupsDict[Splines][timeID].addSpline(pts, reslice, renderer, interactor, is_manual=is_manual, LOOP=LOOP, timeID=timeID, sliceID=sliceID)
+
+    def clearSplinesAtTime(self, timeID):
+        """Remove all spline widgets at this time index (used before replacing auto splines)."""
+        if Splines not in self.markupsDict or timeID not in self.markupsDict[Splines]:
+            return
+        self._cleanupSplineWidgets(timeID)
+        self.markupsDict[Splines][timeID] = MarkupSplines()
+
+    def set_all_splines_loop(self, loop):
+        """Apply open vs periodic (closed) geometry to every spline at every time step."""
+        if Splines not in self.markupsDict:
+            return
+        for t_id in self.markupsDict[Splines]:
+            for sp in self.markupsDict[Splines][t_id]:
+                sp.set_loop(loop)
 
     # NOT USED
     def showSplines_timeID_CP(self, timeID, CP, N, dx): # Used by TUI
@@ -369,8 +384,8 @@ class MarkupSplines(list):
     def __init__(self):
         super(MarkupSplines, self).__init__([])
 
-    def addSpline(self, Xarrary_image, reslice, renderer, interactor, handDrawn, LOOP, timeID=0, sliceID=0, orientation=None):
-        self.append(MarkupSpline(Xarrary_image, reslice, renderer, interactor, handDrawn, LOOP, timeID=timeID, sliceID=sliceID, orientation=orientation))
+    def addSpline(self, Xarrary_image, reslice, renderer, interactor, is_manual, LOOP, timeID=0, sliceID=0, orientation=None):
+        self.append(MarkupSpline(Xarrary_image, reslice, renderer, interactor, is_manual, LOOP, timeID=timeID, sliceID=sliceID, orientation=orientation))
 
     def getSplinePolyData_WorldCS(self, imageToWorld_func, nSplinePts=100):
         return vtkfilters.appendPolyDataList([i.getSplinePolyData_WorldCS(imageToWorld_func, nSplinePts) for i in self])
@@ -381,7 +396,11 @@ class MarkupSplines(list):
 ### ====================================================================================================================
 ### MARKUP - SPLINE
 class MarkupSpline(Markup, vtk.vtkSplineWidget):
-    def __init__(self, handlePoints, reslice, renderer, interactor, handDrawn, LOOP, timeID=0, sliceID=0, orientation=None):
+    # Line colours: manual = user keyframe (never overwritten by interpolation); automatic = filled in by interpolation.
+    _COLOR_MANUAL = (0.95, 0.32, 0.18)
+    _COLOR_AUTO = (0.35, 0.78, 1.0)
+
+    def __init__(self, handlePoints, reslice, renderer, interactor, is_manual, LOOP, timeID=0, sliceID=0, orientation=None):
         Markup.__init__(self, timeID, sliceID, orientation)
         vtk.vtkSplineWidget.__init__(self)
         self.LOOP = LOOP
@@ -399,8 +418,8 @@ class MarkupSpline(Markup, vtk.vtkSplineWidget):
         self.Off()
         self.SetEnabled(0)
 
-        self._isHandDrawn = handDrawn
-        self.GetLineProperty().SetColor(1,0,1)
+        self._isManual = bool(is_manual)
+        self._applyManualLineColor()
         ##
         self.SetEnabled(1)
         self.On()
@@ -410,25 +429,40 @@ class MarkupSpline(Markup, vtk.vtkSplineWidget):
         ##
         self.AddObserver("EndInteractionEvent", self.splineUpdated)
 
+    def set_loop(self, loop):
+        """Periodic (closed) spline along the contour vs open polyline; updates VTK widget and resampling."""
+        self.LOOP = bool(loop)
+        if self.LOOP:
+            self.ClosedOn()
+        else:
+            self.ClosedOff()
+
+    def _applyManualLineColor(self):
+        c = self._COLOR_MANUAL if self._isManual else self._COLOR_AUTO
+        self.GetLineProperty().SetColor(c[0], c[1], c[2])
 
     @property
+    def isManual(self):
+        """True if user-built or user-edited (never overwritten by time interpolation)."""
+        return self._isManual
+
+    @isManual.setter
+    def isManual(self, value):
+        self._isManual = bool(value)
+        self._applyManualLineColor()
+
+    def splineUpdated(self, obj, event):
+        """Any edit promotes the spline to manual so interpolation will not overwrite it."""
+        self.isManual = True
+
+    # Backward-compatible alias (same meaning as isManual in this codebase).
+    @property
     def isHandDrawn(self):
-        logger.info("Getting isHandDrawn value")
-        return self._isHandDrawn
+        return self._isManual
 
     @isHandDrawn.setter
     def isHandDrawn(self, tf):
-        self._isHandDrawn = tf
-        if self._isHandDrawn:
-            self.SetEnabled(1)
-            self.On()
-        else:
-            self.SetEnabled(0)
-            self.Off()
-
-    def splineUpdated(self, obj, event):
-        self.isHandDrawn = True
-        self.GetLineProperty().SetColor(1,0,0)
+        self.isManual = tf
 
     def setPoints(self, pts, subSample=1):
         IDs = list(range(0,len(pts), subSample))
@@ -467,7 +501,7 @@ class MarkupSpline(Markup, vtk.vtkSplineWidget):
         self.SetNumberOfHandles(self.GetNumberOfHandles() + 1)
         self.SetEnabled(1)
         self.On()
-        self.GetLineProperty().SetColor(1,0,0)
+        self.isManual = True
 
     def getActor(self):
         pass
