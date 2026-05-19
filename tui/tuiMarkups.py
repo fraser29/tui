@@ -185,7 +185,7 @@ class Markups(object):
             for sp in self.markupsDict[Splines][t_id]:
                 sp.set_loop(loop)
 
-    # NOT USED
+
     def showSplines_timeID_CP(self, timeID, CP, N, dx): # Used by TUI
         for iTimeID in self.markupsDict[Splines].keys():
             for iSpline in self.markupsDict[Splines][timeID]:

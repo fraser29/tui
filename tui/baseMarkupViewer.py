@@ -144,8 +144,10 @@ class BaseMarkupViewer:
 
     def saveLine(self, featureName=None, LINE_LOOP=False, prefix='line'):
         """Save line as polydata"""
+        logger.debug("DEBUG: saveLine: %s, %s, %s", featureName, LINE_LOOP, prefix)
         try:
             lineDict = self.getMarkupAsPolydata_lines(LINE_LOOP=LINE_LOOP)
+            logger.debug("DEBUG: lineDict: %d time points", len(lineDict))
             return self._save(lineDict, featureName=featureName, prefix=prefix)
         except Exception as e:
             logger.error("Error in _saveLine: %s", e)
@@ -180,6 +182,7 @@ class BaseMarkupViewer:
 
     def getMarkupAsPolydata_lines(self, LINE_LOOP=False):
         try:
+            logger.debug("DEBUG: getMarkupAsPolydata_lines: %s, %s", LINE_LOOP, self.markupMode)
             if self.markupMode == 'Spline':
                 lineDict = self.getMarkupAsPolydata()
             else:
@@ -366,6 +369,10 @@ class BaseMarkupViewer:
                 self.modPushButtons[k1].setEnabled(True)
                 if self.modPushButtonDict[k1][1] == dummyModButtonAction:
                     self.modPushButtons[k1].setEnabled(False)
+                else:
+                    logger.debug(f"DEBUG: modPushButton {k1} enabled: {self.modPushButtonDict[k1][0]}")
+            logger.info("Updated modPushButtonDict")
+
 
     def setUserDefinedKeyPress(self, newKeyPressDict=None):
         """Set user-defined key press callbacks"""

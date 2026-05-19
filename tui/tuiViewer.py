@@ -364,6 +364,7 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
             piwakawaka_viewer.orientationComboBox.setCurrentText("Custom")
             if len(centers_list) == 1:
                 piwakawaka_viewer.orientationComboBox.setEnabled(False)
+            piwakawaka_viewer.updatePushButtonDict(self.modPushButtonDict)
 
             logger.info("Launched piwakawaka with reslice data from %d time points", len(self.times))
             
