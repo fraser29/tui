@@ -23,6 +23,47 @@ logger = logging.getLogger(__name__)
 ### COORDINATE SYSTEM ABSTRACTION
 ### ====================================================================================================================
 
+def _image_cs_to_world(imageToWorld_func, pt, slice_id, time_id):
+    """Call viewer image→world; supports optional sliceID/timeID (piwakawaka)."""
+    try:
+        w = imageToWorld_func(pt, sliceID=slice_id, timeID=time_id)
+    except TypeError:
+        try:
+            w = imageToWorld_func(pt, slice_id)
+        except TypeError:
+            w = imageToWorld_func(pt)
+    if w is None:
+        raise ValueError("image to world coordinate transform returned None")
+    return w
+
+
+def _resample_polyline_handles(pts, n_out, periodic=False):
+    """Chord-length resample when scipy splprep fails (e.g. sparse auto splines).
+
+    Returns array shaped like ``splinePoints(..., RETURN_NUMPY=False)``: (3, n_out).
+    """
+    arr = np.asarray(pts, dtype=float)
+    if arr.ndim != 2:
+        arr = arr.reshape(-1, 3)
+    if len(arr) < 2:
+        raise ValueError("need at least 2 points to resample")
+    if periodic:
+        arr = np.vstack([arr, arr[0]])
+    seg = np.linalg.norm(np.diff(arr, axis=0), axis=1)
+    cum = np.concatenate([[0.0], np.cumsum(seg)])
+    total = float(cum[-1])
+    if total <= 0.0:
+        raise ValueError("degenerate polyline for resampling")
+    t = np.linspace(0.0, total, int(n_out), endpoint=not periodic)
+    out = np.zeros((len(t), 3))
+    for i, ti in enumerate(t):
+        j = max(0, int(np.searchsorted(cum, ti, side='right') - 1))
+        j = min(j, len(arr) - 2)
+        denom = cum[j + 1] - cum[j]
+        u = (ti - cum[j]) / denom if denom > 0.0 else 0.0
+        out[i] = (1.0 - u) * arr[j] + u * arr[j + 1]
+    return out.T
+
 
 ### ====================================================================================================================
 ### ====================================================================================================================
@@ -217,8 +258,10 @@ class Markups(object):
         """Get splines list for each time"""
         return [self.markupsDict[Splines].get(iTimeID, []) for iTimeID in range(self.nTimes)]
 
-    def getSplinePolyData(self, timeID, nSplinePts=100):
-        return self.markupsDict[Splines][timeID].getSplinePolyData_WorldCS(self.parentImageViewer.imageCS_To_WorldCS_X, nSplinePts)
+    def getSplinePolyData(self, timeID, nSplinePts=100, sliceID=None):
+        splines = self.markupsDict[Splines].get(timeID, MarkupSplines())
+        return splines.getSplinePolyData_WorldCS(
+            self.parentImageViewer.imageCS_To_WorldCS_X, nSplinePts, sliceID=sliceID)
 
 
     def getAllPointsActors(self, timeID, pointSize, boundCP=None, boundN=None, bounddx=None, sliceID=None):
@@ -387,8 +430,25 @@ class MarkupSplines(list):
     def addSpline(self, Xarrary_image, reslice, renderer, interactor, is_manual, LOOP, timeID=0, sliceID=0, orientation=None):
         self.append(MarkupSpline(Xarrary_image, reslice, renderer, interactor, is_manual, LOOP, timeID=timeID, sliceID=sliceID, orientation=orientation))
 
-    def getSplinePolyData_WorldCS(self, imageToWorld_func, nSplinePts=100):
-        return vtkfilters.appendPolyDataList([i.getSplinePolyData_WorldCS(imageToWorld_func, nSplinePts) for i in self])
+    def getSplinePolyData_WorldCS(self, imageToWorld_func, nSplinePts=100, sliceID=None):
+        parts = []
+        for spline in self:
+            if sliceID is not None and spline.sliceID != sliceID:
+                continue
+            try:
+                pd = spline.getSplinePolyData_WorldCS(imageToWorld_func, nSplinePts)
+            except ValueError as e:
+                logger.warning(
+                    "Skipping spline timeID=%s sliceID=%s manual=%s: %s",
+                    spline.timeID, spline.sliceID, spline.isManual, e)
+                continue
+            if pd is not None and pd.GetNumberOfPoints() > 0:
+                parts.append(pd)
+        if not parts:
+            return vtk.vtkPolyData()
+        if len(parts) == 1:
+            return parts[0]
+        return vtkfilters.appendPolyDataList(parts)
 
     def isSplineOnThisSlice(self, sliceID):
         return any([i.sliceID==sliceID for i in self])
@@ -478,19 +538,42 @@ class MarkupSpline(Markup, vtk.vtkSplineWidget):
         return poly
 
     def getSplinePolyData_WorldCS(self, imageToWorld_func, nSplinePts=100):
-        pts = self.getPoints(nSplinePts=nSplinePts) # Note LOOP done here with splining
-        # but if self.LOOP  AND we had NO splining - then do loop. 
-        worldCoords = np.array([imageToWorld_func(i, self.sliceID) for i in pts])
-        return vtkfilters.buildPolyLineFromXYZ(worldCoords, LOOP=(self.LOOP and (nSplinePts is None)))
+        pts = self.getPoints(nSplinePts=nSplinePts)  # Note LOOP done here with splining
+        # but if self.LOOP AND we had NO splining - then do loop.
+        pts_arr = np.asarray(pts)
+        if pts_arr.ndim == 2 and pts_arr.shape[0] == 3 and pts_arr.shape[1] != 3:
+            pts_arr = pts_arr.T
+        worldCoords = np.array([
+            _image_cs_to_world(imageToWorld_func, pt, self.sliceID, self.timeID)
+            for pt in pts_arr
+        ])
+        return vtkfilters.buildPolyLineFromXYZ(worldCoords, LOOP=self.LOOP)
 
     def getPoints(self, nSplinePts=None):
         pts = []
         for k0 in range(self.GetNumberOfHandles()):
-            ixyz = [0.0,0.0,0.0]
+            ixyz = [0.0, 0.0, 0.0]
             self.GetHandlePosition(k0, ixyz)
             pts.append(ixyz)
+        min_handles = 3 if self.LOOP else 2
+        if len(pts) < min_handles:
+            raise ValueError(
+                "Spline needs at least %d handle(s) (has %d)" % (min_handles, len(pts)))
         if nSplinePts is not None:
-            pts = vtkfilters.ftk.splinePoints(pts, nSplinePts, periodic=self.LOOP, RETURN_NUMPY=False)
+            try:
+                pts = vtkfilters.ftk.splinePoints(
+                    pts, nSplinePts, periodic=self.LOOP, RETURN_NUMPY=False)
+            except ValueError:
+                logger.debug(
+                    "splinePoints failed (handles=%d, loop=%s), retrying open spline",
+                    len(pts), self.LOOP)
+                try:
+                    pts = vtkfilters.ftk.splinePoints(
+                        pts, nSplinePts, periodic=False, RETURN_NUMPY=False)
+                except ValueError:
+                    logger.debug(
+                        "open splinePoints failed, using chord-length resample")
+                    pts = _resample_polyline_handles(pts, nSplinePts, periodic=self.LOOP)
         return np.array(pts).T
 
     def getPlane(self):

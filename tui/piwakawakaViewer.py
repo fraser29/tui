@@ -508,11 +508,13 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         return ijk, X_worldCS, self.getPtID_at_IJK(ijk)
 
 
-    def imageCS_to_ResliceCS_X(self, imageCS_X, sliceID=None):
+    def imageCS_to_ResliceCS_X(self, imageCS_X, sliceID=None, timeID=None):
         if sliceID is None:
             matrix = self.getCurrentResliceMatrix()
         else:
-            currentTime = self.times[self.currentTimeID]
+            if timeID is None:
+                timeID = self.currentTimeID
+            currentTime = self.times[timeID]
             resliceList = self.resliceDict[currentTime]
             matrix = resliceList[sliceID].GetResliceAxes()
         return matrix.MultiplyPoint([imageCS_X[0], imageCS_X[1], imageCS_X[2], 1])[:3]
@@ -524,19 +526,31 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
         return inv_matrix.MultiplyPoint([resliceX[0], resliceX[1], resliceX[2], 1])[:3]
 
 
-    def imageCS_To_WorldCS_X(self, imageCS_X, sliceID=None):
+    def imageCS_To_WorldCS_X(self, imageCS_X, sliceID=None, timeID=None):
         """Convert image coordinates to world coordinates - need sliceID else will look at current
         **not dealing with orientation change**
             1. Convert image coordinates to reslice coordinates
             2. Get IJK coordinates in reslice coordinates
             3. Convert IJK coordinates to world coordinates using PatientMeta
+
+        *timeID* must match the spline's time step when exporting markups from non-current
+        frames (e.g. interpolated / automatic splines at other cardiac phases).
         """
-        worldX_in_reslice = self.imageCS_to_ResliceCS_X(imageCS_X, sliceID)
-        ijk_in_reslice = self.getIJKAtX(worldX_in_reslice)
-        if ijk_in_reslice is None:
-            return None
-        imageCS_ijk = np.array([ijk_in_reslice[0], ijk_in_reslice[1], ijk_in_reslice[2]])
-        return np.array(self.patientMeta.imageToPatientCoordinates(imageCS_ijk))
+        if timeID is None:
+            timeID = self.currentTimeID
+        saved_time_id = self.currentTimeID
+        try:
+            if timeID != self.currentTimeID:
+                self.currentTimeID = timeID
+            worldX_in_reslice = self.imageCS_to_ResliceCS_X(imageCS_X, sliceID, timeID)
+            ijk_in_reslice = self.getIJKAtX(worldX_in_reslice)
+            if ijk_in_reslice is None:
+                return None
+            imageCS_ijk = np.array([ijk_in_reslice[0], ijk_in_reslice[1], ijk_in_reslice[2]])
+            return np.array(self.patientMeta.imageToPatientCoordinates(imageCS_ijk))
+        finally:
+            if timeID != saved_time_id:
+                self.currentTimeID = saved_time_id
 
 
     def mouseXYTo_ImageCS_X(self, mouseX, mouseY):
@@ -702,12 +716,18 @@ class PIWAKAWAKAMarkupViewer(piwakawakamarkupui.QtWidgets.QMainWindow, piwakawak
                 t_eval = float(times[ti])
                 x_row = np.zeros(n_curve)
                 y_row = np.zeros(n_curve)
+                z_row = np.zeros(n_curve)
                 for k in range(n_curve):
                     xs = np.array([P_kf[j][0, curve_IDs[k]] for j in range(len(kf))])
                     ys = np.array([P_kf[j][1, curve_IDs[k]] for j in range(len(kf))])
+                    zs = np.array([P_kf[j][2, curve_IDs[k]] for j in range(len(kf))])
                     x_row[k] = _interp_scalar_in_time(t_eval, t_kf, xs, times, periodic_time)
                     y_row[k] = _interp_scalar_in_time(t_eval, t_kf, ys, times, periodic_time)
-                new_pts = [[float(x_row[k]), float(y_row[k]), 0.0] for k in range(n_curve)]
+                    z_row[k] = _interp_scalar_in_time(t_eval, t_kf, zs, times, periodic_time)
+                new_pts = [
+                    [float(x_row[k]), float(y_row[k]), float(z_row[k])]
+                    for k in range(n_curve)
+                ]
                 time_val = times[ti]
                 reslice = self.resliceDict[time_val][slice_id]
                 self.Markups.addSpline(

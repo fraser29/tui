@@ -9,6 +9,7 @@ Base viewer class for common functionality between 2D and 3D viewers.
 @email: callaghan.fm@gmail.com
 """
 
+import functools
 import logging
 import os
 import vtk
@@ -168,16 +169,20 @@ class BaseMarkupViewer:
     def getMarkupAsPolydata(self):
         """Get markups as polydata dictionary"""
         outDict = {}
-        try:
-            for k1 in range(len(self.times)):
+        for k1 in range(len(self.times)):
+            try:
                 if self.markupMode == 'Spline':
-                    pp = self.Markups.getSplinePolyData(timeID=k1, nSplinePts=self.nSplinePoints)
+                    logger.debug("DEBUG: getMarkupAsPolydata: Spline: %s", k1)
+                    pp = self.Markups.getSplinePolyData(
+                        timeID=k1, nSplinePts=self.nSplinePoints)
+                    logger.debug("DEBUG: getMarkupAsPolydata: pp: %s", pp.GetNumberOfPoints())
                 else:
                     pp = self.Markups.getPolyDataFromPoints(timeID=k1)
-                if pp.GetNumberOfPoints() > 0:
+                if pp is not None and pp.GetNumberOfPoints() > 0:
+                    logger.debug("DEBUG: getMarkupAsPolydata: Adding time: %s", self.times[k1])
                     outDict[self.times[k1]] = pp
-        except (AttributeError, ValueError) as e:
-            logger.error("Error getting markup polydata: %s", e)
+            except (AttributeError, ValueError) as e:
+                logger.debug("Skipping time index %s: %s", k1, e)
         return outDict
 
     def getMarkupAsPolydata_lines(self, LINE_LOOP=False):
@@ -365,13 +370,26 @@ class BaseMarkupViewer:
                     self.modPushButtons[k1].clicked.disconnect()
                 except (TypeError, RuntimeError):
                     pass
-                self.modPushButtons[k1].clicked.connect(self.modPushButtonDict[k1][1])
+                self.modPushButtons[k1].clicked.connect(
+                    as_qt_button_slot(self.modPushButtonDict[k1][1]))
                 self.modPushButtons[k1].setEnabled(True)
                 if self.modPushButtonDict[k1][1] == dummyModButtonAction:
                     self.modPushButtons[k1].setEnabled(False)
                 else:
                     logger.debug(f"DEBUG: modPushButton {k1} enabled: {self.modPushButtonDict[k1][0]}")
             logger.info("Updated modPushButtonDict")
+
+    def clone_mod_push_button_dict_for_viewer(self, target_viewer, button_dict=None):
+        """Return a copy of *button_dict* with callbacks rebound to *target_viewer*.
+
+        Used when opening a child viewer (e.g. piwakawaka) so customised mod buttons
+        run against that viewer's markups instead of this instance.
+
+        See :func:`clone_mod_push_button_dict`.
+        """
+        if button_dict is None:
+            button_dict = self.modPushButtonDict
+        return clone_mod_push_button_dict(button_dict, self, target_viewer)
 
 
     def setUserDefinedKeyPress(self, newKeyPressDict=None):
@@ -1054,6 +1072,72 @@ class BaseMarkupViewer:
         """Exit application"""
         self.close()
         return 0
+
+
+def clone_mod_push_button_dict(button_dict, source_viewer, target_viewer):
+    """Copy mod-button labels and rebind actions for a different viewer instance.
+
+    Supported callback styles:
+
+    * Bound methods on *source_viewer* (e.g. ``source_viewer.deleteAllMarkups``,
+      ``source_viewer._defaultSavePoints``) → same method on *target_viewer*.
+    * Bound methods on a TUI project (or similar) with ``owner.ex is source_viewer``
+      (e.g. ``project.savePolyPts_``) → run with ``owner.ex`` temporarily set to
+      *target_viewer* so ``self.ex.savePoints()`` uses piwakawaka markups.
+
+    Other callables (lambdas, free functions) are passed through unchanged.
+    """
+    cloned = {}
+    for key, (label, callback) in button_dict.items():
+        cloned[key] = [label, rebind_mod_button_callback(callback, source_viewer, target_viewer)]
+    return cloned
+
+
+def rebind_mod_button_callback(callback, source_viewer, target_viewer):
+    """Rebind a single mod-button callback to *target_viewer* (see :func:`clone_mod_push_button_dict`)."""
+    if callback is dummyModButtonAction:
+        return callback
+    if not callable(callback):
+        return callback
+
+    if isinstance(callback, functools.partial):
+        return callback
+
+    owner = getattr(callback, '__self__', None)
+    if owner is None:
+        return callback
+
+    if owner is source_viewer:
+        func = callback.__func__
+        return as_qt_button_slot(lambda: func(target_viewer))
+
+    if getattr(owner, 'ex', None) is source_viewer:
+        return _wrap_project_ex_callback(owner, target_viewer, callback)
+
+    return callback
+
+
+def as_qt_button_slot(callback):
+    """Wrap a handler for QPushButton.clicked (PyQt may pass an unused ``checked`` bool)."""
+    if callback is dummyModButtonAction:
+        return callback
+
+    def slot(*_args, **_kwargs):
+        return callback()
+
+    return slot
+
+
+def _wrap_project_ex_callback(project, target_viewer, callback):
+    """Run *callback* while ``project.ex`` points at *target_viewer*."""
+    def run_with_target_viewer():
+        old_ex = project.ex
+        project.ex = target_viewer
+        try:
+            return callback()
+        finally:
+            project.ex = old_ex
+    return as_qt_button_slot(run_with_target_viewer)
 
 
 def dummyModButtonAction():
