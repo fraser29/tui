@@ -585,9 +585,12 @@ class BaseMarkupViewer:
     def loadDicomDir(self, dicomDir):
         """Load DICOM directory"""
         dcmSeries = spydcmtk.dcmTK.DicomSeries.setFromDirectory(dicomDir)
+        self.loadDicomSereis_spydcmtk(dcmSeries, os.path.split(dicomDir)[0])
+
+    def loadDicomSeries(self, dcmSeries: spydcmtk.dcmTK.DicomSeries, workingDir: str):
         self.vtiDict = dcmSeries.buildVTIDict()
         logger.debug("Have VTI dict. Times (ms): %s", [int(i*1000.0) for i in sorted(self.vtiDict.keys())])
-        self.workingDir = os.path.split(dicomDir)[0]
+        self.workingDir = workingDir
         self._setupAfterLoad()
 
     def loadVTI_or_PVD(self, fileName=None):
