@@ -23,6 +23,47 @@ logger = logging.getLogger(__name__)
 ### COORDINATE SYSTEM ABSTRACTION
 ### ====================================================================================================================
 
+def _image_cs_to_world(imageToWorld_func, pt, slice_id, time_id):
+    """Call viewer image→world; supports optional sliceID/timeID (piwakawaka)."""
+    try:
+        w = imageToWorld_func(pt, sliceID=slice_id, timeID=time_id)
+    except TypeError:
+        try:
+            w = imageToWorld_func(pt, slice_id)
+        except TypeError:
+            w = imageToWorld_func(pt)
+    if w is None:
+        raise ValueError("image to world coordinate transform returned None")
+    return w
+
+
+def _resample_polyline_handles(pts, n_out, periodic=False):
+    """Chord-length resample when scipy splprep fails (e.g. sparse auto splines).
+
+    Returns array shaped like ``splinePoints(..., RETURN_NUMPY=False)``: (3, n_out).
+    """
+    arr = np.asarray(pts, dtype=float)
+    if arr.ndim != 2:
+        arr = arr.reshape(-1, 3)
+    if len(arr) < 2:
+        raise ValueError("need at least 2 points to resample")
+    if periodic:
+        arr = np.vstack([arr, arr[0]])
+    seg = np.linalg.norm(np.diff(arr, axis=0), axis=1)
+    cum = np.concatenate([[0.0], np.cumsum(seg)])
+    total = float(cum[-1])
+    if total <= 0.0:
+        raise ValueError("degenerate polyline for resampling")
+    t = np.linspace(0.0, total, int(n_out), endpoint=not periodic)
+    out = np.zeros((len(t), 3))
+    for i, ti in enumerate(t):
+        j = max(0, int(np.searchsorted(cum, ti, side='right') - 1))
+        j = min(j, len(arr) - 2)
+        denom = cum[j + 1] - cum[j]
+        u = (ti - cum[j]) / denom if denom > 0.0 else 0.0
+        out[i] = (1.0 - u) * arr[j] + u * arr[j + 1]
+    return out.T
+
 
 ### ====================================================================================================================
 ### ====================================================================================================================
@@ -134,7 +175,7 @@ class Markups(object):
                                                     reslice=self.parentImageViewer.getCurrentReslice(), 
                                                     renderer=self.parentImageViewer.getCurrentRenderer(), 
                                                     interactor=self.parentImageViewer.graphicsViewVTK, 
-                                                    handDrawn=True,
+                                                    is_manual=True,
                                                     LOOP=self.parentImageViewer.splineClosed,
                                                     timeID=timeID, 
                                                     sliceID=sliceID,
@@ -167,10 +208,25 @@ class Markups(object):
         except IndexError:
             pass
     # ============ SPLINES =============================================================================================
-    def addSpline(self, pts, reslice, renderer, interactor, timeID, sliceID, LOOP, isHandDrawn=True):
-        self.markupsDict[Splines][timeID].addSpline(pts, reslice, renderer, interactor, handDrawn=isHandDrawn, LOOP=LOOP, timeID=timeID, sliceID=sliceID)
+    def addSpline(self, pts, reslice, renderer, interactor, timeID, sliceID, LOOP, is_manual=True):
+        self.markupsDict[Splines][timeID].addSpline(pts, reslice, renderer, interactor, is_manual=is_manual, LOOP=LOOP, timeID=timeID, sliceID=sliceID)
 
-    # NOT USED
+    def clearSplinesAtTime(self, timeID):
+        """Remove all spline widgets at this time index (used before replacing auto splines)."""
+        if Splines not in self.markupsDict or timeID not in self.markupsDict[Splines]:
+            return
+        self._cleanupSplineWidgets(timeID)
+        self.markupsDict[Splines][timeID] = MarkupSplines()
+
+    def set_all_splines_loop(self, loop):
+        """Apply open vs periodic (closed) geometry to every spline at every time step."""
+        if Splines not in self.markupsDict:
+            return
+        for t_id in self.markupsDict[Splines]:
+            for sp in self.markupsDict[Splines][t_id]:
+                sp.set_loop(loop)
+
+
     def showSplines_timeID_CP(self, timeID, CP, N, dx): # Used by TUI
         for iTimeID in self.markupsDict[Splines].keys():
             for iSpline in self.markupsDict[Splines][timeID]:
@@ -202,8 +258,10 @@ class Markups(object):
         """Get splines list for each time"""
         return [self.markupsDict[Splines].get(iTimeID, []) for iTimeID in range(self.nTimes)]
 
-    def getSplinePolyData(self, timeID, nSplinePts=100):
-        return self.markupsDict[Splines][timeID].getSplinePolyData_WorldCS(self.parentImageViewer.imageCS_To_WorldCS_X, nSplinePts)
+    def getSplinePolyData(self, timeID, nSplinePts=100, sliceID=None):
+        splines = self.markupsDict[Splines].get(timeID, MarkupSplines())
+        return splines.getSplinePolyData_WorldCS(
+            self.parentImageViewer.imageCS_To_WorldCS_X, nSplinePts, sliceID=sliceID)
 
 
     def getAllPointsActors(self, timeID, pointSize, boundCP=None, boundN=None, bounddx=None, sliceID=None):
@@ -369,11 +427,28 @@ class MarkupSplines(list):
     def __init__(self):
         super(MarkupSplines, self).__init__([])
 
-    def addSpline(self, Xarrary_image, reslice, renderer, interactor, handDrawn, LOOP, timeID=0, sliceID=0, orientation=None):
-        self.append(MarkupSpline(Xarrary_image, reslice, renderer, interactor, handDrawn, LOOP, timeID=timeID, sliceID=sliceID, orientation=orientation))
+    def addSpline(self, Xarrary_image, reslice, renderer, interactor, is_manual, LOOP, timeID=0, sliceID=0, orientation=None):
+        self.append(MarkupSpline(Xarrary_image, reslice, renderer, interactor, is_manual, LOOP, timeID=timeID, sliceID=sliceID, orientation=orientation))
 
-    def getSplinePolyData_WorldCS(self, imageToWorld_func, nSplinePts=100):
-        return vtkfilters.appendPolyDataList([i.getSplinePolyData_WorldCS(imageToWorld_func, nSplinePts) for i in self])
+    def getSplinePolyData_WorldCS(self, imageToWorld_func, nSplinePts=100, sliceID=None):
+        parts = []
+        for spline in self:
+            if sliceID is not None and spline.sliceID != sliceID:
+                continue
+            try:
+                pd = spline.getSplinePolyData_WorldCS(imageToWorld_func, nSplinePts)
+            except ValueError as e:
+                logger.warning(
+                    "Skipping spline timeID=%s sliceID=%s manual=%s: %s",
+                    spline.timeID, spline.sliceID, spline.isManual, e)
+                continue
+            if pd is not None and pd.GetNumberOfPoints() > 0:
+                parts.append(pd)
+        if not parts:
+            return vtk.vtkPolyData()
+        if len(parts) == 1:
+            return parts[0]
+        return vtkfilters.appendPolyDataList(parts)
 
     def isSplineOnThisSlice(self, sliceID):
         return any([i.sliceID==sliceID for i in self])
@@ -381,7 +456,11 @@ class MarkupSplines(list):
 ### ====================================================================================================================
 ### MARKUP - SPLINE
 class MarkupSpline(Markup, vtk.vtkSplineWidget):
-    def __init__(self, handlePoints, reslice, renderer, interactor, handDrawn, LOOP, timeID=0, sliceID=0, orientation=None):
+    # Line colours: manual = user keyframe (never overwritten by interpolation); automatic = filled in by interpolation.
+    _COLOR_MANUAL = (0.95, 0.32, 0.18)
+    _COLOR_AUTO = (0.35, 0.78, 1.0)
+
+    def __init__(self, handlePoints, reslice, renderer, interactor, is_manual, LOOP, timeID=0, sliceID=0, orientation=None):
         Markup.__init__(self, timeID, sliceID, orientation)
         vtk.vtkSplineWidget.__init__(self)
         self.LOOP = LOOP
@@ -399,8 +478,8 @@ class MarkupSpline(Markup, vtk.vtkSplineWidget):
         self.Off()
         self.SetEnabled(0)
 
-        self._isHandDrawn = handDrawn
-        self.GetLineProperty().SetColor(1,0,1)
+        self._isManual = bool(is_manual)
+        self._applyManualLineColor()
         ##
         self.SetEnabled(1)
         self.On()
@@ -410,25 +489,40 @@ class MarkupSpline(Markup, vtk.vtkSplineWidget):
         ##
         self.AddObserver("EndInteractionEvent", self.splineUpdated)
 
+    def set_loop(self, loop):
+        """Periodic (closed) spline along the contour vs open polyline; updates VTK widget and resampling."""
+        self.LOOP = bool(loop)
+        if self.LOOP:
+            self.ClosedOn()
+        else:
+            self.ClosedOff()
+
+    def _applyManualLineColor(self):
+        c = self._COLOR_MANUAL if self._isManual else self._COLOR_AUTO
+        self.GetLineProperty().SetColor(c[0], c[1], c[2])
 
     @property
+    def isManual(self):
+        """True if user-built or user-edited (never overwritten by time interpolation)."""
+        return self._isManual
+
+    @isManual.setter
+    def isManual(self, value):
+        self._isManual = bool(value)
+        self._applyManualLineColor()
+
+    def splineUpdated(self, obj, event):
+        """Any edit promotes the spline to manual so interpolation will not overwrite it."""
+        self.isManual = True
+
+    # Backward-compatible alias (same meaning as isManual in this codebase).
+    @property
     def isHandDrawn(self):
-        logger.info("Getting isHandDrawn value")
-        return self._isHandDrawn
+        return self._isManual
 
     @isHandDrawn.setter
     def isHandDrawn(self, tf):
-        self._isHandDrawn = tf
-        if self._isHandDrawn:
-            self.SetEnabled(1)
-            self.On()
-        else:
-            self.SetEnabled(0)
-            self.Off()
-
-    def splineUpdated(self, obj, event):
-        self.isHandDrawn = True
-        self.GetLineProperty().SetColor(1,0,0)
+        self.isManual = tf
 
     def setPoints(self, pts, subSample=1):
         IDs = list(range(0,len(pts), subSample))
@@ -444,19 +538,42 @@ class MarkupSpline(Markup, vtk.vtkSplineWidget):
         return poly
 
     def getSplinePolyData_WorldCS(self, imageToWorld_func, nSplinePts=100):
-        pts = self.getPoints(nSplinePts=nSplinePts) # Note LOOP done here with splining
-        # but if self.LOOP  AND we had NO splining - then do loop. 
-        worldCoords = np.array([imageToWorld_func(i, self.sliceID) for i in pts])
-        return vtkfilters.buildPolyLineFromXYZ(worldCoords, LOOP=(self.LOOP and (nSplinePts is None)))
+        pts = self.getPoints(nSplinePts=nSplinePts)  # Note LOOP done here with splining
+        # but if self.LOOP AND we had NO splining - then do loop.
+        pts_arr = np.asarray(pts)
+        if pts_arr.ndim == 2 and pts_arr.shape[0] == 3 and pts_arr.shape[1] != 3:
+            pts_arr = pts_arr.T
+        worldCoords = np.array([
+            _image_cs_to_world(imageToWorld_func, pt, self.sliceID, self.timeID)
+            for pt in pts_arr
+        ])
+        return vtkfilters.buildPolyLineFromXYZ(worldCoords, LOOP=self.LOOP)
 
     def getPoints(self, nSplinePts=None):
         pts = []
         for k0 in range(self.GetNumberOfHandles()):
-            ixyz = [0.0,0.0,0.0]
+            ixyz = [0.0, 0.0, 0.0]
             self.GetHandlePosition(k0, ixyz)
             pts.append(ixyz)
+        min_handles = 3 if self.LOOP else 2
+        if len(pts) < min_handles:
+            raise ValueError(
+                "Spline needs at least %d handle(s) (has %d)" % (min_handles, len(pts)))
         if nSplinePts is not None:
-            pts = vtkfilters.ftk.splinePoints(pts, nSplinePts, periodic=self.LOOP, RETURN_NUMPY=False)
+            try:
+                pts = vtkfilters.ftk.splinePoints(
+                    pts, nSplinePts, periodic=self.LOOP, RETURN_NUMPY=False)
+            except ValueError:
+                logger.debug(
+                    "splinePoints failed (handles=%d, loop=%s), retrying open spline",
+                    len(pts), self.LOOP)
+                try:
+                    pts = vtkfilters.ftk.splinePoints(
+                        pts, nSplinePts, periodic=False, RETURN_NUMPY=False)
+                except ValueError:
+                    logger.debug(
+                        "open splinePoints failed, using chord-length resample")
+                    pts = _resample_polyline_handles(pts, nSplinePts, periodic=self.LOOP)
         return np.array(pts).T
 
     def getPlane(self):
@@ -467,7 +584,7 @@ class MarkupSpline(Markup, vtk.vtkSplineWidget):
         self.SetNumberOfHandles(self.GetNumberOfHandles() + 1)
         self.SetEnabled(1)
         self.On()
-        self.GetLineProperty().SetColor(1,0,0)
+        self.isManual = True
 
     def getActor(self):
         pass

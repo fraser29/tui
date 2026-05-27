@@ -354,16 +354,25 @@ class TUIMarkupViewer(tuimarkupui.QtWidgets.QMainWindow, tuimarkupui.Ui_BASEUI, 
             app = piwakawakamarkupui.QtWidgets.QApplication.instance()
             if app is None:
                 app = piwakawakamarkupui.QtWidgets.QApplication(['PIWAKAWAKA Reslice Viewer'])
-            # Create piwakawaka viewer instance
+            # Create piwakawaka viewer instance (connections() wires its own save buttons)
             piwakawaka_viewer = piwakawakaViewer.PIWAKAWAKAMarkupViewer()
             piwakawaka_viewer.loadVTI_or_PVD(self.vtiDict)
             piwakawaka_viewer.setCustomSliceCentersAndNormals(centers_list, normals_list)
             piwakawaka_viewer.workingDir = self.workingDir
+            piwakawaka_viewer.markupMode = self.markupMode
+            piwakawaka_viewer.splineClosed = self.splineClosed
             piwakawaka_viewer.rotateCamera90()
             piwakawaka_viewer.rotateCamera90()
             piwakawaka_viewer.orientationComboBox.setCurrentText("Custom")
             if len(centers_list) == 1:
                 piwakawaka_viewer.orientationComboBox.setEnabled(False)
+            # Same customised mod buttons as this viewer, rebound to piwakawaka
+            # (TUIProject savePolyPts_ etc. run with project.ex -> piwakawaka_viewer).
+            piwakawaka_viewer.updatePushButtonDict(
+                self.clone_mod_push_button_dict_for_viewer(piwakawaka_viewer))
+            if not hasattr(self, '_piwakawaka_viewers'):
+                self._piwakawaka_viewers = []
+            self._piwakawaka_viewers.append(piwakawaka_viewer)
 
             logger.info("Launched piwakawaka with reslice data from %d time points", len(self.times))
             

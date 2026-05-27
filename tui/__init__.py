@@ -28,8 +28,13 @@ def configure_logging(level=logging.INFO, fmt=None):
     from tui.  If your application already configures Python logging globally
     you do not need this; just call :func:`set_log_level` instead.
 
+    Safe to call more than once: reuses an existing stream handler and only
+    updates the level, so a host app that configures DEBUG before importing
+    tui submodules is not reset to INFO by a later call.
+
     Args:
-        level: Logging level to apply (default: ``logging.INFO``).
+        level: Logging level to apply (default: ``logging.INFO``).  Accepts
+               level names such as ``"DEBUG"`` as well as ``logging`` constants.
         fmt:   Format string for log records.  Defaults to a format that
                includes timestamp, logger name and level.
 
@@ -39,10 +44,18 @@ def configure_logging(level=logging.INFO, fmt=None):
         tui.configure_logging()          # INFO and above
         tui.configure_logging(level=logging.DEBUG)
     """
+    if isinstance(level, str):
+        level = getattr(logging, level.upper())
     if fmt is None:
         fmt = '%(asctime)s  %(name)-35s  %(levelname)-8s  %(message)s'
-    handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter(fmt))
     tui_logger = logging.getLogger('tui')
-    tui_logger.addHandler(handler)
+    handler = None
+    for h in tui_logger.handlers:
+        if isinstance(h, logging.StreamHandler) and not isinstance(h, logging.FileHandler):
+            handler = h
+            break
+    if handler is None:
+        handler = logging.StreamHandler()
+        tui_logger.addHandler(handler)
+    handler.setFormatter(logging.Formatter(fmt))
     tui_logger.setLevel(level)

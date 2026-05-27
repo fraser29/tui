@@ -11,11 +11,13 @@ from tui import tuiUtils
 
 
 class Ui_BASEUI(BaseMarkupUI):
-    def setupUi(self, BASEUI):
-        """Setup Piwakawaka-specific UI components."""
-        # Call parent setup
-        super().setupUi(BASEUI)
-    
+    def _setupSubclassSpecific(self, BASEUI):
+        """Widgets that must exist before BaseMarkupUI.retranslateUi (runs at end of setupUi)."""
+        self.temporalPeriodicSplineCheck = QtWidgets.QCheckBox(self.markupGroupBox)
+        self.temporalPeriodicSplineCheck.setObjectName("temporalPeriodicSplineCheck")
+        self.temporalPeriodicSplineCheck.setChecked(False)
+        self.markupModeLayout.addWidget(self.temporalPeriodicSplineCheck)
+
     def _addGraphicsViewControls(self):
         """Add Piwakawaka-specific graphics view controls."""
         # Add vertical slice slider
@@ -111,9 +113,11 @@ class Ui_BASEUI(BaseMarkupUI):
         self.imManip_B.setText(_translate("BASEUI", "Rotate 90°"))
         
         # Markup controls
-        self.imMarkupButton_A.setText(_translate("BASEUI", "Nothing"))
+        self.imMarkupButton_A.setText(_translate("BASEUI", "Interpolate splines"))
         self.imMarkupButton_B.setText(_translate("BASEUI", "Nothing"))
         self.closedSplineCheck.setText(_translate("BASEUI", "Closed Spline"))
+        self.temporalPeriodicSplineCheck.setText(
+            _translate("BASEUI", "Periodic temporal interpolation"))
         
         # Animation controls
         self.speedLabel.setText(_translate("BASEUI", "Speed:"))

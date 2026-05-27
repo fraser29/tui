@@ -24,8 +24,6 @@ import tui as _tui_pkg
 
 logger = logging.getLogger(__name__)
 
-
-
 ### ====================================================================================================================
 ### ====================================================================================================================
 
@@ -35,9 +33,8 @@ class _TUIProj(object):
         self.app = app
         self.VERBOSE = VERBOSE
         if self.VERBOSE:
-            logger.setLevel(logging.DEBUG)
-        else:
-            logger.setLevel(logging.INFO)
+            _tui_pkg.set_log_level(logging.DEBUG)
+            logger.debug("DEBUG logging enabled for tui package")
     
     def setup(self, inputPath, workDir=None, scalar=None):
         if os.path.isdir(inputPath): # DICOM directory
@@ -106,14 +103,10 @@ class TUIProject(_TUIProj):
     def __init__(self, app=None, VERBOSE=False):
         if app is None:
             app = tuimarkupui.QtWidgets.QApplication(['TUI Image Viewer'])
-        super().__init__(app)
+        super().__init__(app, VERBOSE=VERBOSE)
         self.ex = tuiViewer.TUIMarkupViewer()
         logger.info("TUIProject initialized")
-        self.VERBOSE = VERBOSE
-        if self.VERBOSE:
-            logger.setLevel(logging.DEBUG)
-        else:
-            logger.setLevel(logging.INFO)
+        logger.debug("DEBUG: VERBOSE: %s", VERBOSE)
 
     def alignBy_X_Norm(self, X, Norm):
         logger.debug("This is centering but not aligning.")
@@ -155,14 +148,9 @@ class TUI2DProject(_TUIProj):
     def __init__(self, app=None, VERBOSE=False):
         if app is None:
             app = piwakawakamarkupui.QtWidgets.QApplication(['PIWAKAWAKA Image Viewer'])
-        super().__init__(app)
+        super().__init__(app, VERBOSE=VERBOSE)
         self.ex = piwakawakaViewer.PIWAKAWAKAMarkupViewer()
         logger.info("TUI2DProject initialized")
-        self.VERBOSE = VERBOSE
-        if self.VERBOSE:
-            logger.setLevel(logging.DEBUG)
-        else:
-            logger.setLevel(logging.INFO)
 
 
 
@@ -297,10 +285,10 @@ def launch2D(inputPath, scalar, workDir):
     sys.exit(app.exec_())
 
 
-def LaunchCustomApp(TUIApp, subjObj):
+def LaunchCustomApp(TUIApp, subjObj, VERBOSE=False):
     app = tuimarkupui.QtWidgets.QApplication(['TUI Image Viewer'])
     try:
-        OBJ = TUIApp(app)
+        OBJ = TUIApp(app, VERBOSE=VERBOSE)
     except TypeError:
         OBJ = TUIApp(app)
     OBJ.setup(subjObj)
