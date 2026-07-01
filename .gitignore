@@ -163,3 +163,4 @@ cython_debug/
 
 
 sandbox*
+TEST_DATA/
