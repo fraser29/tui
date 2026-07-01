@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<VTKFile type="Collection" version="0.1" byte_order="LittleEndian">
+<Collection>
+<DataSet timestep="0.00000" file="markup_splines_000000.vtp"/>
+<DataSet timestep="0.02813" file="markup_splines_000001.vtp"/>
+<DataSet timestep="0.05625" file="markup_splines_000002.vtp"/>
+<DataSet timestep="0.08438" file="markup_splines_000003.vtp"/>
+<DataSet timestep="0.11250" file="markup_splines_000004.vtp"/>
+<DataSet timestep="0.14062" file="markup_splines_000005.vtp"/>
+<DataSet timestep="0.16875" file="markup_splines_000006.vtp"/>
+<DataSet timestep="0.19687" file="markup_splines_000007.vtp"/>
+<DataSet timestep="0.22500" file="markup_splines_000008.vtp"/>
+<DataSet timestep="0.25312" file="markup_splines_000009.vtp"/>
+<DataSet timestep="0.28125" file="markup_splines_000010.vtp"/>
+<DataSet timestep="0.30938" file="markup_splines_000011.vtp"/>
+<DataSet timestep="0.33750" file="markup_splines_000012.vtp"/>
+<DataSet timestep="0.36563" file="markup_splines_000013.vtp"/>
+<DataSet timestep="0.39375" file="markup_splines_000014.vtp"/>
+<DataSet timestep="0.42188" file="markup_splines_000015.vtp"/>
+<DataSet timestep="0.45000" file="markup_splines_000016.vtp"/>
+<DataSet timestep="0.47813" file="markup_splines_000017.vtp"/>
+<DataSet timestep="0.50625" file="markup_splines_000018.vtp"/>
+<DataSet timestep="0.53438" file="markup_splines_000019.vtp"/>
+<DataSet timestep="0.56250" file="markup_splines_000020.vtp"/>
+<DataSet timestep="0.59063" file="markup_splines_000021.vtp"/>
+<DataSet timestep="0.61875" file="markup_splines_000022.vtp"/>
+<DataSet timestep="0.64687" file="markup_splines_000023.vtp"/>
+<DataSet timestep="0.67500" file="markup_splines_000024.vtp"/>
+<DataSet timestep="0.70312" file="markup_splines_000025.vtp"/>
+<DataSet timestep="0.73125" file="markup_splines_000026.vtp"/>
+<DataSet timestep="0.75938" file="markup_splines_000027.vtp"/>
+<DataSet timestep="0.78750" file="markup_splines_000028.vtp"/>
+<DataSet timestep="0.81563" file="markup_splines_000029.vtp"/>
+<DataSet timestep="0.84375" file="markup_splines_000030.vtp"/>
+<DataSet timestep="0.87188" file="markup_splines_000031.vtp"/>
+<DataSet timestep="0.90000" file="markup_splines_000032.vtp"/>
+<DataSet timestep="0.92812" file="markup_splines_000033.vtp"/>
+<DataSet timestep="0.95625" file="markup_splines_000034.vtp"/>
+<DataSet timestep="0.98438" file="markup_splines_000035.vtp"/>
+<DataSet timestep="1.01250" file="markup_splines_000036.vtp"/>
+<DataSet timestep="1.04063" file="markup_splines_000037.vtp"/>
+<DataSet timestep="1.06875" file="markup_splines_000038.vtp"/>
+<DataSet timestep="1.09688" file="markup_splines_000039.vtp"/>
+</Collection>
+</VTKFile>

@@ -1,61 +1,98 @@
+"""TUI - a customisable 4-panel medical image viewer.
+
+The package is organised so that the heavy lifting (data model, IO and markup
+logic) is decoupled from the Qt/VTK presentation layer.  This keeps the model
+fully testable without a display and makes the viewer straightforward to extend.
+
+Typical library use::
+
+    from tui import launch, ViewerApp
+
+    class MyViewer(ViewerApp):
+        def customise(self):
+            self.set_custom_button(0, 0, "Save ROI", self.save_roi)
+
+        def save_roi(self):
+            self.save_markups("/tmp/roi")
+
+    launch("/path/to/data.vti", viewer_class=MyViewer)
+
+The data model (:mod:`tui.core`) and IO (:mod:`tui.io`) can be imported
+and used without ever importing Qt.
+"""
+
+from __future__ import annotations
+
 import logging
 
-# Add a NullHandler to prevent "No handlers could be found" warnings
-# when tui is used as a library without logging configured.
+__version__ = "0.1.0"
+__author__ = "Fraser M. Callaghan"
+
+# Library convention: never configure logging on import - host apps own it.
 logging.getLogger(__name__).addHandler(logging.NullHandler())
+
+# Lightweight, dependency-free exports (no Qt/VTK import side effects here).
+from .core.enums import Orientation, ViewType, MarkupMode  # noqa: E402
+from .core.image_series import ImageSeries  # noqa: E402
+from .core.markups import Markups, PointSet, Spline  # noqa: E402
+from .io.loader import as_image_series  # noqa: E402
+
+__all__ = [
+    "__version__",
+    "Orientation",
+    "ViewType",
+    "MarkupMode",
+    "ImageSeries",
+    "Markups",
+    "PointSet",
+    "Spline",
+    "configure_logging",
+    "set_log_level",
+    "as_image_series",
+    # The following are imported lazily to avoid pulling in Qt/VTK unless needed.
+    "ViewerApp",
+    "launch",
+    "launch_viewer",
+]
 
 
 def set_log_level(level):
-    """Set the log level for all tui package loggers.
-
-    Args:
-        level: A logging level constant (e.g. ``logging.DEBUG``,
-               ``logging.INFO``, ``logging.WARNING``) or its integer
-               equivalent.
-
-    Example::
-
-        import tui, logging
-        tui.set_log_level(logging.INFO)
-    """
-    logging.getLogger('tui').setLevel(level)
+    """Set the log level for all ``tui`` loggers."""
+    logging.getLogger("tui").setLevel(level)
 
 
 def configure_logging(level=logging.INFO, fmt=None):
-    """Attach a :class:`logging.StreamHandler` to the tui package logger.
+    """Attach a :class:`logging.StreamHandler` to the ``tui`` logger.
 
-    Call this once at the start of your application to enable console output
-    from tui.  If your application already configures Python logging globally
-    you do not need this; just call :func:`set_log_level` instead.
-
-    Safe to call more than once: reuses an existing stream handler and only
-    updates the level, so a host app that configures DEBUG before importing
-    tui submodules is not reset to INFO by a later call.
-
-    Args:
-        level: Logging level to apply (default: ``logging.INFO``).  Accepts
-               level names such as ``"DEBUG"`` as well as ``logging`` constants.
-        fmt:   Format string for log records.  Defaults to a format that
-               includes timestamp, logger name and level.
-
-    Example::
-
-        import tui
-        tui.configure_logging()          # INFO and above
-        tui.configure_logging(level=logging.DEBUG)
+    Idempotent: reuses an existing stream handler so a host application that
+    configured DEBUG before importing submodules is not reset to INFO.
     """
     if isinstance(level, str):
         level = getattr(logging, level.upper())
     if fmt is None:
-        fmt = '%(asctime)s  %(name)-35s  %(levelname)-8s  %(message)s'
-    tui_logger = logging.getLogger('tui')
+        fmt = "%(asctime)s  %(name)-28s  %(levelname)-8s  %(message)s"
+    logger = logging.getLogger("tui")
     handler = None
-    for h in tui_logger.handlers:
+    for h in logger.handlers:
         if isinstance(h, logging.StreamHandler) and not isinstance(h, logging.FileHandler):
             handler = h
             break
     if handler is None:
         handler = logging.StreamHandler()
-        tui_logger.addHandler(handler)
+        logger.addHandler(handler)
     handler.setFormatter(logging.Formatter(fmt))
-    tui_logger.setLevel(level)
+    logger.setLevel(level)
+
+
+def __getattr__(name):
+    """Lazily expose the Qt-dependent entry points.
+
+    Importing :data:`ViewerApp` or :func:`launch` only pulls in Qt/VTK on
+    first access, keeping ``import tui`` cheap and headless-friendly.
+    """
+    if name in ("ViewerApp", "launch", "launch_viewer"):
+        from .app import ViewerApp, launch, launch_viewer
+
+        return {"ViewerApp": ViewerApp, "launch": launch,
+                "launch_viewer": launch_viewer}[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
