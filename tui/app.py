@@ -51,7 +51,7 @@ class ViewerApp(QtWidgets.QMainWindow):
     """4-panel (axial / sagittal / coronal / 3D) viewer with markup support."""
 
     def __init__(self, data=None, *, image_series: Optional[ImageSeries] = None,
-                 title: str = "TUI"):
+                 title: str = "TUI", work_dir: Optional[str] = None):
         super().__init__()
         if image_series is not None and data is not None:
             raise TypeError("pass data or image_series=, not both")
@@ -66,6 +66,11 @@ class ViewerApp(QtWidgets.QMainWindow):
         self._views_started = False
         self._last_cursor_slice: Optional[SliceView] = None
         self._last_cursor_display: Optional[Tuple[int, int]] = None
+        
+        if work_dir is not None:
+            self.WORK_DIR = work_dir
+        else:
+            self.WORK_DIR = os.environ.get("TUI_WORK_DIR", None)
 
         self.setWindowTitle(title)
         self.resize(1400, 900)
@@ -203,6 +208,18 @@ class ViewerApp(QtWidgets.QMainWindow):
         sc_pt = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Period), self)
         sc_pt.setContext(QtCore.Qt.WindowShortcut)
         sc_pt.activated.connect(self._add_point_at_cursor)
+
+        sc_u = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_U), self)
+        sc_u.setContext(QtCore.Qt.WindowShortcut)
+        sc_u.activated.connect(lambda: self._on_action("undo"))
+
+        sc_ctrl_z = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+Z"), self)
+        sc_ctrl_z.setContext(QtCore.Qt.WindowShortcut)
+        sc_ctrl_z.activated.connect(lambda: self._on_action("undo"))
+
+        sc_ctrl_s = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+S"), self)
+        sc_ctrl_s.setContext(QtCore.Qt.WindowShortcut)
+        sc_ctrl_s.activated.connect(self.save_markups_helper)
 
     def _on_slice_cursor(self, view: SliceView, x: int, y: int) -> None:
         self._last_cursor_slice = view
@@ -386,7 +403,7 @@ class ViewerApp(QtWidgets.QMainWindow):
         elif action == "clear_all":
             self._clear_all_frames()
         elif action == "save":
-            self._save_markups_dialog()
+            self.save_markups_helper()
         self.refresh_all()
 
     def _clear_all_frames(self) -> None:
@@ -497,17 +514,34 @@ class ViewerApp(QtWidgets.QMainWindow):
         self._populate_controls()  # configures the time slider via _sync_time_bar
         self.refresh_all()
 
-    def _save_markups_dialog(self) -> None:
-        out_dir = QtWidgets.QFileDialog.getExistingDirectory(self, "Save markups to")
-        if not out_dir:
-            return
+
+    def save_markups_helper(self, filename: str=None) -> None:
+        if os.sep in filename:
+            out_dir = os.path.dirname(filename)
+            filename = os.path.basename(filename)
+        else:
+            if self.WORK_DIR is None:
+                if filename is None:
+                    full_filename = QtWidgets.QFileDialog.getSaveFileName(self, "Save markups to")
+                    if not full_filename:
+                        return
+                    filename = os.path.basename(full_filename)
+                else:
+                    out_dir = QtWidgets.QFileDialog.getExistingDirectory(self, "Save markups to")
+                    if not out_dir:
+                        return
+            else:
+                out_dir = self.WORK_DIR
+            if filename is None:
+                filename, ok = QtWidgets.QInputDialog.getText(
+                    self, "Save markups", "Filename:")
+                if not ok or not filename.strip():
+                    return
         try:
-            files = self.save_markups(out_dir)
+            files = self.save_markups(out_dir, prefix=filename.strip())
         except Exception as exc:  # noqa: BLE001
             QtWidgets.QMessageBox.critical(self, "Save failed", str(exc))
             return
-        QtWidgets.QMessageBox.information(
-            self, "Saved", f"Wrote {len(files)} file(s) to:\n{out_dir}")
 
 
 # ----------------------------------------------------------------------------
