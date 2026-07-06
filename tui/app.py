@@ -221,6 +221,17 @@ class ViewerApp(QtWidgets.QMainWindow):
         sc_ctrl_s.setContext(QtCore.Qt.WindowShortcut)
         sc_ctrl_s.activated.connect(self.save_markups_helper)
 
+        for key, mode in (
+            (QtCore.Qt.Key_N, MarkupMode.NAVIGATE),
+            (QtCore.Qt.Key_A, MarkupMode.POINTS),
+            (QtCore.Qt.Key_S, MarkupMode.SPLINES),
+            (QtCore.Qt.Key_P, MarkupMode.PAINT),
+            (QtCore.Qt.Key_M, MarkupMode.MODIFY),
+        ):
+            sc = QtWidgets.QShortcut(QtGui.QKeySequence(key), self)
+            sc.setContext(QtCore.Qt.WindowShortcut)
+            sc.activated.connect(lambda m=mode: self._set_markup_mode(m))
+
     def _on_slice_cursor(self, view: SliceView, x: int, y: int) -> None:
         self._last_cursor_slice = view
         self._last_cursor_display = (x, y)
@@ -306,6 +317,11 @@ class ViewerApp(QtWidgets.QMainWindow):
             self.state.active_spline = None
         self.state.mode = mode
         logger.debug("Markup mode -> %s", mode)
+
+    def _set_markup_mode(self, mode: MarkupMode) -> None:
+        """Switch markup mode from the keyboard (keeps side-panel toggle in sync)."""
+        self._on_mode_changed(mode)
+        self.side_panel.set_mode(mode)
 
     def _on_show_markups(self, show: bool) -> None:
         self.state.show_markups = show
