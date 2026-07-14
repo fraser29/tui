@@ -26,6 +26,7 @@ class SidePanel(QtWidgets.QWidget):
     sigShowCrosshair = QtCore.pyqtSignal(bool)
     sigResetFrame = QtCore.pyqtSignal()
     sigPeriodicChanged = QtCore.pyqtSignal(bool)
+    sigHelp = QtCore.pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -48,6 +49,14 @@ class SidePanel(QtWidgets.QWidget):
         self._build_markup_group()
         self._build_custom_group()
         self._layout.addStretch(1)
+        self._build_help_button()
+
+    # ----------------------------------------------------------- help button
+    def _build_help_button(self) -> None:
+        help_btn = QtWidgets.QPushButton("Help")
+        help_btn.setToolTip("Show usage help: modes, mouse actions and keyboard shortcuts")
+        help_btn.clicked.connect(lambda: self.sigHelp.emit())
+        self._layout.addWidget(help_btn)
 
     # ----------------------------------------------------------- view group
     def _build_view_group(self) -> None:

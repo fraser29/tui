@@ -156,6 +156,11 @@ class ViewerApp(QtWidgets.QMainWindow):
         quit_act = menu.addAction("Quit")
         quit_act.triggered.connect(self.close)
 
+        help_menu = self.menuBar().addMenu("&Help")
+        help_act = help_menu.addAction("Usage help")
+        help_act.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_F1))
+        help_act.triggered.connect(self._show_help)
+
     def _apply_grid_layout(self, maximised: Optional[ViewType] = None) -> None:
         for v in self.views.values():
             self.grid_layout.removeWidget(v)
@@ -182,6 +187,7 @@ class ViewerApp(QtWidgets.QMainWindow):
         sp.sigShowCrosshair.connect(self._on_show_crosshair)
         sp.sigResetFrame.connect(self._on_reset_frame)
         sp.sigPeriodicChanged.connect(self._on_periodic_changed)
+        sp.sigHelp.connect(self._show_help)
 
         self.time_slider.valueChanged.connect(self._on_time_changed)
 
@@ -343,6 +349,84 @@ class ViewerApp(QtWidgets.QMainWindow):
         """Window/level changed in one panel -> apply to every panel."""
         for view in self.views.values():
             view.apply_window_level()
+
+    # ================================================================== help
+    _HELP_HTML = """
+<h2>TUI viewer &mdash; usage</h2>
+<p>Four panels show the <b>axial</b>, <b>sagittal</b> and <b>coronal</b> slices
+plus a <b>3D</b> view. Click a <i>Layout</i> button (or double-click a panel) to
+maximise one view; <i>Grid (2&times;2)</i> restores all four.</p>
+
+<h3>Mouse (any mode)</h3>
+<ul>
+<li><b>Mouse wheel</b> over a slice &mdash; scroll through slices.</li>
+<li><b>3D panel</b> &mdash; left-drag rotates, wheel zooms, middle-drag pans.</li>
+</ul>
+
+<h3>Markup modes</h3>
+<p>Pick a mode in the <i>Markup</i> panel (or with the keyboard). The left/right
+mouse buttons on a slice panel do different things per mode:</p>
+<table cellpadding="4">
+<tr><th align="left">Mode</th><th align="left">Left button</th>
+    <th align="left">Right button</th></tr>
+<tr><td><b>Navigate</b></td>
+    <td>Drag the crosshair centre to move all planes, or drag a crosshair line
+        to rotate (double-oblique). Elsewhere, drag to adjust
+        window/level (brightness&nbsp;/&nbsp;contrast).</td>
+    <td>&ndash;</td></tr>
+<tr><td><b>Add points</b></td>
+    <td>Click to drop a landmark point.</td><td>&ndash;</td></tr>
+<tr><td><b>Add splines</b></td>
+    <td>Click to add spline control points. Use <i>New spline</i> to start a
+        fresh spline and <i>Close spline</i> to close the loop.</td>
+    <td>&ndash;</td></tr>
+<tr><td><b>Paint</b></td>
+    <td>Drag to paint with a 3D spherical brush (set <i>Brush</i> size and
+        <i>Label</i>).</td>
+    <td>Drag to erase.</td></tr>
+<tr><td><b>Modify</b></td>
+    <td>Drag the nearest handle to move it; click on a spline line to insert a
+        control point. Editing an interpolated (cyan) frame turns it into an
+        editable keyframe.</td>
+    <td>Delete the nearest handle.</td></tr>
+</table>
+
+<h3>Time (4D data)</h3>
+<p>Drag the <i>Time</i> slider to move between time steps. Manual markups are
+keyframes; frames in between are interpolated (shown in cyan). Enable
+<i>Periodic interpolation</i> for cyclic data (e.g. cardiac/respiratory).</p>
+
+<h3>Keyboard shortcuts</h3>
+<table cellpadding="4">
+<tr><td><b>&larr;</b> / <b>&rarr;</b></td><td>Previous / next time step</td></tr>
+<tr><td><b>N</b></td><td>Navigate mode</td></tr>
+<tr><td><b>A</b></td><td>Add points mode</td></tr>
+<tr><td><b>S</b></td><td>Add splines mode</td></tr>
+<tr><td><b>P</b></td><td>Paint mode</td></tr>
+<tr><td><b>M</b></td><td>Modify mode</td></tr>
+<tr><td><b>.</b></td><td>Add a point under the pointer</td></tr>
+<tr><td><b>U</b> or <b>Ctrl+Z</b></td><td>Undo last markup in this frame</td></tr>
+<tr><td><b>Ctrl+S</b></td><td>Save markups</td></tr>
+<tr><td><b>F1</b></td><td>Show this help</td></tr>
+<tr><td><b>Q</b></td><td>Quit</td></tr>
+</table>
+"""
+
+    def _show_help(self) -> None:
+        """Show a small, scrollable window with usage help and shortcuts."""
+        dlg = QtWidgets.QDialog(self)
+        dlg.setWindowTitle("TUI help")
+        dlg.resize(560, 640)
+        layout = QtWidgets.QVBoxLayout(dlg)
+        browser = QtWidgets.QTextBrowser()
+        browser.setOpenExternalLinks(True)
+        browser.setHtml(self._HELP_HTML)
+        layout.addWidget(browser)
+        buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Close)
+        buttons.rejected.connect(dlg.reject)
+        buttons.accepted.connect(dlg.accept)
+        layout.addWidget(buttons)
+        dlg.exec_()
 
     def _maximise(self, view_type: Optional[ViewType]) -> None:
         self._apply_grid_layout(view_type)
