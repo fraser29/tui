@@ -31,7 +31,13 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from .core.enums import MarkupMode, ViewType
 from .core.image_series import ImageSeries
 from .core.markups import Markups, Spline
-from .io import load_image_series, save_markups
+from .io import (
+    load_image_series,
+    load_markup_labelmap,
+    load_markup_polydata,
+    load_surface_as_labelmap,
+    save_markups,
+)
 from .io.loader import as_image_series
 from .state import ViewerState
 from .ui.side_panel import CUSTOM_COLS, SidePanel
@@ -155,6 +161,19 @@ class ViewerApp(QtWidgets.QMainWindow):
         menu.addSeparator()
         quit_act = menu.addAction("Quit")
         quit_act.triggered.connect(self.close)
+
+        markups_menu = self.menuBar().addMenu("&Markups")
+        load_poly_act = markups_menu.addAction("Load polydata...")
+        load_poly_act.triggered.connect(self._on_load_polydata)
+        load_label_act = markups_menu.addAction("Load labelmap...")
+        load_label_act.triggered.connect(self._on_load_labelmap)
+        load_surf_act = markups_menu.addAction("Load surf2labelmap...")
+        load_surf_act.triggered.connect(self._on_load_surf2labelmap)
+        markups_menu.addSeparator()
+        export_poly_act = markups_menu.addAction("Export polydata...")
+        export_poly_act.triggered.connect(self._on_export_polydata)
+        export_label_act = markups_menu.addAction("Export labelmap...")
+        export_label_act.triggered.connect(self._on_export_labelmap)
 
         help_menu = self.menuBar().addMenu("&Help")
         help_act = help_menu.addAction("Usage help")
@@ -613,6 +632,124 @@ keyframes; frames in between are interpolated (shown in cyan). Enable
             view.prepare_geometry() if isinstance(view, SliceView) else None
         self._populate_controls()  # configures the time slider via _sync_time_bar
         self.refresh_all()
+
+    # -------------------------------------------------- markup load / export
+    _POLYDATA_FILTER = "Polydata (*.vtp *.vtk *.vtu *.stl)"
+    _LABELMAP_FILTER = "Label map (*.vti *.nii *.nii.gz *.nrrd *.mha *.mhd)"
+
+    def _on_load_polydata(self) -> None:
+        """Load points/splines from a polydata file into the current frame."""
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self, "Load markup polydata", "", self._POLYDATA_FILTER)
+        if not path:
+            return
+        try:
+            points, splines = load_markup_polydata(path, self.image_series)
+        except Exception as exc:  # noqa: BLE001
+            QtWidgets.QMessageBox.critical(self, "Load polydata failed", str(exc))
+            return
+        if not points and not splines:
+            QtWidgets.QMessageBox.information(
+                self, "Load polydata", "No points or splines found in the file.")
+            return
+        tid = self.state.current_time_id
+        for xyz in points:
+            self.state.markups.add_point(tid, xyz)
+        for spline in splines:
+            self.state.markups.add_spline(tid, spline)
+        self.state.active_spline = None
+        self.refresh_all()
+
+    def _on_load_labelmap(self) -> None:
+        """Load a label map into the current frame's paint mask (merged in)."""
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self, "Load labelmap", "", self._LABELMAP_FILTER)
+        if not path:
+            return
+        try:
+            mask = load_markup_labelmap(path, self.image_series)
+        except Exception as exc:  # noqa: BLE001
+            QtWidgets.QMessageBox.critical(self, "Load labelmap failed", str(exc))
+            return
+        self._merge_paint_mask(mask)
+
+    def _on_load_surf2labelmap(self) -> None:
+        """Voxelise a closed surface into the current frame's paint mask."""
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self, "Load surface to voxelise", "", self._POLYDATA_FILTER)
+        if not path:
+            return
+        try:
+            mask = load_surface_as_labelmap(
+                path, self.image_series, self.state.current_time_id,
+                fill_value=self.state.paint_label)
+        except Exception as exc:  # noqa: BLE001
+            QtWidgets.QMessageBox.critical(
+                self, "Load surf2labelmap failed", str(exc))
+            return
+        self._merge_paint_mask(mask)
+
+    def _merge_paint_mask(self, mask: np.ndarray) -> None:
+        """Merge a loaded ``(nx,ny,nz)`` mask into the current paint mask."""
+        if not mask.any():
+            QtWidgets.QMessageBox.information(
+                self, "Load labelmap", "The label map is empty (no set voxels).")
+            return
+        tid = self.state.current_time_id
+        existing = self.state.markups.paint_mask(tid, create=True)
+        set_voxels = mask > 0
+        existing[set_voxels] = mask[set_voxels]
+        self.refresh_all()
+
+    def _on_export_polydata(self) -> None:
+        self._export_markups(("points", "splines"), "Export polydata",
+                             self._POLYDATA_FILTER)
+
+    def _on_export_labelmap(self) -> None:
+        self._export_markups(("paint",), "Export labelmap",
+                             self._LABELMAP_FILTER)
+
+    def _export_markups(self, kinds: Tuple[str, ...], title: str,
+                        file_filter: str) -> None:
+        m = self.state.markups
+        present = {
+            "points": bool(m.point_keyframes()),
+            "splines": bool(m.spline_keyframes()),
+            "paint": bool(m.paint_keyframes()),
+        }
+        nonempty = [k for k in kinds if present[k]]
+        if not nonempty:
+            QtWidgets.QMessageBox.information(
+                self, title, "There are no markups of this type to export.")
+            return
+        # Ask for a full save path via the file selector, then split it into the
+        # (out_dir, prefix) pair the underlying save logic expects.
+        start = os.path.join(self.WORK_DIR, "markup") if self.WORK_DIR else "markup"
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, title, start, file_filter)
+        if not path:
+            return
+        out_dir = os.path.dirname(path) or "."
+        prefix = os.path.basename(path)
+        prefix = os.path.splitext(prefix)[0]  # drop the chosen extension
+        if prefix.endswith(".nii"):  # handle the .nii.gz double extension
+            prefix = prefix[:-4]
+        if not prefix:
+            QtWidgets.QMessageBox.warning(self, title, "Please choose a filename.")
+            return
+        # Use the chosen name verbatim (no "_points"/"_paint" suffix). Points and
+        # splines share the .vtp extension, so only drop the suffix when a single
+        # output file will be written (otherwise the two would collide).
+        kind_suffix = len(nonempty) > 1
+        try:
+            files = save_markups(self.markups, self.image_series, out_dir,
+                                 prefix=prefix, kinds=kinds,
+                                 kind_suffix=kind_suffix)
+        except Exception as exc:  # noqa: BLE001
+            QtWidgets.QMessageBox.critical(self, "Export failed", str(exc))
+            return
+        QtWidgets.QMessageBox.information(
+            self, title, f"Wrote {len(files)} file(s) to {out_dir}.")
 
 
     def save_markups_helper(self, filename: str=None) -> None:
