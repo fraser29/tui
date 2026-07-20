@@ -27,6 +27,7 @@ from typing import Callable, Dict, Optional, Tuple
 
 import numpy as np
 from PyQt5 import QtCore, QtGui, QtWidgets
+from vtk.util import numpy_support as vtk_np
 
 from .core.enums import MarkupMode, ViewType
 from .core.image_series import ImageSeries
@@ -120,6 +121,13 @@ class ViewerApp(QtWidgets.QMainWindow):
         root.addWidget(self.side_panel, 0)
 
         self._build_menu()
+        self._build_status_bar()
+
+    def _build_status_bar(self) -> None:
+        """Footer showing xyz / ijk / value under the cursor."""
+        self._cursor_label = QtWidgets.QLabel(self._CURSOR_HINT)
+        self._cursor_label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        self.statusBar().addWidget(self._cursor_label)
 
     def _build_time_bar(self) -> QtWidgets.QWidget:
         # The bar is always shown (a single-point slider for non-temporal data)
@@ -174,6 +182,9 @@ class ViewerApp(QtWidgets.QMainWindow):
         export_poly_act.triggered.connect(self._on_export_polydata)
         export_label_act = markups_menu.addAction("Export labelmap...")
         export_label_act.triggered.connect(self._on_export_labelmap)
+        markups_menu.addSeparator()
+        paint_limits_act = markups_menu.addAction("Set paint intensity limits...")
+        paint_limits_act.triggered.connect(self._on_set_paint_limits)
 
         help_menu = self.menuBar().addMenu("&Help")
         help_act = help_menu.addAction("Usage help")
@@ -257,9 +268,64 @@ class ViewerApp(QtWidgets.QMainWindow):
             sc.setContext(QtCore.Qt.WindowShortcut)
             sc.activated.connect(lambda m=mode: self._set_markup_mode(m))
 
+    _CURSOR_HINT = "Move the cursor over a slice panel to read xyz / ijk / value"
+
     def _on_slice_cursor(self, view: SliceView, x: int, y: int) -> None:
         self._last_cursor_slice = view
         self._last_cursor_display = (x, y)
+        self._update_cursor_readout(view, x, y)
+
+    def _update_cursor_readout(self, view: SliceView, x: int, y: int) -> None:
+        """Update the footer with xyz (3dp), ijk and value under the cursor.
+
+        ``xyz`` is reported in true world (patient) coordinates - the patient
+        transform is applied when present.  ``ijk``/value are only shown when the
+        point lies inside the image volume; otherwise the footer notes this.
+        """
+        try:
+            world = view.display_to_world(x, y)
+            xyz = self._to_patient(world)
+            inside, ijk, value = self._probe_image(world)
+        except Exception:  # noqa: BLE001 - a readout must never break the UI
+            return
+        txt = f"xyz = ({xyz[0]:.3f}, {xyz[1]:.3f}, {xyz[2]:.3f})"
+        if inside:
+            txt += (f"    ijk = ({ijk[0]}, {ijk[1]}, {ijk[2]})"
+                    f"    value = {value:g}")
+        else:
+            txt += "    ijk = -    value = -    (cursor outside image)"
+        self._cursor_label.setText(txt)
+
+    def _to_patient(self, world) -> Tuple[float, float, float]:
+        """Map an axis-aligned working-grid point to true world (patient) space."""
+        m = getattr(self.state.image_series, "patient_matrix", None)
+        if m is None or np.allclose(m, np.eye(4)):
+            return (float(world[0]), float(world[1]), float(world[2]))
+        v = np.asarray(m, dtype=float) @ np.array(
+            [world[0], world[1], world[2], 1.0])
+        return (float(v[0]), float(v[1]), float(v[2]))
+
+    def _probe_image(self, world):
+        """Return ``(inside, ijk, value)`` for a working-grid world point.
+
+        ``ijk`` and ``value`` are ``None`` when the point is outside the volume.
+        """
+        series = self.state.image_series
+        b = series.bounds
+        sp = series.spacing
+        tol = (0.5 * abs(sp[0]), 0.5 * abs(sp[1]), 0.5 * abs(sp[2]))
+        inside = (b[0] - tol[0] <= world[0] <= b[1] + tol[0]
+                  and b[2] - tol[1] <= world[1] <= b[3] + tol[1]
+                  and b[4] - tol[2] <= world[2] <= b[5] + tol[2])
+        if not inside:
+            return False, None, None
+        i, j, k = self.state.world_to_voxel(world)
+        ex = series.extent
+        img = self.state.current_image
+        if self.state.array_name:
+            img.GetPointData().SetActiveScalars(self.state.array_name)
+        value = img.GetScalarComponentAsDouble(i + ex[0], j + ex[2], k + ex[4], 0)
+        return True, (i, j, k), value
 
     def _resolve_pointer_on_slice(self) -> Optional[Tuple[SliceView, int, int]]:
         """Return (slice view, vtk display x, y) for the pointer, if known."""
@@ -472,7 +538,11 @@ keyframes; frames in between are interpolated (shown in cyan). Enable
         mask = self.state.markups.paint_mask(tid, create=True)
         ijk = self.state.world_to_voxel(xyz)
         value = 0 if erase else self.state.paint_label
-        box = self._paint_sphere(mask, ijk, self.state.paint_radius, value)
+        # Painting (not erasing) is gated to voxels within the intensity limits.
+        intensity = None if erase else self._current_intensity_view()
+        limits = None if erase else (self.state.paint_lower, self.state.paint_upper)
+        box = self._paint_sphere(mask, ijk, self.state.paint_radius, value,
+                                 intensity=intensity, limits=limits)
         if box is None:
             return
         # Fast path: update only the painted sub-region and redraw only the
@@ -483,12 +553,17 @@ keyframes; frames in between are interpolated (shown in cyan). Enable
             v.update_paint_region(mask, box, render=(v is view))
 
     @staticmethod
-    def _paint_sphere(mask: np.ndarray, ijk, radius: int, value: int):
+    def _paint_sphere(mask: np.ndarray, ijk, radius: int, value: int,
+                      intensity: Optional[np.ndarray] = None,
+                      limits: Optional[Tuple[float, float]] = None):
         """Paint a filled 3D ball of voxels centred on ``ijk``.
 
         A spherical brush spans several slices, so the stroke is visible (and
         editable) from all three orthogonal panels rather than a single plane.
-        Returns the affected ``(i0,i1,j0,j1,k0,k1)`` box, or ``None`` if empty.
+        When ``intensity`` (an ``(nx,ny,nz)`` array aligned with ``mask``) and
+        ``limits`` ``(lower, upper)`` are given, only voxels whose intensity lies
+        within the limits are affected.  Returns the affected
+        ``(i0,i1,j0,j1,k0,k1)`` box, or ``None`` if empty.
         """
         nx, ny, nz = mask.shape
         i, j, k = int(ijk[0]), int(ijk[1]), int(ijk[2])
@@ -502,8 +577,72 @@ keyframes; frames in between are interpolated (shown in cyan). Enable
         jj = np.arange(j0, j1)[None, :, None]
         kk = np.arange(k0, k1)[None, None, :]
         ball = (ii - i) ** 2 + (jj - j) ** 2 + (kk - k) ** 2 <= r ** 2
+        if intensity is not None and limits is not None:
+            lo, hi = limits
+            sub = intensity[i0:i1, j0:j1, k0:k1]
+            ball &= (sub >= lo) & (sub <= hi)
+            if not ball.any():
+                return None
         mask[i0:i1, j0:j1, k0:k1][ball] = value
         return (i0, i1, j0, j1, k0, k1)
+
+    def _current_intensity_view(self) -> Optional[np.ndarray]:
+        """Return the current display array as an ``(nx,ny,nz)`` numpy view.
+
+        Aligned with the paint mask (same F-order shape, extent-based index 0),
+        so a paint box slices straight into it.  Returns ``None`` if unavailable.
+        """
+        img = self.state.current_image
+        pd = img.GetPointData()
+        arr = pd.GetArray(self.state.array_name) if self.state.array_name else None
+        if arr is None:
+            arr = pd.GetScalars()
+        if arr is None:
+            return None
+        np_arr = vtk_np.vtk_to_numpy(arr)  # no copy
+        if np_arr.ndim > 1:  # multi-component -> gate on the first component
+            np_arr = np_arr[:, 0]
+        return np_arr.reshape(img.GetDimensions(), order="F")
+
+    def _on_set_paint_limits(self) -> None:
+        """Dialog to set the lower/upper intensity limits used when painting."""
+        lo_range, hi_range = self.state.full_scalar_range()
+        span = (hi_range - lo_range) or 1.0
+
+        dlg = QtWidgets.QDialog(self)
+        dlg.setWindowTitle("Paint intensity limits")
+        form = QtWidgets.QFormLayout(dlg)
+        form.addRow(QtWidgets.QLabel(
+            "Painting only affects voxels whose value is within these limits.\n"
+            f"Display array '{self.state.array_name}' range: "
+            f"{lo_range:g} to {hi_range:g}."))
+
+        def _spin(value: float) -> QtWidgets.QDoubleSpinBox:
+            sb = QtWidgets.QDoubleSpinBox()
+            sb.setDecimals(3)
+            sb.setRange(lo_range - span, hi_range + span)
+            sb.setSingleStep(span / 100.0)
+            sb.setValue(value)
+            return sb
+
+        lower = _spin(self.state.paint_lower)
+        upper = _spin(self.state.paint_upper)
+        form.addRow("Lower limit", lower)
+        form.addRow("Upper limit", upper)
+
+        buttons = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel
+            | QtWidgets.QDialogButtonBox.RestoreDefaults)
+        form.addRow(buttons)
+        buttons.accepted.connect(dlg.accept)
+        buttons.rejected.connect(dlg.reject)
+        buttons.button(QtWidgets.QDialogButtonBox.RestoreDefaults).clicked.connect(
+            lambda: (lower.setValue(lo_range), upper.setValue(hi_range)))
+
+        if dlg.exec_() != QtWidgets.QDialog.Accepted:
+            return
+        lo, hi = lower.value(), upper.value()
+        self.state.paint_lower, self.state.paint_upper = min(lo, hi), max(lo, hi)
 
     def _on_action(self, action: str) -> None:
         tid = self.state.current_time_id

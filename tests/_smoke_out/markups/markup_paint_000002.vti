@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<VTKFile type="ImageData" version="0.1" byte_order="LittleEndian" header_type="UInt32" compressor="vtkZLibDataCompressor">
+  <ImageData WholeExtent="5 44 7 46 9 48" Origin="0 0 0" Spacing="1 1 1" Direction="1 0 0 0 1 0 0 0 1">
+  <Piece Extent="5 44 7 46 9 48">
+    <PointData Scalars="paint">
+      <DataArray type="UInt8" Name="paint" format="binary" RangeMin="0" RangeMax="1">
+        AgAAAACAAAAAegAAbwAAAFgAAAA=eJzt1TEKwDAMBEHf/z+dzmWQQciBzNRXqNKuBQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAsOX2AQBMSEoPP6kNu3fV+wBo0tuFpDbs3ukMwLCPd+FeZwB+q/Yl7/QjORu23XfQD5UBeDPcjwfFdACteJzt1cEJACAMBMHYf9M+UkAUQhCced/7NiKtFJXuXRzOAKgc3unNPT/dBfkAmNXbmfadLgD8wt0DAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMGYD9HMAVg==
+      </DataArray>
+    </PointData>
+    <CellData>
+    </CellData>
+  </Piece>
+  </ImageData>
+</VTKFile>

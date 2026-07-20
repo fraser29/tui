@@ -96,6 +96,12 @@ class ViewerState:
         # Paint settings.
         self.paint_radius: int = 3      # voxels
         self.paint_label: int = 1
+        # Intensity gate: painting only affects voxels whose (display-array)
+        # value lies in [paint_lower, paint_upper].  Defaults to the full data
+        # range, so by default every voxel under the brush is painted.
+        self.paint_lower: float = 0.0
+        self.paint_upper: float = 1.0
+        self.reset_paint_limits()
         self.show_markups: bool = True
         self.show_crosshair: bool = True
 
@@ -116,10 +122,23 @@ class ViewerState:
         self.window = max(hi - lo, 1e-6)
         self.level = 0.5 * (lo + hi)
 
+    def full_scalar_range(self) -> Tuple[float, float]:
+        """Data range of the current display array (``(0, 1)`` if none)."""
+        if self.array_name and self.image_series.has_array(self.array_name):
+            lo, hi = self.image_series.scalar_range(self.array_name)
+            return float(lo), float(hi)
+        return 0.0, 1.0
+
+    def reset_paint_limits(self) -> None:
+        """Reset the paint intensity gate to the full data range."""
+        self.paint_lower, self.paint_upper = self.full_scalar_range()
+
     def set_array(self, array_name: str) -> None:
         if array_name and self.image_series.has_array(array_name):
             self.array_name = array_name
             self.reset_window_level()
+            # Intensity limits are array-specific; snap back to the new range.
+            self.reset_paint_limits()
 
     def set_time_id(self, time_id: int) -> None:
         new_id = max(0, min(int(time_id), self.image_series.n_times - 1))
