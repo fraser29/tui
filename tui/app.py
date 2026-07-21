@@ -615,18 +615,15 @@ keyframes; frames in between are interpolated (shown in cyan). Enable
         form.addRow(QtWidgets.QLabel(
             "Painting only affects voxels whose value is within these limits.\n"
             f"Display array '{self.state.array_name}' range: "
-            f"{lo_range:g} to {hi_range:g}."))
+            f"{lo_range:0.2f} to {hi_range:0.2f}."))
 
-        def _spin(value: float) -> QtWidgets.QDoubleSpinBox:
-            sb = QtWidgets.QDoubleSpinBox()
-            sb.setDecimals(3)
-            sb.setRange(lo_range - span, hi_range + span)
-            sb.setSingleStep(span / 100.0)
-            sb.setValue(value)
+        def _threshold_edit(value: float) -> QtWidgets.QLineEdit:
+            sb = QtWidgets.QLineEdit()
+            sb.setText(f"{value:0.2f}")
             return sb
 
-        lower = _spin(self.state.paint_lower)
-        upper = _spin(self.state.paint_upper)
+        lower = _threshold_edit(self.state.paint_lower)
+        upper = _threshold_edit(self.state.paint_upper)
         form.addRow("Lower limit", lower)
         form.addRow("Upper limit", upper)
 
@@ -637,11 +634,20 @@ keyframes; frames in between are interpolated (shown in cyan). Enable
         buttons.accepted.connect(dlg.accept)
         buttons.rejected.connect(dlg.reject)
         buttons.button(QtWidgets.QDialogButtonBox.RestoreDefaults).clicked.connect(
-            lambda: (lower.setValue(lo_range), upper.setValue(hi_range)))
+            lambda: (lower.setText(f"{lo_range:.2f}"), upper.setText(f"{hi_range:.2f}")))
 
         if dlg.exec_() != QtWidgets.QDialog.Accepted:
             return
-        lo, hi = lower.value(), upper.value()
+        try:
+            lo = float(lower.text())
+        except ValueError:
+            print(f"WARNING: error reading lower threshold - reset to {lo_range}")
+            lo = lo_range
+        try:
+            hi = float(upper.text())
+        except ValueError:
+            print(f"WARNING: error reading upper threshold - reset to {hi_range}")
+            hi = hi_range
         self.state.paint_lower, self.state.paint_upper = min(lo, hi), max(lo, hi)
 
     def _on_action(self, action: str) -> None:
