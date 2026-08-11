@@ -268,6 +268,18 @@ class ViewerApp(QtWidgets.QMainWindow):
         sc_ctrl_s.setContext(QtCore.Qt.WindowShortcut)
         sc_ctrl_s.activated.connect(self.save_markups_helper)
 
+        sc_r = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_R), self)
+        sc_r.setContext(QtCore.Qt.WindowShortcut)
+        sc_r.activated.connect(self._on_reset_frame)
+
+        sc_c = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_C), self)
+        sc_c.setContext(QtCore.Qt.WindowShortcut)
+        sc_c.activated.connect(lambda: self._on_action("clear_frame"))
+
+        sc_clear_all = QtWidgets.QShortcut(QtGui.QKeySequence("Shift+C"), self)
+        sc_clear_all.setContext(QtCore.Qt.WindowShortcut)
+        sc_clear_all.activated.connect(self._clear_all_frames_no_confirm)
+
         for key, mode in (
             (QtCore.Qt.Key_N, MarkupMode.NAVIGATE),
             (QtCore.Qt.Key_A, MarkupMode.POINTS),
@@ -502,6 +514,9 @@ keyframes; frames in between are interpolated (shown in cyan). Enable
 <tr><td><b>M</b></td><td>Modify mode</td></tr>
 <tr><td><b>.</b></td><td>Add a point under the pointer</td></tr>
 <tr><td><b>U</b> or <b>Ctrl+Z</b></td><td>Undo last markup in this frame</td></tr>
+<tr><td><b>R</b></td><td>Reset planes (axis-aligned frame)</td></tr>
+<tr><td><b>C</b></td><td>Clear markups in this frame</td></tr>
+<tr><td><b>Shift+C</b></td><td>Clear markups in every frame (no confirmation)</td></tr>
 <tr><td><b>Ctrl+S</b></td><td>Save markups</td></tr>
 <tr><td><b>F1</b></td><td>Show this help</td></tr>
 <tr><td><b>Q</b></td><td>Quit</td></tr>
@@ -690,8 +705,15 @@ keyframes; frames in between are interpolated (shown in cyan). Enable
             QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
             QtWidgets.QMessageBox.No)
         if reply == QtWidgets.QMessageBox.Yes:
-            self.state.markups.clear_all()
-            self.state.active_spline = None
+            self._clear_all_frames_no_confirm()
+
+    def _clear_all_frames_no_confirm(self) -> None:
+        """Clear markups from every time step without a confirmation dialog."""
+        if self.state.markups.is_empty():
+            return
+        self.state.markups.clear_all()
+        self.state.active_spline = None
+        self.refresh_all()
 
     def _undo(self, tid: int) -> None:
         m = self.state.markups
