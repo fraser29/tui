@@ -74,10 +74,7 @@ class ViewerApp(QtWidgets.QMainWindow):
         self._last_cursor_slice: Optional[SliceView] = None
         self._last_cursor_display: Optional[Tuple[int, int]] = None
         
-        if work_dir is not None:
-            self.WORK_DIR = work_dir
-        else:
-            self.WORK_DIR = os.environ.get("TUI_WORK_DIR", None)
+        self._work_dir = work_dir
 
         self.setWindowTitle(title)
         self.resize(1400, 900)
@@ -87,6 +84,20 @@ class ViewerApp(QtWidgets.QMainWindow):
         self._populate_controls()
         # User extension hook - safe to register custom buttons here.
         self.customise()
+
+    @property
+    def WORK_DIR(self) -> str:
+        """Default directory for open/save dialogs and one-click exports.
+
+        Resolves in order: an explicit ``work_dir`` (constructor arg or later
+        assignment), the ``TUI_WORK_DIR`` environment variable, then the current
+        working directory - so it always yields a real directory.
+        """
+        return self._work_dir or os.environ.get("TUI_WORK_DIR") or os.getcwd()
+
+    @WORK_DIR.setter
+    def WORK_DIR(self, value: Optional[str]) -> None:
+        self._work_dir = value
 
     # ===================================================================== UI
     def _build_ui(self) -> None:
@@ -760,7 +771,8 @@ keyframes; frames in between are interpolated (shown in cyan). Enable
     # ----------------------------------------------------------- file dialogs
     def _on_open(self) -> None:
         path, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self, "Open image", "", "Image data (*.vti *.pvd *.nii *.nii.gz *.nrrd *.mha *.mhd)")
+            self, "Open image", self.WORK_DIR,
+            "Image data (*.vti *.pvd *.nii *.nii.gz *.nrrd *.mha *.mhd)")
         if not path:
             return
         try:
@@ -785,7 +797,7 @@ keyframes; frames in between are interpolated (shown in cyan). Enable
     def _on_load_polydata(self) -> None:
         """Load points/splines from a polydata file into the current frame."""
         path, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self, "Load markup polydata", "", self._POLYDATA_FILTER)
+            self, "Load markup polydata", self.WORK_DIR, self._POLYDATA_FILTER)
         if not path:
             return
         try:
@@ -808,7 +820,7 @@ keyframes; frames in between are interpolated (shown in cyan). Enable
     def _on_load_labelmap(self) -> None:
         """Load a label map into the current frame's paint mask (merged in)."""
         path, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self, "Load labelmap", "", self._LABELMAP_FILTER)
+            self, "Load labelmap", self.WORK_DIR, self._LABELMAP_FILTER)
         if not path:
             return
         try:
@@ -821,7 +833,7 @@ keyframes; frames in between are interpolated (shown in cyan). Enable
     def _on_load_surf2labelmap(self) -> None:
         """Voxelise a closed surface into the current frame's paint mask."""
         path, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self, "Load surface to voxelise", "", self._POLYDATA_FILTER)
+            self, "Load surface to voxelise", self.WORK_DIR, self._POLYDATA_FILTER)
         if not path:
             return
         try:
@@ -869,7 +881,7 @@ keyframes; frames in between are interpolated (shown in cyan). Enable
             return
         # Ask for a full save path via the file selector, then split it into the
         # (out_dir, prefix) pair the underlying save logic expects.
-        start = os.path.join(self.WORK_DIR, "markup") if self.WORK_DIR else "markup"
+        start = os.path.join(self.WORK_DIR, "markup")
         path, _ = QtWidgets.QFileDialog.getSaveFileName(
             self, title, start, file_filter)
         if not path:
@@ -897,23 +909,12 @@ keyframes; frames in between are interpolated (shown in cyan). Enable
             self, title, f"Wrote {len(files)} file(s) to {out_dir}.")
 
 
-    def save_markups_helper(self, filename: str=None) -> None:
-        if os.sep in filename:
+    def save_markups_helper(self, filename: str = None) -> None:
+        if filename and os.sep in filename:
             out_dir = os.path.dirname(filename)
             filename = os.path.basename(filename)
         else:
-            if self.WORK_DIR is None:
-                if filename is None:
-                    full_filename = QtWidgets.QFileDialog.getSaveFileName(self, "Save markups to")
-                    if not full_filename:
-                        return
-                    filename = os.path.basename(full_filename)
-                else:
-                    out_dir = QtWidgets.QFileDialog.getExistingDirectory(self, "Save markups to")
-                    if not out_dir:
-                        return
-            else:
-                out_dir = self.WORK_DIR
+            out_dir = self.WORK_DIR
             if filename is None:
                 filename, ok = QtWidgets.QInputDialog.getText(
                     self, "Save markups", "Filename:")
