@@ -98,6 +98,11 @@ class ViewerApp(QtWidgets.QMainWindow):
     @WORK_DIR.setter
     def WORK_DIR(self, value: Optional[str]) -> None:
         self._work_dir = value
+        # Keep the working-directory bar in sync when set programmatically or
+        # from a subclass (the field may not exist yet during __init__).
+        field = getattr(self, "workdir_field", None)
+        if field is not None:
+            field.setText(self.WORK_DIR)
 
     # ===================================================================== UI
     def _build_ui(self) -> None:
@@ -126,6 +131,10 @@ class ViewerApp(QtWidgets.QMainWindow):
         # Time slider.
         self.time_bar = self._build_time_bar()
         left.addWidget(self.time_bar)
+
+        # Working-directory bar.
+        self.workdir_bar = self._build_workdir_bar()
+        left.addWidget(self.workdir_bar)
 
         # Right side panel.
         self.side_panel = SidePanel()
@@ -157,6 +166,30 @@ class ViewerApp(QtWidgets.QMainWindow):
         self.time_label.setMinimumWidth(120)
         h.addWidget(self.time_label)
         return bar
+
+    def _build_workdir_bar(self) -> QtWidgets.QWidget:
+        """Row under the time slider showing / editing the working directory."""
+        bar = QtWidgets.QWidget()
+        h = QtWidgets.QHBoxLayout(bar)
+        h.setContentsMargins(4, 2, 4, 2)
+        h.addWidget(QtWidgets.QLabel("WORKING_DIRECTORY"))
+        self.workdir_field = QtWidgets.QLineEdit(self.WORK_DIR)
+        self.workdir_field.setReadOnly(True)
+        self.workdir_field.setToolTip("Default directory for open/save dialogs")
+        h.addWidget(self.workdir_field, 1)
+        browse = QtWidgets.QPushButton("...")
+        browse.setFixedWidth(30)
+        browse.setToolTip("Choose the working directory")
+        browse.clicked.connect(self._on_choose_work_dir)
+        h.addWidget(browse)
+        return bar
+
+    def _on_choose_work_dir(self) -> None:
+        path = QtWidgets.QFileDialog.getExistingDirectory(
+            self, "Select working directory", self.WORK_DIR)
+        if not path:
+            return
+        self.WORK_DIR = path
 
     def _sync_time_bar(self) -> None:
         """Configure the (always-visible) time slider for the current series."""
