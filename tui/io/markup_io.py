@@ -171,7 +171,7 @@ def _write_frames(frames: Dict[float, vtk.vtkDataObject], out_dir: str,
         fIO.writeVTKFile(data, path)
         return [path]
     # Temporal -> let ngawari emit the per-time files plus a .pvd index.
-    fIO.writeVTK_PVD_Dict(frames, out_dir, prefix, ext, BUILD_SUBDIR=False)
+    fIO.writeVTK_PVD_Dict(frames, out_dir, prefix, ext, BUILD_SUBDIR=True)
     pvd = os.path.join(out_dir, f"{prefix}.pvd")
     return [pvd]
 
