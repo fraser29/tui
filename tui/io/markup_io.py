@@ -193,8 +193,7 @@ def _world_to_grid_matrix(image_series: ImageSeries) -> Optional[np.ndarray]:
     return np.linalg.inv(np.asarray(m, dtype=float))
 
 
-def _read_polydata(path: str) -> vtk.vtkPolyData:
-    obj = fIO.readVTKFile(path)
+def _coerce_polydata(obj: vtk.vtkDataObject, path: str) -> vtk.vtkPolyData:
     if isinstance(obj, vtk.vtkPolyData):
         return obj
     if isinstance(obj, vtk.vtkDataSet):
@@ -204,6 +203,18 @@ def _read_polydata(path: str) -> vtk.vtkPolyData:
         surf.Update()
         return surf.GetOutput()
     raise IOError(f"{path} does not contain polydata (got {type(obj).__name__})")
+
+
+def _read_polydata(path: str) -> vtk.vtkPolyData:
+    return _coerce_polydata(fIO.readVTKFile(path), path)
+
+
+def _read_markup_pvd(path: str) -> Dict[float, vtk.vtkDataObject]:
+    """Read a markup ``.pvd`` index into a ``{time: vtkDataObject}`` dict."""
+    frames = fIO.readPVD(path)
+    if not frames:
+        raise IOError(f"No time steps found in {path}")
+    return {float(t): obj for t, obj in frames.items()}
 
 
 def _cell_point_lists(cells: vtk.vtkCellArray, points: vtk.vtkPoints
@@ -230,7 +241,16 @@ def load_markup_polydata(path: str, image_series: ImageSeries
     treated as a set of landmarks.  Coordinates are mapped from true world back
     into the viewer's axis-aligned working grid.
     """
-    poly = _read_polydata(path)
+    points, splines = _polydata_to_markups(
+        _read_polydata(path), image_series)
+    logger.info("Loaded %d point(s) and %d spline(s) from %s",
+                len(points), len(splines), path)
+    return points, splines
+
+
+def _polydata_to_markups(poly: vtk.vtkPolyData, image_series: ImageSeries
+                         ) -> Tuple[List[XYZ], List[Spline]]:
+    """Parse a (world-space) polydata into ``(points, splines)`` on the grid."""
     grid_matrix = _world_to_grid_matrix(image_series)
     if grid_matrix is not None:
         poly = _transform_polydata(poly, grid_matrix)
@@ -258,10 +278,24 @@ def load_markup_polydata(path: str, image_series: ImageSeries
         # No cells at all -> every stored point is a landmark.
         points = [tuple(vtk_pts.GetPoint(i))
                   for i in range(vtk_pts.GetNumberOfPoints())]
-
-    logger.info("Loaded %d point(s) and %d spline(s) from %s",
-                len(points), len(splines), path)
     return points, splines
+
+
+def load_markup_polydata_series(path: str, image_series: ImageSeries
+                                ) -> Dict[float, Tuple[List[XYZ], List[Spline]]]:
+    """Read a ``.pvd`` of polydata markups into ``{time: (points, splines)}``.
+
+    Each referenced time step is parsed like :func:`load_markup_polydata`; the
+    caller maps every source time onto the nearest time step of the loaded
+    series (see ``ImageSeries.closest_time_id``).
+    """
+    frames = _read_markup_pvd(path)
+    out: Dict[float, Tuple[List[XYZ], List[Spline]]] = {}
+    for t, obj in frames.items():
+        out[t] = _polydata_to_markups(_coerce_polydata(obj, path), image_series)
+    logger.info("Loaded polydata markups for %d time step(s) from %s",
+                len(out), path)
+    return out
 
 
 def _labelmap_to_mask(img: vtk.vtkImageData, image_series: ImageSeries,
@@ -290,6 +324,21 @@ def load_markup_labelmap(path: str, image_series: ImageSeries) -> np.ndarray:
     return mask
 
 
+def load_markup_labelmap_series(path: str, image_series: ImageSeries
+                                ) -> Dict[float, np.ndarray]:
+    """Read a ``.pvd`` of label maps into ``{time: (nx,ny,nz) uint8 mask}``."""
+    frames = _read_markup_pvd(path)
+    out: Dict[float, np.ndarray] = {}
+    for t, obj in frames.items():
+        if not isinstance(obj, vtk.vtkImageData):
+            raise IOError(
+                f"{path} (t={t}) is not label-map image data "
+                f"(got {type(obj).__name__})")
+        out[t] = _labelmap_to_mask(obj, image_series, path)
+    logger.info("Loaded label maps for %d time step(s) from %s", len(out), path)
+    return out
+
+
 def load_surface_as_labelmap(path: str, image_series: ImageSeries,
                              time_id: int = 0, fill_value: int = 1) -> np.ndarray:
     """Convert a closed surface to an ``(nx, ny, nz)`` uint8 paint mask.
@@ -298,13 +347,36 @@ def load_surface_as_labelmap(path: str, image_series: ImageSeries,
     voxelised against the reference volume with ``fill_value`` inside the
     surface (via ngawari's ``filterSurfaceToImageStencil``).
     """
-    surf = _read_polydata(path)
+    mask = _voxelise_surface(_read_polydata(path), image_series, time_id,
+                             fill_value, path)
+    logger.info("Voxelised surface %s -> %d voxel(s)", path, int((mask > 0).sum()))
+    return mask
+
+
+def _voxelise_surface(surf: vtk.vtkPolyData, image_series: ImageSeries,
+                      time_id: int, fill_value: int, path: str) -> np.ndarray:
     grid_matrix = _world_to_grid_matrix(image_series)
     if grid_matrix is not None:
         surf = _transform_polydata(surf, grid_matrix)
     ref = image_series.get_image(time_id)
     stencil = vtkfilters.filterSurfaceToImageStencil(
         ref, surf, fill_value=int(fill_value))
-    mask = _labelmap_to_mask(stencil, image_series, path)
-    logger.info("Voxelised surface %s -> %d voxel(s)", path, int((mask > 0).sum()))
-    return mask
+    return _labelmap_to_mask(stencil, image_series, path)
+
+
+def load_surface_as_labelmap_series(path: str, image_series: ImageSeries,
+                                    fill_value: int = 1
+                                    ) -> Dict[float, np.ndarray]:
+    """Read a ``.pvd`` of surfaces, voxelising each into ``{time: mask}``.
+
+    Every time step shares the series geometry, so each surface is voxelised
+    against the reference volume; the caller maps source times to the nearest
+    loaded time step.
+    """
+    frames = _read_markup_pvd(path)
+    out: Dict[float, np.ndarray] = {}
+    for t, obj in frames.items():
+        out[t] = _voxelise_surface(_coerce_polydata(obj, path), image_series,
+                                   0, fill_value, path)
+    logger.info("Voxelised surfaces for %d time step(s) from %s", len(out), path)
+    return out

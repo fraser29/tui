@@ -35,8 +35,11 @@ from .core.markups import Markups, Spline
 from .io import (
     load_image_series,
     load_markup_labelmap,
+    load_markup_labelmap_series,
     load_markup_polydata,
+    load_markup_polydata_series,
     load_surface_as_labelmap,
+    load_surface_as_labelmap_series,
     save_markups,
 )
 from .io.loader import as_image_series
@@ -846,71 +849,109 @@ keyframes; frames in between are interpolated (shown in cyan). Enable
         self.refresh_all()
 
     # -------------------------------------------------- markup load / export
-    _POLYDATA_FILTER = "Polydata (*.vtp *.vtk *.vtu *.stl)"
-    _LABELMAP_FILTER = "Label map (*.vti *.nii *.nii.gz *.nrrd *.mha *.mhd)"
+    # ``.pvd`` time-series are also accepted: each frame is loaded into the
+    # nearest time step of the current series (see _closest_time_id).
+    _POLYDATA_FILTER = "Polydata (*.vtp *.vtk *.vtu *.stl *.pvd)"
+    _LABELMAP_FILTER = "Label map (*.vti *.nii *.nii.gz *.nrrd *.mha *.mhd *.pvd)"
+
+    @staticmethod
+    def _is_pvd(path: str) -> bool:
+        return path.lower().endswith(".pvd")
+
+    def _closest_time_id(self, t: Optional[float]) -> int:
+        """Nearest current time step for a source time (``None`` -> current)."""
+        if t is None:
+            return self.state.current_time_id
+        return self.state.image_series.closest_time_id(t)
 
     def _on_load_polydata(self) -> None:
-        """Load points/splines from a polydata file into the current frame."""
+        """Load points/splines from a polydata (or ``.pvd``) file.
+
+        A single file loads into the current frame; a ``.pvd`` distributes each
+        time step to the closest current time step.
+        """
         path, _ = QtWidgets.QFileDialog.getOpenFileName(
             self, "Load markup polydata", self.WORK_DIR, self._POLYDATA_FILTER)
         if not path:
             return
         try:
-            points, splines = load_markup_polydata(path, self.image_series)
+            if self._is_pvd(path):
+                frames = load_markup_polydata_series(path, self.image_series)
+            else:
+                frames = {None: load_markup_polydata(path, self.image_series)}
         except Exception as exc:  # noqa: BLE001
             QtWidgets.QMessageBox.critical(self, "Load polydata failed", str(exc))
             return
-        if not points and not splines:
+        m = self.state.markups
+        n_points = n_splines = 0
+        for t in sorted(frames, key=lambda k: (k is not None, k)):
+            points, splines = frames[t]
+            tid = self._closest_time_id(t)
+            for xyz in points:
+                m.add_point(tid, xyz)
+            for spline in splines:
+                m.add_spline(tid, spline)
+            n_points += len(points)
+            n_splines += len(splines)
+        if not n_points and not n_splines:
             QtWidgets.QMessageBox.information(
                 self, "Load polydata", "No points or splines found in the file.")
             return
-        tid = self.state.current_time_id
-        for xyz in points:
-            self.state.markups.add_point(tid, xyz)
-        for spline in splines:
-            self.state.markups.add_spline(tid, spline)
         self.state.active_spline = None
         self.refresh_all()
 
     def _on_load_labelmap(self) -> None:
-        """Load a label map into the current frame's paint mask (merged in)."""
+        """Load a label map (or ``.pvd``) into the paint mask(s), merged in."""
         path, _ = QtWidgets.QFileDialog.getOpenFileName(
             self, "Load labelmap", self.WORK_DIR, self._LABELMAP_FILTER)
         if not path:
             return
         try:
-            mask = load_markup_labelmap(path, self.image_series)
+            if self._is_pvd(path):
+                frames = load_markup_labelmap_series(path, self.image_series)
+            else:
+                frames = {None: load_markup_labelmap(path, self.image_series)}
         except Exception as exc:  # noqa: BLE001
             QtWidgets.QMessageBox.critical(self, "Load labelmap failed", str(exc))
             return
-        self._merge_paint_mask(mask)
+        self._merge_paint_frames(frames)
 
     def _on_load_surf2labelmap(self) -> None:
-        """Voxelise a closed surface into the current frame's paint mask."""
+        """Voxelise a closed surface (or ``.pvd``) into the paint mask(s)."""
         path, _ = QtWidgets.QFileDialog.getOpenFileName(
             self, "Load surface to voxelise", self.WORK_DIR, self._POLYDATA_FILTER)
         if not path:
             return
         try:
-            mask = load_surface_as_labelmap(
-                path, self.image_series, self.state.current_time_id,
-                fill_value=self.state.paint_label)
+            if self._is_pvd(path):
+                frames = load_surface_as_labelmap_series(
+                    path, self.image_series, fill_value=self.state.paint_label)
+            else:
+                frames = {None: load_surface_as_labelmap(
+                    path, self.image_series, self.state.current_time_id,
+                    fill_value=self.state.paint_label)}
         except Exception as exc:  # noqa: BLE001
             QtWidgets.QMessageBox.critical(
                 self, "Load surf2labelmap failed", str(exc))
             return
-        self._merge_paint_mask(mask)
+        self._merge_paint_frames(frames)
 
-    def _merge_paint_mask(self, mask: np.ndarray) -> None:
-        """Merge a loaded ``(nx,ny,nz)`` mask into the current paint mask."""
-        if not mask.any():
+    def _merge_paint_frames(self, frames: Dict[Optional[float], np.ndarray]) -> None:
+        """Merge one or more ``(nx,ny,nz)`` masks into their nearest frames."""
+        merged = 0
+        for t in sorted(frames, key=lambda k: (k is not None, k)):
+            mask = frames[t]
+            if not mask.any():
+                continue
+            existing = self.state.markups.paint_mask(
+                self._closest_time_id(t), create=True)
+            set_voxels = mask > 0
+            existing[set_voxels] = mask[set_voxels]
+            merged += 1
+        if not merged:
             QtWidgets.QMessageBox.information(
                 self, "Load labelmap", "The label map is empty (no set voxels).")
             return
-        tid = self.state.current_time_id
-        existing = self.state.markups.paint_mask(tid, create=True)
-        set_voxels = mask > 0
-        existing[set_voxels] = mask[set_voxels]
         self.refresh_all()
 
     def _on_export_polydata(self) -> None:

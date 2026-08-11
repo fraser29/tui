@@ -72,6 +72,11 @@ class ImageSeries:
     def time_for_id(self, time_id: int) -> float:
         return self._times[self._clamp(time_id)]
 
+    def closest_time_id(self, t: float) -> int:
+        """Return the ``time_id`` whose time is nearest ``t`` (ties -> earlier)."""
+        return int(min(range(self.n_times),
+                       key=lambda i: (abs(self._times[i] - float(t)), i)))
+
     def _clamp(self, time_id: int) -> int:
         if time_id < 0:
             return 0
