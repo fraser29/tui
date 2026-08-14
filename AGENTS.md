@@ -19,7 +19,7 @@ viewer (see `../tui`), designed from the start for testability and extension.
 | `PyQt5` | UI |
 | `numpy` / `scipy` | Markup maths / interpolation |
 | `ngawari` | `fIO` (all file IO), `vtkfilters`, `ftk` (splines) — local source at `/home/fraser/DEV/ngawari` |
-| `spydcmtk` | Optional, DICOM directory reading (`[dicom]` extra) |
+| `spydcmtk` | DICOM directory reading |
 
 A working env with all of the above: `/home/fraser/DEV/envs/dev/bin/python`
 (also `main`, `cfihura`). The system `python3` lacks PyQt5.

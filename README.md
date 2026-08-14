@@ -25,8 +25,7 @@ panel** on the right.
 - **Temporal data**: PVD time series are loaded as multiple time points and
   scrubbed with the time slider. Non-temporal data hides the slider.
 - **All IO via [`ngawari`](https://pypi.org/project/ngawari/)** (`fIO`) — `.vti`,
-  `.pvd`, `.nii(.gz)`, `.nrrd`, `.mha/.mhd`, and DICOM directories (with the
-  optional `spydcmtk` extra).
+  `.pvd`, `.nii(.gz)`, `.nrrd`, `.mha/.mhd`, and DICOM directories.
 - **Array selector**: choose which point-data array to display when a volume has
   several.
 - **Markup modes**: add points, add splines, paint (a **3D spherical brush**),
@@ -43,11 +42,9 @@ panel** on the right.
 
 ```bash
 pip install -e .
-# optional DICOM support:
-pip install -e ".[dicom]"
 ```
 
-Requires `vtk>=9.3`, `PyQt5`, `numpy`, `scipy`, and `ngawari`.
+Requires `vtk>=9.3`, `PyQt5`, `numpy`, `scipy`, `ngawari`, and `spydcmtk`.
 
 ## Run
 
@@ -177,6 +174,10 @@ as a transform on the series. When you **save markups**, every exported frame
 (points, splines and paint masks — including the interpolated ones) is mapped
 back into true world / patient coordinates, so the polydata lines up with the
 original DICOM in other tools.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## Tests
 

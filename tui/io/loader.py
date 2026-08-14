@@ -19,6 +19,7 @@ from typing import Dict, Mapping, Optional, Sequence, Union
 import numpy as np
 import vtk
 from ngawari import fIO, vtkfilters
+from spydcmtk import dcmTK
 
 from ..core.image_series import ImageSeries
 
@@ -47,7 +48,7 @@ def load_image_series(path: str) -> ImageSeries:
     * Any single-volume image ngawari can read (``.vti``, ``.nii``, ``.nrrd``,
       ``.mha`` ...).
     * ``.pvd`` time-series (temporal data -> multiple time points).
-    * A directory of DICOM (requires the optional ``spydcmtk`` dependency).
+    * A directory of DICOM.
     """
     path = os.path.expanduser(path)
     if not os.path.exists(path):
@@ -262,14 +263,6 @@ def _validate_dict(time_to_image: Dict[float, vtk.vtkDataObject], path: str
 
 
 def _load_dicom_dir(path: str) -> Dict[float, vtk.vtkImageData]:
-    try:
-        from spydcmtk import dcmTK
-    except ImportError as exc:  # pragma: no cover - optional dependency
-        raise ImportError(
-            "Reading a DICOM directory requires the optional 'spydcmtk' "
-            "dependency. Install with: pip install spydcmtk"
-        ) from exc
-
     logger.info("Reading DICOM directory: %s", path)
     studies = dcmTK.ListOfDicomStudies.setFromDirectory(path, HIDE_PROGRESSBAR=True)
     if not studies:
