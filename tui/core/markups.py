@@ -152,20 +152,27 @@ class Markups:
         self._splines: Dict[int, List[Spline]] = {}
         self._paint: Dict[int, np.ndarray] = {}
         self._spline_sample_n = 80  # density used when interpolating splines
+        # Bumped whenever paint voxels change so views can skip re-uploading an
+        # overlay that is already in sync (scroll / crosshair stay cheap).
+        self.paint_revision: int = 0
 
     # ------------------------------------------------------------- bookkeeping
     def set_n_times(self, n_times: int) -> None:
         self.n_times = max(1, int(n_times))
 
     def clear_all(self) -> None:
+        had_paint = bool(self._paint)
         self._points.clear()
         self._splines.clear()
         self._paint.clear()
+        if had_paint:
+            self._bump_paint()
 
     def clear_time(self, time_id: int) -> None:
         self._points.pop(time_id, None)
         self._splines.pop(time_id, None)
-        self._paint.pop(time_id, None)
+        if self._paint.pop(time_id, None) is not None:
+            self._bump_paint()
 
     def manual_time_ids(self) -> List[int]:
         ids = set(self._points) | set(self._splines) | set(self._paint)
@@ -399,20 +406,35 @@ class Markups:
     def paint_mask(self, time_id: int, create: bool = True) -> Optional[np.ndarray]:
         """Return the manual paint mask for ``time_id`` (numpy k,j,i, uint8)."""
         if time_id in self._paint:
+            if create:
+                # Caller typically mutates in place; invalidate overlay caches.
+                self._bump_paint()
             return self._paint[time_id]
         if not create:
             return None
         if self.image_shape is None:
             raise RuntimeError("Markups.image_shape must be set before painting")
-        mask = np.zeros(self.image_shape, dtype=np.uint8)
+        # Fortran layout matches the VTK overlay buffer (x fastest), so a full
+        # upload is a single memcpy rather than a gather from C-order memory.
+        mask = np.zeros(self.image_shape, dtype=np.uint8, order="F")
         self._paint[time_id] = mask
+        self._bump_paint()
         return mask
 
     def set_paint_mask(self, time_id: int, mask: np.ndarray) -> None:
-        self._paint[time_id] = mask.astype(np.uint8)
+        self._paint[time_id] = np.asfortranarray(mask, dtype=np.uint8)
+        self._bump_paint()
 
     def clear_paint(self, time_id: int) -> None:
-        self._paint.pop(time_id, None)
+        if self._paint.pop(time_id, None) is not None:
+            self._bump_paint()
+
+    def touch_paint(self) -> None:
+        """Mark paint voxels as changed after an in-place edit of a mask."""
+        self._bump_paint()
+
+    def _bump_paint(self) -> None:
+        self.paint_revision += 1
 
     def has_paint(self, time_id: int) -> bool:
         m = self._paint.get(time_id)

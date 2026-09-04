@@ -97,6 +97,10 @@ def main():
     _mid = np.array(_m.shape) / 2.0
     assert np.all(np.abs(_centroid - _mid) < 6), (_centroid, _mid)
 
+    # Slice / crosshair path must not re-upload the paint volume.
+    viewer.refresh_reslice()
+    app.processEvents()
+
     # Move to a later time, add a keyframe spline, check interpolation exists.
     viewer.time_slider.setValue(2)
     st.mode = MarkupMode.SPLINES

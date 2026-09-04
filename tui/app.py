@@ -274,6 +274,7 @@ class ViewerApp(QtWidgets.QMainWindow):
                 view.sigPointPicked.connect(self._on_point_picked)
                 view.sigPaint.connect(self._on_paint)
                 view.sigFrameChanged.connect(self.refresh_all)
+                view.sigResliceChanged.connect(self.refresh_reslice)
                 view.sigWindowLevel.connect(self._on_window_level)
                 view._cursor_tracker = self._on_slice_cursor  # set by app
 
@@ -451,6 +452,11 @@ class ViewerApp(QtWidgets.QMainWindow):
     def refresh_all(self) -> None:
         for view in self.views.values():
             view.refresh()
+
+    def refresh_reslice(self) -> None:
+        """Slice scroll / crosshair: update planes without re-uploading paint."""
+        for view in self.views.values():
+            view.refresh_reslice()
 
     # ============================================================== handlers
     def _on_time_changed(self, value: int) -> None:
@@ -952,6 +958,7 @@ keyframes; frames in between are interpolated (shown in cyan). Enable
             QtWidgets.QMessageBox.information(
                 self, "Load labelmap", "The label map is empty (no set voxels).")
             return
+        self.state.markups.touch_paint()
         self.refresh_all()
 
     def _on_export_polydata(self) -> None:

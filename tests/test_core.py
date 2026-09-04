@@ -246,6 +246,27 @@ def test_paint_nearest_keyframe():
     assert m.effective_paint(4) is not None       # still nearest available
 
 
+def test_paint_revision_tracks_mutations():
+    m = Markups(n_times=2, image_shape=(4, 4, 4))
+    assert m.paint_revision == 0
+    mask = m.paint_mask(0)
+    assert mask.flags.f_contiguous
+    rev = m.paint_revision
+    assert rev > 0
+    m.paint_mask(0, create=True)          # in-place access
+    assert m.paint_revision == rev + 1
+    m.paint_mask(0, create=False)         # read-only: no bump
+    assert m.paint_revision == rev + 1
+    m.touch_paint()
+    assert m.paint_revision == rev + 2
+    m.set_paint_mask(1, np.ones((4, 4, 4), dtype=np.uint8))
+    assert m.paint_revision == rev + 3
+    m.clear_paint(1)
+    assert m.paint_revision == rev + 4
+    m.clear_all()
+    assert m.paint_revision == rev + 5
+
+
 def test_three_point_spline_is_curved_not_straight():
     """Sparse (3-point) splines must render as a real curve, not straight lines
     (regression: cubic-only fit failed for <4 points and dropped to linear)."""

@@ -142,6 +142,14 @@ class VolumeView(QtWidgets.QFrame):
         self.renderer.ResetCameraClippingRange()
         self._render_window.Render()
 
+    def refresh_reslice(self) -> None:
+        """Update MPR planes after the reslice frame moved (no markup rebuild)."""
+        for orient, (_mapper, _actor, plane) in self._slice_actors.items():
+            plane.SetOrigin(*self.state.center)
+            plane.SetNormal(*self.state.normal_for(orient))
+        self.renderer.ResetCameraClippingRange()
+        self._render_window.Render()
+
     def apply_window_level(self) -> None:
         """Re-apply the shared window/level to the MPR slices and redraw."""
         for _orient, (_mapper, actor, _plane) in self._slice_actors.items():

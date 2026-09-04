@@ -47,6 +47,7 @@ class SliceView(QtWidgets.QFrame):
     sigPointPicked = QtCore.pyqtSignal(object, tuple)
     sigPaint = QtCore.pyqtSignal(object, tuple, bool)
     sigFrameChanged = QtCore.pyqtSignal()       # frame or markup edited -> refresh all
+    sigResliceChanged = QtCore.pyqtSignal()     # slice/crosshair moved -> geometry only
     sigWindowLevel = QtCore.pyqtSignal()        # window/level edited -> sync all views
     sigViewActivated = QtCore.pyqtSignal(object)
 
@@ -123,6 +124,7 @@ class SliceView(QtWidgets.QFrame):
         self._overlay_img: Optional[vtk.vtkImageData] = None
         self._overlay_buf: Optional[np.ndarray] = None
         self._overlay_view: Optional[np.ndarray] = None
+        self._overlay_key = None  # (id(mask), paint_revision) last uploaded
 
         # Markup actors.
         self._point_actor, self._point_poly = self._make_point_actor(
@@ -217,6 +219,7 @@ class SliceView(QtWidgets.QFrame):
         # (nx, ny, nz) Fortran view onto the same buffer, aligned with the paint
         # mask so a painted sub-region can be copied in without a full O(N) pass.
         self._overlay_view = self._overlay_buf.reshape(dims, order="F")
+        self._overlay_key = None
         self._paint_mapper.SetInputData(self._overlay_img)
         self._camera_initialised = False
 
@@ -253,6 +256,18 @@ class SliceView(QtWidgets.QFrame):
         self._update_plane()
         self._refresh_image()
         self._refresh_paint()
+        self._finish_refresh()
+
+    def refresh_reslice(self) -> None:
+        """Re-render after the reslice frame moved (scroll / crosshair).
+
+        The paint overlay volume is already on the mapper; re-uploading it and
+        calling ``Modified`` is what made slicing crawl once a labelmap exists.
+        """
+        self._update_plane()
+        self._finish_refresh()
+
+    def _finish_refresh(self) -> None:
         self._refresh_markups()
         self._refresh_crosshair()
         self._refresh_annotation()
@@ -281,13 +296,26 @@ class SliceView(QtWidgets.QFrame):
         self._render_window.Render()
 
     def _refresh_paint(self) -> None:
-        mask = self.state.markups.effective_paint(self.state.current_time_id)
-        if mask is None or not mask.any() or not self.state.show_markups:
+        if not self.state.show_markups:
             self._paint_slice.VisibilityOff()
             return
+        mask = self.state.markups.effective_paint(self.state.current_time_id)
+        if mask is None:
+            if self._overlay_key is not None:
+                self._overlay_buf[:] = 0
+                self._overlay_img.Modified()
+                self._overlay_key = None
+            self._paint_slice.VisibilityOff()
+            return
+        key = (id(mask), self.state.markups.paint_revision)
+        if key == self._overlay_key:
+            self._paint_slice.VisibilityOn()
+            return
+        # Full upload: only when the mask object/revision actually changed.
         self._overlay_buf[:] = np.ascontiguousarray(mask.ravel(order="F"))
         self._overlay_img.Modified()
-        self._paint_slice.VisibilityOn()
+        self._overlay_key = key
+        self._paint_slice.SetVisibility(bool(mask.any()))
 
     def _refresh_markups(self) -> None:
         show = self.state.show_markups
@@ -452,6 +480,7 @@ class SliceView(QtWidgets.QFrame):
         i0, i1, j0, j1, k0, k1 = box
         self._overlay_view[i0:i1, j0:j1, k0:k1] = mask[i0:i1, j0:j1, k0:k1]
         self._overlay_img.Modified()
+        self._overlay_key = (id(mask), self.state.markups.paint_revision)
         self._paint_slice.SetVisibility(self.state.show_markups)
         if render:
             self._render_window.Render()
@@ -462,7 +491,7 @@ class SliceView(QtWidgets.QFrame):
 
     def step_slice(self, delta: int) -> None:
         self.state.step_along_normal(self.orientation, delta)
-        self.sigFrameChanged.emit()
+        self.sigResliceChanged.emit()
 
     # --- window / level --------------------------------------------------- #
     def window_level_begin(self, x: int, y: int) -> None:
@@ -517,7 +546,7 @@ class SliceView(QtWidgets.QFrame):
             ang = np.arctan2(float(np.dot(np.cross(axis_vec, d), n)),
                              float(np.dot(axis_vec, d)))
             self.state.rotate_about(self.orientation, ang)
-        self.sigFrameChanged.emit()
+        self.sigResliceChanged.emit()
 
     # --- modify handles --------------------------------------------------- #
     def _near_plane_fn(self):

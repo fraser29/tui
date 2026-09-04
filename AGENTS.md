@@ -103,7 +103,14 @@ re-render. Views are dumb renderers of `state`.
   four-panel sync (incl. the 3D view) happens once on stroke end
   (`SliceView.end_paint_stroke` -> `sigFrameChanged`). The overlay keeps an
   `(nx,ny,nz)` Fortran view (`_overlay_view`) aligned with the paint mask for
-  O(box) updates.
+  O(box) updates. Paint masks themselves are F-contiguous so a full overlay
+  upload is a memcpy.
+- Wheel-scroll and crosshair drags emit `sigResliceChanged` ->
+  `ViewerApp.refresh_reslice`: update slice planes / crosshair / near-plane
+  markups **without** re-copying the paint volume. `_refresh_paint` also skips
+  the upload when `Markups.paint_revision` is unchanged. Do not route those
+  interactions through `refresh_all` (a full-volume copy + `Modified()` per
+  event is what made slicing crawl once a labelmap exists).
 - **MODIFY** mode (`MarkupMode.MODIFY`): `SliceView.modify_grab/insert/delete/
   drag/release`. Left-drag moves the nearest handle on the plane; left-click on
   a spline line inserts a control point; right-click deletes a handle. Hit-tests
