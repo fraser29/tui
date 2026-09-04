@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tui"
-version = "0.2.1"
+version = "0.2.2"
 description = "Customisable 4-panel (axial / sagittal / coronal / 3D) medical image viewer with temporal data and markup."
 readme = "README.md"
 requires-python = ">=3.9"
