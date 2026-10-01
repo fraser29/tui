@@ -9,11 +9,15 @@ Behaviour by mode:
 * MODIFY    - left-drag moves the nearest handle; left-click on a spline line
   inserts a new control point; right-click deletes the nearest handle.  Editing
   an interpolated (cyan) frame promotes it to an editable keyframe.
+
+Hold **Ctrl** in any markup mode to temporarily use NAVIGATE interactions;
+release Ctrl to return to the selected markup mode (the mode itself is unchanged).
 """
 
 from __future__ import annotations
 
 import vtk
+from PyQt5 import QtCore, QtWidgets
 
 from ..core.enums import MarkupMode
 
@@ -32,8 +36,17 @@ class SliceInteractorStyle(vtk.vtkInteractorStyleImage):
         self.AddObserver("MouseWheelBackwardEvent", self._on_wheel_backward)
         self.AddObserver("RightButtonPressEvent", self._on_right_down)
 
+    @staticmethod
+    def _ctrl_held() -> bool:
+        """True while Ctrl is held (Qt is the source of truth under QVTK)."""
+        return bool(
+            QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
+
     @property
     def _mode(self) -> MarkupMode:
+        # Ctrl temporarily overrides to navigate without changing state.mode.
+        if self._ctrl_held():
+            return MarkupMode.NAVIGATE
         return self._view.state.mode
 
     def _pos(self):

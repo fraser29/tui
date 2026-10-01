@@ -518,6 +518,9 @@ maximise one view; <i>Grid (2&times;2)</i> restores all four.</p>
 <h3>Mouse (any mode)</h3>
 <ul>
 <li><b>Mouse wheel</b> over a slice &mdash; scroll through slices.</li>
+<li><b>Ctrl</b> (held) in any markup mode &mdash; temporarily navigate
+    (crosshair / window-level) without leaving the selected mode; release
+    Ctrl to resume markup.</li>
 <li><b>3D panel</b> &mdash; left-drag rotates, wheel zooms, middle-drag pans.</li>
 </ul>
 
@@ -563,6 +566,7 @@ keyframes; frames in between are interpolated (shown in cyan). Enable
 <tr><td><b>S</b></td><td>Add splines mode</td></tr>
 <tr><td><b>P</b></td><td>Paint mode</td></tr>
 <tr><td><b>M</b></td><td>Modify mode</td></tr>
+<tr><td><b>Ctrl</b> (held)</td><td>Temporarily navigate (crosshair / window-level)</td></tr>
 <tr><td><b>.</b></td><td>Add a point under the pointer</td></tr>
 <tr><td><b>U</b> or <b>Ctrl+Z</b></td><td>Undo last markup in this frame</td></tr>
 <tr><td><b>R</b></td><td>Reset planes (axis-aligned frame)</td></tr>
