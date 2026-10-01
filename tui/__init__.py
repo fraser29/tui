@@ -64,8 +64,8 @@ def set_log_level(level):
 def configure_logging(level=logging.INFO, fmt=None):
     """Attach a :class:`logging.StreamHandler` to the ``tui`` logger.
 
-    Idempotent: reuses an existing stream handler so a host application that
-    configured DEBUG before importing submodules is not reset to INFO.
+    Idempotent: reuses an existing stream handler and does not lower an already
+    configured level, so a host that set DEBUG before calling ``launch`` keeps it.
     """
     if isinstance(level, str):
         level = getattr(logging, level.upper())
@@ -81,7 +81,9 @@ def configure_logging(level=logging.INFO, fmt=None):
         handler = logging.StreamHandler()
         logger.addHandler(handler)
     handler.setFormatter(logging.Formatter(fmt))
-    logger.setLevel(level)
+    # Never downgrade an already-configured level (e.g. CLI ``--log-level DEBUG``).
+    if logger.level == logging.NOTSET or level < logger.level:
+        logger.setLevel(level)
 
 
 def __getattr__(name):

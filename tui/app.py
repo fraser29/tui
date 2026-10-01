@@ -803,6 +803,11 @@ keyframes; frames in between are interpolated (shown in cyan). Enable
             logger.exception("Custom button callback failed")
         self.refresh_all()
 
+    def _report_error(self, title: str, exc: Exception) -> None:
+        """Log ``exc`` to the terminal and show a critical dialog (UI stays up)."""
+        logger.exception("%s: %s", title, exc)
+        QtWidgets.QMessageBox.critical(self, title, str(exc))
+
     # ====================================================== convenience props
     @property
     def image_series(self) -> ImageSeries:
@@ -842,7 +847,7 @@ keyframes; frames in between are interpolated (shown in cyan). Enable
         try:
             series = load_image_series(path)
         except Exception as exc:  # noqa: BLE001
-            QtWidgets.QMessageBox.critical(self, "Open failed", str(exc))
+            self._report_error("Open failed", exc)
             return
         self._reset_with_series(series)
 
@@ -886,7 +891,7 @@ keyframes; frames in between are interpolated (shown in cyan). Enable
             else:
                 frames = {None: load_markup_polydata(path, self.image_series)}
         except Exception as exc:  # noqa: BLE001
-            QtWidgets.QMessageBox.critical(self, "Load polydata failed", str(exc))
+            self._report_error("Load polydata failed", exc)
             return
         m = self.state.markups
         n_points = n_splines = 0
@@ -918,7 +923,7 @@ keyframes; frames in between are interpolated (shown in cyan). Enable
             else:
                 frames = {None: load_markup_labelmap(path, self.image_series)}
         except Exception as exc:  # noqa: BLE001
-            QtWidgets.QMessageBox.critical(self, "Load labelmap failed", str(exc))
+            self._report_error("Load labelmap failed", exc)
             return
         self._merge_paint_frames(frames)
 
@@ -937,8 +942,7 @@ keyframes; frames in between are interpolated (shown in cyan). Enable
                     path, self.image_series, self.state.current_time_id,
                     fill_value=self.state.paint_label)}
         except Exception as exc:  # noqa: BLE001
-            QtWidgets.QMessageBox.critical(
-                self, "Load surf2labelmap failed", str(exc))
+            self._report_error("Load surf2labelmap failed", exc)
             return
         self._merge_paint_frames(frames)
 
@@ -1006,7 +1010,7 @@ keyframes; frames in between are interpolated (shown in cyan). Enable
                                  prefix=prefix, kinds=kinds,
                                  kind_suffix=kind_suffix)
         except Exception as exc:  # noqa: BLE001
-            QtWidgets.QMessageBox.critical(self, "Export failed", str(exc))
+            self._report_error("Export failed", exc)
             return
         QtWidgets.QMessageBox.information(
             self, title, f"Wrote {len(files)} file(s) to {out_dir}.")
@@ -1026,7 +1030,7 @@ keyframes; frames in between are interpolated (shown in cyan). Enable
         try:
             files = self.save_markups(out_dir, prefix=filename.strip())
         except Exception as exc:  # noqa: BLE001
-            QtWidgets.QMessageBox.critical(self, "Save failed", str(exc))
+            self._report_error("Save failed", exc)
             return
 
 
@@ -1049,6 +1053,19 @@ def launch(data, viewer_class=ViewerApp, array: Optional[str] = None,
         launch(subject.MIPVTI, viewer_class=MyViewer, subject=subject)
         launch(vtk_dict, viewer_class=MyViewer)
     """
+    from . import configure_logging
+    configure_logging()  # ensure caught errors reach the terminal
+
+    # Surface uncaught exceptions (incl. Qt slot failures) on stderr.
+    def _excepthook(exc_type, exc, tb):
+        if issubclass(exc_type, KeyboardInterrupt):
+            sys.__excepthook__(exc_type, exc, tb)
+            return
+        logging.getLogger("tui").error(
+            "Uncaught exception", exc_info=(exc_type, exc, tb))
+
+    sys.excepthook = _excepthook
+
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(argv or sys.argv)
     viewer = viewer_class(
         data, title=title or _title_for(data), **viewer_kwargs)
