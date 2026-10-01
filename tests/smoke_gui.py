@@ -82,9 +82,10 @@ def main():
     viewer._on_point_picked(viewer.views[ViewType.AXIAL], (c[0] + 5, c[1], c[2]))
 
     st.mode = MarkupMode.SPLINES
+    st.spline_closed = True
     for p in [(10, 10, 20), (30, 10, 20), (30, 30, 20), (10, 30, 20)]:
         viewer._on_point_picked(viewer.views[ViewType.AXIAL], p)
-    viewer._on_action("close_spline")
+    viewer._on_action("new_spline")
 
     st.mode = MarkupMode.PAINT
     st.paint_radius = 4
@@ -104,9 +105,10 @@ def main():
     # Move to a later time, add a keyframe spline, check interpolation exists.
     viewer.time_slider.setValue(2)
     st.mode = MarkupMode.SPLINES
+    st.spline_closed = True
     for p in [(10, 10, 20), (30, 10, 20), (30, 30, 20), (10, 30, 20)]:
         viewer._on_point_picked(viewer.views[ViewType.AXIAL], p)
-    viewer._on_action("close_spline")
+    viewer._on_action("new_spline")
     interp = st.markups.effective_splines(1)
     assert interp and not interp[0].is_manual, "frame 1 should be interpolated"
 

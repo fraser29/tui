@@ -92,6 +92,8 @@ class ViewerState:
 
         self.mode: MarkupMode = MarkupMode.NAVIGATE
         self.active_spline: Optional[Spline] = None
+        # Sticky session preference: new / in-progress splines are closed loops.
+        self.spline_closed: bool = False
 
         # Paint settings.
         self.paint_radius: int = 3      # voxels

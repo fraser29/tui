@@ -26,6 +26,7 @@ class SidePanel(QtWidgets.QWidget):
     sigShowCrosshair = QtCore.pyqtSignal(bool)
     sigResetFrame = QtCore.pyqtSignal()
     sigPeriodicChanged = QtCore.pyqtSignal(bool)
+    sigSplineClosedChanged = QtCore.pyqtSignal(bool)
     sigHelp = QtCore.pyqtSignal()
 
     def __init__(self, parent=None):
@@ -140,13 +141,18 @@ class SidePanel(QtWidgets.QWidget):
         self.periodic_cb.toggled.connect(self.sigPeriodicChanged.emit)
         v.addWidget(self.periodic_cb)
 
-        # Spline actions.
+        # Spline actions: start a fresh curve; closed-loop is a sticky preference.
         spline_row = QtWidgets.QHBoxLayout()
-        for label, action in (("New spline", "new_spline"),
-                              ("Close spline", "close_spline")):
-            b = QtWidgets.QPushButton(label)
-            b.clicked.connect(lambda _=False, a=action: self.sigAction.emit(a))
-            spline_row.addWidget(b)
+        new_btn = QtWidgets.QPushButton("New spline")
+        new_btn.setToolTip("Finish the current spline and start a new one")
+        new_btn.clicked.connect(lambda: self.sigAction.emit("new_spline"))
+        spline_row.addWidget(new_btn)
+        self.closed_spline_cb = QtWidgets.QCheckBox("Closed")
+        self.closed_spline_cb.setToolTip(
+            "Draw splines as closed loops. Stays on for the session until you "
+            "change it; also updates the spline currently being drawn.")
+        self.closed_spline_cb.toggled.connect(self.sigSplineClosedChanged.emit)
+        spline_row.addWidget(self.closed_spline_cb)
         v.addLayout(spline_row)
 
         # Paint controls.

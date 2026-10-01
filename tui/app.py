@@ -264,6 +264,7 @@ class ViewerApp(QtWidgets.QMainWindow):
         sp.sigShowCrosshair.connect(self._on_show_crosshair)
         sp.sigResetFrame.connect(self._on_reset_frame)
         sp.sigPeriodicChanged.connect(self._on_periodic_changed)
+        sp.sigSplineClosedChanged.connect(self._on_spline_closed_changed)
         sp.sigHelp.connect(self._show_help)
 
         self.time_slider.valueChanged.connect(self._on_time_changed)
@@ -495,6 +496,13 @@ class ViewerApp(QtWidgets.QMainWindow):
         self.state.markups.periodic = enabled
         self.refresh_all()
 
+    def _on_spline_closed_changed(self, closed: bool) -> None:
+        """Sticky closed-loop preference for the session; updates the active spline."""
+        self.state.spline_closed = closed
+        if self.state.active_spline is not None:
+            self.state.active_spline.closed = closed
+            self.refresh_all()
+
     def _on_window_level(self) -> None:
         """Window/level changed in one panel -> apply to every panel."""
         for view in self.views.values():
@@ -528,7 +536,8 @@ mouse buttons on a slice panel do different things per mode:</p>
     <td>Click to drop a landmark point.</td><td>&ndash;</td></tr>
 <tr><td><b>Add splines</b></td>
     <td>Click to add spline control points. Use <i>New spline</i> to start a
-        fresh spline and <i>Close spline</i> to close the loop.</td>
+        fresh spline. Check <i>Closed</i> to draw loops (sticky for the
+        session).</td>
     <td>&ndash;</td></tr>
 <tr><td><b>Paint</b></td>
     <td>Drag to paint with a 3D spherical brush (set <i>Brush</i> size and
@@ -595,7 +604,8 @@ keyframes; frames in between are interpolated (shown in cyan). Enable
             self.state.markups.add_point(tid, xyz)
         elif self.state.mode is MarkupMode.SPLINES:
             if self.state.active_spline is None:
-                self.state.active_spline = self.state.markups.add_spline(tid)
+                self.state.active_spline = self.state.markups.add_spline(
+                    tid, closed=self.state.spline_closed)
             self.state.active_spline.control_points.append(tuple(xyz))
         self.refresh_all()
 
@@ -723,10 +733,6 @@ keyframes; frames in between are interpolated (shown in cyan). Enable
         m = self.state.markups
         if action == "new_spline":
             self.state.active_spline = None
-        elif action == "close_spline":
-            if self.state.active_spline is not None:
-                self.state.active_spline.closed = True
-                self.state.active_spline = None
         elif action == "undo":
             self._undo(tid)
         elif action == "clear_frame":
@@ -852,7 +858,10 @@ keyframes; frames in between are interpolated (shown in cyan). Enable
         self._reset_with_series(series)
 
     def _reset_with_series(self, series: ImageSeries) -> None:
+        # Keep sticky session prefs (closed-spline checkbox, etc.) across reload.
+        spline_closed = self.state.spline_closed
         self.state = ViewerState(series)
+        self.state.spline_closed = spline_closed
         for view in self.views.values():
             view.state = self.state
             view.prepare_geometry() if isinstance(view, SliceView) else None
