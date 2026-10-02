@@ -87,6 +87,28 @@ class ImageSeries:
     def get_image(self, time_id: int = 0) -> vtk.vtkImageData:
         return self._images[self._clamp(time_id)]
 
+    def add_times(self, time_to_image: Dict[float, vtk.vtkImageData]) -> None:
+        """Append additional time points (e.g. after a progressive PVD load).
+
+        Times already present are rejected.  Scalar-range caches are cleared so
+        subsequent queries span the expanded series.
+        """
+        if not time_to_image:
+            return
+        existing = set(self._times)
+        for t in sorted(time_to_image.keys()):
+            tf = float(t)
+            if tf in existing:
+                raise ValueError(f"time {tf} already present in ImageSeries")
+            self._times.append(tf)
+            self._images.append(time_to_image[t])
+            existing.add(tf)
+        order = sorted(range(len(self._times)), key=lambda i: self._times[i])
+        self._times = [self._times[i] for i in order]
+        self._images = [self._images[i] for i in order]
+        self._scalar_range_cache.clear()
+        self._validate()
+
     # -------------------------------------------------------------- geometry
     @property
     def reference(self) -> vtk.vtkImageData:

@@ -1,9 +1,9 @@
 """Load image data into an :class:`~tui.core.image_series.ImageSeries`.
 
-All file reading is delegated to :mod:`ngawari.fIO`.  ``fIO.readImageFileToDict``
-returns a ``{time: vtkImageData}`` dictionary for both single-volume files
-(``{0.0: img}``) and PVD time series, which maps directly onto our temporal
-container.
+All file reading is delegated to :mod:`ngawari.fIO`.  For ``.pvd`` time series
+the index is read first (``fIO.readPVDFileName``); the earliest frame is loaded
+immediately and the remaining frames can be fetched in parallel in the
+background (see :func:`begin_image_series_load`).
 
 Use :func:`as_image_series` when you have in-memory VTK data (a single volume,
 a ``{time: image}`` dict, or a list of frames) and need the same
@@ -14,7 +14,8 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Dict, Mapping, Optional, Sequence, Union
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import vtk
@@ -39,9 +40,12 @@ ImageInput = Union[
     Sequence[vtk.vtkImageData],
 ]
 
+# (time, filepath) pairs still to load after the first frame.
+PendingFrames = List[Tuple[float, str]]
+
 
 def load_image_series(path: str) -> ImageSeries:
-    """Load ``path`` into an :class:`ImageSeries`.
+    """Load ``path`` into an :class:`ImageSeries` (blocking; all frames).
 
     Supports:
 
@@ -49,32 +53,109 @@ def load_image_series(path: str) -> ImageSeries:
       ``.mha`` ...).
     * ``.pvd`` time-series (temporal data -> multiple time points).
     * A directory of DICOM.
+
+    For interactive progressive load (show first frame, fill the rest in the
+    background) use :func:`begin_image_series_load` instead.
+    """
+    series, pending = begin_image_series_load(path)
+    if pending:
+        extra = load_pending_frames(pending)
+        merge_pending_frames(series, extra)
+        logger.info("Loaded remaining %d frame(s) -> %s", len(extra), series)
+    return series
+
+
+def begin_image_series_load(path: str) -> Tuple[ImageSeries, PendingFrames]:
+    """Load the first frame of ``path`` and return any remaining frames to fetch.
+
+    * **DICOM directory** — fully loaded; ``pending`` is empty.
+    * **Single-volume file** — that volume is loaded; ``pending`` is empty.
+    * **Multi-frame ``.pvd``** — earliest time is loaded into the returned
+      :class:`ImageSeries`; ``pending`` is a list of ``(time, filepath)`` for
+      the rest (safe to read in worker threads via :func:`load_pending_frames`).
+
+    The time slider should stay disabled until ``pending`` has been loaded and
+    merged with :meth:`ImageSeries.add_times`.
     """
     path = os.path.expanduser(path)
     if not os.path.exists(path):
         raise FileNotFoundError(f"Input path does not exist: {path}")
 
-    is_dicom = os.path.isdir(path)
-    if is_dicom:
+    if os.path.isdir(path):
         time_to_image = _load_dicom_dir(path)
-    else:
-        logger.info("Reading image data via ngawari.fIO: %s", path)
-        time_to_image = fIO.readImageFileToDict(path)
-
-    time_to_image = _validate_dict(time_to_image, path)
-    # Capture the patient/world orientation as a transform while keeping the grid
-    # axis-aligned (so the viewer's coordinate maths stay valid).  The transform
-    # is reapplied when markups are exported so polydata lands in true world
-    # (patient) coordinates.  DICOM orientation comes from the stored DICOM tags
-    # (reliable); other formats use the image's own direction matrix.
-    if is_dicom:
         patient_matrix = _dicom_patient_matrix(time_to_image)
-    else:
-        patient_matrix = _extract_and_normalise_orientation(time_to_image)
+        series = ImageSeries(time_to_image, patient_matrix=patient_matrix)
+        logger.info("Loaded %s%s", series,
+                    " (with patient transform)" if patient_matrix is not None else "")
+        return series, []
+
+    logger.info("Reading image index via ngawari.fIO: %s", path)
+    time_to_files = fIO.readPVDFileName(path)
+    if not time_to_files:
+        raise IOError(f"No image data found in {path}")
+
+    times = sorted(float(t) for t in time_to_files.keys())
+    t0 = times[0]
+    # Keys from readPVDFileName are floats; look up with the original key.
+    t0_key = sorted(time_to_files.keys(), key=float)[0]
+    first_path = time_to_files[t0_key]
+
+    logger.info("Loading first frame t=%g (%s)", t0, first_path)
+    first = _read_image_file(first_path)
+    time_to_image = {t0: first}
+    patient_matrix = _extract_and_normalise_orientation(time_to_image)
     series = ImageSeries(time_to_image, patient_matrix=patient_matrix)
-    logger.info("Loaded %s%s", series,
-                " (with patient transform)" if patient_matrix is not None else "")
-    return series
+
+    pending: PendingFrames = [
+        (float(t), time_to_files[t])
+        for t in sorted(time_to_files.keys(), key=float)
+        if float(t) != t0
+    ]
+    if pending:
+        logger.info(
+            "Loaded first frame of %s (%d more to load in background)",
+            series, len(pending))
+    else:
+        logger.info("Loaded %s%s", series,
+                    " (with patient transform)" if patient_matrix is not None else "")
+    return series, pending
+
+
+def load_pending_frames(pending: PendingFrames,
+                        max_workers: Optional[int] = None
+                        ) -> Dict[float, vtk.vtkImageData]:
+    """Read ``pending`` ``(time, filepath)`` pairs in parallel (thread pool).
+
+    Safe to call from a worker thread.  Merge the result on the main thread with
+    :func:`merge_pending_frames`.
+    """
+    if not pending:
+        return {}
+    n_workers = max_workers or min(8, max(1, len(pending)))
+    logger.info("Parallel-loading %d frame(s) with %d worker(s)",
+                len(pending), n_workers)
+    out: Dict[float, vtk.vtkImageData] = {}
+    with ThreadPoolExecutor(max_workers=n_workers) as pool:
+        futures = {
+            pool.submit(_read_image_file, filepath): float(t)
+            for t, filepath in pending
+        }
+        for fut in as_completed(futures):
+            t = futures[fut]
+            out[t] = fut.result()
+    return out
+
+
+def merge_pending_frames(series: ImageSeries,
+                         frames: Dict[float, vtk.vtkImageData]) -> None:
+    """Validate / normalise ``frames`` and append them to ``series``."""
+    if not frames:
+        return
+    frames = _validate_dict(frames, "<pending frames>")
+    if series.has_patient_transform:
+        for img in frames.values():
+            _set_identity_direction(img)
+    series.add_times(frames)
 
 
 def as_image_series(source: ImageInput, *,
@@ -125,6 +206,20 @@ def as_image_series(source: ImageInput, *,
     series = ImageSeries(time_to_image, patient_matrix=patient_matrix)
     logger.info("Built %s from %s", series, source_label)
     return series
+
+
+def _read_image_file(path: str) -> vtk.vtkImageData:
+    """Read one image file via ngawari and ensure it is ``vtkImageData``."""
+    img = fIO.readVTKFile(path)
+    if img is None or not isinstance(img, vtk.vtkImageData):
+        raise IOError(
+            f"{path} is not vtkImageData "
+            f"(got {type(img).__name__ if img is not None else None}); "
+            "this viewer requires image (volume) data."
+        )
+    if img.GetPointData().GetNumberOfArrays() == 0:
+        raise IOError(f"{path} contains no point-data arrays")
+    return img
 
 
 def _mapping_to_time_dict(mapping: Mapping, label: str

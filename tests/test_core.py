@@ -70,6 +70,56 @@ def test_load_real_vti():
     assert lo < hi
 
 
+def test_begin_image_series_load_single():
+    from tui.io import begin_image_series_load
+
+    series, pending = begin_image_series_load(TEST_VTI)
+    assert series.n_times == 1
+    assert pending == []
+
+
+def test_image_series_add_times():
+    s = ImageSeries({0.0: _make_volume(0.0)})
+    s.add_times({2.0: _make_volume(2.0), 1.0: _make_volume(1.0)})
+    assert s.n_times == 3
+    assert s.times == [0.0, 1.0, 2.0]
+    assert s.is_temporal
+
+
+def test_progressive_pvd_load():
+    """Write a 3-frame .pvd, load first frame only, then merge the rest."""
+    from ngawari import fIO
+    from tui.io import begin_image_series_load, load_pending_frames, merge_pending_frames
+
+    with tempfile.TemporaryDirectory() as td:
+        frames = {}
+        for t in (0.0, 1.0, 2.0):
+            path = os.path.join(td, f"frame_{int(t)}.vti")
+            fIO.writeVTKFile(_make_volume(t), path)
+            frames[t] = path
+        pvd = os.path.join(td, "series.pvd")
+        lines = [
+            '<?xml version="1.0"?>',
+            '<VTKFile type="Collection" version="0.1">',
+            "<Collection>",
+        ]
+        for t, fpath in frames.items():
+            lines.append(
+                f'  <DataSet timestep="{t}" file="{os.path.basename(fpath)}"/>')
+        lines += ["</Collection>", "</VTKFile>"]
+        with open(pvd, "w") as fh:
+            fh.write("\n".join(lines))
+
+        series, pending = begin_image_series_load(pvd)
+        assert series.n_times == 1
+        assert series.times == [0.0]
+        assert len(pending) == 2
+        extra = load_pending_frames(pending)
+        merge_pending_frames(series, extra)
+        assert series.n_times == 3
+        assert series.times == [0.0, 1.0, 2.0]
+
+
 def test_as_image_series_path():
     from tui.io import as_image_series
 

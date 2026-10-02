@@ -33,7 +33,6 @@ from .core.enums import MarkupMode, ViewType
 from .core.image_series import ImageSeries
 from .core.markups import Markups, Spline
 from .io import (
-    load_image_series,
     load_markup_labelmap,
     load_markup_labelmap_series,
     load_markup_polydata,
@@ -42,7 +41,12 @@ from .io import (
     load_surface_as_labelmap_series,
     save_markups,
 )
-from .io.loader import as_image_series
+from .io.loader import (
+    as_image_series,
+    begin_image_series_load,
+    load_pending_frames,
+    merge_pending_frames,
+)
 from .state import ViewerState
 from .ui.side_panel import CUSTOM_COLS, SidePanel
 from .views import SliceView, VolumeView
@@ -70,7 +74,13 @@ class ViewerApp(QtWidgets.QMainWindow):
             raise TypeError(
                 "ViewerApp requires image data: pass a path, vtkImageData, "
                 "{time: image} dict, image list, or ImageSeries as data=")
-        series = as_image_series(source)
+        self._load_generation = 0
+        self._bg_loader: Optional[_PendingFramesThread] = None
+        if isinstance(source, str):
+            series, pending = begin_image_series_load(source)
+        else:
+            series = as_image_series(source)
+            pending = []
         self.state = ViewerState(series)
         self._custom_callbacks: Dict[Tuple[int, int], Callable] = {}
         self._views_started = False
@@ -87,6 +97,8 @@ class ViewerApp(QtWidgets.QMainWindow):
         self._populate_controls()
         # User extension hook - safe to register custom buttons here.
         self.customise()
+        if pending:
+            self._start_background_frame_load(pending)
 
     @property
     def WORK_DIR(self) -> str:
@@ -855,14 +867,16 @@ keyframes; frames in between are interpolated (shown in cyan). Enable
         if not path:
             return
         try:
-            series = load_image_series(path)
+            series, pending = begin_image_series_load(path)
         except Exception as exc:  # noqa: BLE001
             self._report_error("Open failed", exc)
             return
-        self._reset_with_series(series)
+        self._reset_with_series(series, pending=pending)
 
-    def _reset_with_series(self, series: ImageSeries) -> None:
+    def _reset_with_series(self, series: ImageSeries,
+                           pending: Optional[list] = None) -> None:
         # Keep sticky session prefs (closed-spline checkbox, etc.) across reload.
+        self._cancel_background_frame_load()
         spline_closed = self.state.spline_closed
         self.state = ViewerState(series)
         self.state.spline_closed = spline_closed
@@ -871,6 +885,53 @@ keyframes; frames in between are interpolated (shown in cyan). Enable
             view.prepare_geometry() if isinstance(view, SliceView) else None
         self._populate_controls()  # configures the time slider via _sync_time_bar
         self.refresh_all()
+        if pending:
+            self._start_background_frame_load(pending)
+
+    def _cancel_background_frame_load(self) -> None:
+        """Ignore any in-flight progressive load (e.g. user opened a new file)."""
+        self._load_generation += 1
+        self._bg_loader = None
+
+    def _start_background_frame_load(self, pending: list) -> None:
+        """Load remaining PVD frames off the UI thread; enable time slider when done."""
+        n = len(pending)
+        if n == 0:
+            return
+        self.statusBar().showMessage(
+            f"Loading remaining {n} time frame(s) in background…")
+        gen = self._load_generation
+        series = self.state.image_series
+        loader = _PendingFramesThread(pending, parent=self)
+        self._bg_loader = loader
+
+        def _on_done(frames: dict) -> None:
+            if gen != self._load_generation:
+                return
+            self._bg_loader = None
+            try:
+                merge_pending_frames(series, frames)
+            except Exception as exc:  # noqa: BLE001
+                self.statusBar().clearMessage()
+                self._report_error("Background load failed", exc)
+                return
+            self.state.reset_window_level()
+            self._sync_time_bar()
+            self.refresh_all()
+            self.statusBar().showMessage(
+                f"Loaded all {series.n_times} time frames.", 4000)
+            logger.info("Background load complete -> %s", series)
+
+        def _on_fail(message: str) -> None:
+            if gen != self._load_generation:
+                return
+            self._bg_loader = None
+            self.statusBar().clearMessage()
+            self._report_error("Background load failed", RuntimeError(message))
+
+        loader.completed.connect(_on_done)
+        loader.failed.connect(_on_fail)
+        loader.start()
 
     # -------------------------------------------------- markup load / export
     # ``.pvd`` time-series are also accepted: each frame is loaded into the
@@ -1048,6 +1109,25 @@ keyframes; frames in between are interpolated (shown in cyan). Enable
 
 
 # ----------------------------------------------------------------------------
+class _PendingFramesThread(QtCore.QThread):
+    """Background worker: parallel-load remaining PVD frames, emit when done."""
+
+    completed = QtCore.pyqtSignal(object)  # Dict[float, vtkImageData]
+    failed = QtCore.pyqtSignal(str)
+
+    def __init__(self, pending, parent=None):
+        super().__init__(parent)
+        self._pending = list(pending)
+
+    def run(self) -> None:
+        try:
+            frames = load_pending_frames(self._pending)
+            self.completed.emit(frames)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Pending frame load failed")
+            self.failed.emit(str(exc))
+
+
 def _title_for(data) -> str:
     if isinstance(data, str):
         return f"TUI - {os.path.basename(os.path.expanduser(data))}"
