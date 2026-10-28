@@ -479,6 +479,77 @@ def test_markups_saved_in_true_world_coordinates():
         assert np.allclose(out.GetPoint(0), (0.0, 1.0, 0.0), atol=1e-6)
 
 
+def test_add_paint_merges_nonzero_voxels():
+    m = Markups(n_times=2, image_shape=(4, 4, 4))
+    base = np.zeros((4, 4, 4), dtype=np.uint8)
+    base[0, 0, 0] = 3
+    assert m.add_paint(0, base)
+    extra = np.zeros((4, 4, 4), dtype=np.uint8)
+    extra[1, 0, 0] = 5
+    assert m.add_paint(0, extra)
+    got = m.paint_mask(0, create=False)
+    assert got[0, 0, 0] == 3 and got[1, 0, 0] == 5
+    # An empty merge does not create a frame.
+    assert not m.add_paint(1, np.zeros((4, 4, 4)))
+    assert m.paint_mask(1, create=False) is None
+    # Replace installs the mask even when it is empty, and does not alias.
+    blank = np.zeros((4, 4, 4), dtype=np.uint8)
+    assert m.add_paint(0, blank, merge=False)
+    blank[0, 0, 0] = 9
+    assert m.paint_mask(0, create=False)[0, 0, 0] == 0
+    try:
+        m.add_paint(0, np.zeros((2, 2, 2), dtype=np.uint8))
+        raise AssertionError("expected shape mismatch")
+    except ValueError:
+        pass
+
+
+def test_as_paint_frames_accepts_array_image_and_time_dict():
+    from ngawari import vtkfilters
+
+    from tui.io import as_paint_frames
+
+    series = _temporal_series(3)  # times 0, 1, 2; dims (8, 8, 8)
+    arr = np.zeros(series.dimensions, dtype=np.uint16)
+    arr[1, 2, 3] = 4
+    frames = as_paint_frames(arr, series)
+    assert list(frames) == [None]
+    assert frames[None].dtype == np.uint8 and frames[None][1, 2, 3] == 4
+
+    def _image(values):
+        img = vtk.vtkImageData()
+        img.SetDimensions(*series.dimensions)
+        img.SetSpacing(*series.spacing)
+        img.SetOrigin(*series.origin)
+        vtkfilters.setArrayFromNumpy(
+            img, values, "labels", SET_SCALAR=True, IS_3D=True)
+        return img
+
+    one = as_paint_frames(_image(arr), series, time=1.0)
+    assert one[1.0][1, 2, 3] == 4
+
+    other = np.zeros(series.dimensions, dtype=np.uint8)
+    other[0, 0, 0] = 2
+    both = as_paint_frames({0.0: _image(arr), 2: other}, series)
+    assert both[0.0][1, 2, 3] == 4 and both[2.0][0, 0, 0] == 2
+
+    try:
+        as_paint_frames(np.zeros((2, 2, 2), dtype=np.uint8), series)
+        raise AssertionError("expected shape mismatch")
+    except ValueError:
+        pass
+    try:
+        as_paint_frames({"nope": arr}, series)
+        raise AssertionError("expected bad time key")
+    except TypeError:
+        pass
+    try:
+        as_paint_frames({0.0: arr}, series, time=1.0)
+        raise AssertionError("expected time+mapping rejection")
+    except TypeError:
+        pass
+
+
 def test_markups_saved_axis_aligned_when_no_transform():
     s = ImageSeries({0.0: _make_volume(1.0)})
     assert not s.has_patient_transform

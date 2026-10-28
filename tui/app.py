@@ -23,6 +23,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
+from collections.abc import Mapping
 from typing import Callable, Dict, Optional, Tuple
 
 import numpy as np
@@ -33,6 +34,7 @@ from .core.enums import MarkupMode, ViewType
 from .core.image_series import ImageSeries
 from .core.markups import Markups, Spline
 from .io import (
+    as_paint_frames,
     load_markup_labelmap,
     load_markup_labelmap_series,
     load_markup_polydata,
@@ -859,6 +861,61 @@ keyframes; frames in between are interpolated (shown in cyan). Enable
         return save_markups(self.markups, self.image_series, out_dir,
                             prefix=prefix, include_interpolated=include_interpolated)
 
+    def add_paint_mask(self, source, *, time: Optional[float] = None,
+                       time_id: Optional[int] = None, merge: bool = True) -> int:
+        """Add a paint mask and redraw.
+
+        ``source`` may be:
+
+        * a numpy array shaped ``(nx, ny, nz)`` (the series dimensions);
+        * a ``vtkImageData`` whose point-data scalars are the labels;
+        * a ``{time: array or vtkImageData}`` mapping. Keys are **series
+          times** — the same numbers as a ``{time: image}`` dict passed to
+          :func:`launch` — and each mask is applied to the nearest frame.
+
+        A single array or image lands on the current frame. Pass ``time``
+        (a series time) or ``time_id`` (a frame index) to target another
+        frame. Do not pass either when ``source`` is a mapping.
+
+        Non-zero voxels overwrite labels already on that frame. Pass
+        ``merge=False`` to replace the frame's mask entirely. Values are
+        stored as ``uint8``. Returns how many masks were applied.
+
+        Example::
+
+            self.add_paint_mask(mask)                       # current frame
+            self.add_paint_mask(vtk_img, time_id=2)
+            self.add_paint_mask({0.0: img_a, 0.5: img_b})   # series times
+        """
+        if isinstance(source, Mapping):
+            if time is not None or time_id is not None:
+                raise TypeError(
+                    "time and time_id apply to a single paint mask, not a mapping")
+            frames = as_paint_frames(source, self.image_series)
+            targets = [
+                (self._closest_time_id(t), mask) for t, mask in frames.items()]
+        else:
+            if time is not None and time_id is not None:
+                raise TypeError("pass time or time_id, not both")
+            frames = as_paint_frames(source, self.image_series, time=time)
+            mask = frames[time]
+            if time_id is not None:
+                tid = int(time_id)
+                n = self.image_series.n_times
+                if tid < 0 or tid >= n:
+                    raise ValueError(f"time_id {tid} is outside 0..{n - 1}")
+            else:
+                tid = self._closest_time_id(time)
+            targets = [(tid, mask)]
+
+        applied = 0
+        for tid, mask in targets:
+            if self.markups.add_paint(tid, mask, merge=merge):
+                applied += 1
+        if applied and self._views_started:
+            self.refresh_all()
+        return applied
+
     # ----------------------------------------------------------- file dialogs
     def _on_open(self) -> None:
         path, _ = QtWidgets.QFileDialog.getOpenFileName(
@@ -1024,19 +1081,12 @@ keyframes; frames in between are interpolated (shown in cyan). Enable
         """Merge one or more ``(nx,ny,nz)`` masks into their nearest frames."""
         merged = 0
         for t in sorted(frames, key=lambda k: (k is not None, k)):
-            mask = frames[t]
-            if not mask.any():
-                continue
-            existing = self.state.markups.paint_mask(
-                self._closest_time_id(t), create=True)
-            set_voxels = mask > 0
-            existing[set_voxels] = mask[set_voxels]
-            merged += 1
+            if self.state.markups.add_paint(self._closest_time_id(t), frames[t]):
+                merged += 1
         if not merged:
             QtWidgets.QMessageBox.information(
                 self, "Load labelmap", "The label map is empty (no set voxels).")
             return
-        self.state.markups.touch_paint()
         self.refresh_all()
 
     def _on_export_polydata(self) -> None:

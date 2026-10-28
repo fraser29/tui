@@ -15,6 +15,7 @@ from .loader import (
     ImageInput,
 )
 from .markup_io import (
+    as_paint_frames,
     build_mask_image,
     load_markup_labelmap,
     load_markup_labelmap_series,
@@ -27,6 +28,7 @@ from .markup_io import (
 
 __all__ = [
     "as_image_series",
+    "as_paint_frames",
     "begin_image_series_load",
     "ImageInput",
     "load_image_series",

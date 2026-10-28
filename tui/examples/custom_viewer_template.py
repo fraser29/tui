@@ -43,6 +43,7 @@ convenience properties on :class:`~tui.app.ViewerApp` are shortcuts:
 | ``self.current_image``    | ``vtkImageData`` for the current time step     |
 | ``self.markups``          | :class:`~tui.core.markups.Markups` container|
 | ``self.save_markups(...)``| export all markups (see File → Save markups)   |
+| ``self.add_paint_mask()`` | install a numpy / VTK / ``{time: mask}`` paint |
 | ``self.refresh()``        | redraw every panel after you mutate state      |
 +---------------------------+------------------------------------------------+
 
@@ -257,6 +258,12 @@ class CustomViewer(ViewerApp):
         _manual_pts = self.markups.manual_points(_tid)
         _manual_splines = self.markups.manual_splines(_tid)
         _manual_paint = self.markups.paint_mask(_tid, create=False)
+
+        # Install a mask (numpy (nx,ny,nz), vtkImageData, or {series time: mask}).
+        # Non-zero voxels merge into that frame; merge=False replaces it.
+        # self.add_paint_mask(my_numpy_mask)                 # current frame
+        # self.add_paint_mask(my_vtk_image, time_id=2)       # frame index
+        # self.add_paint_mask({0.0: img_a, 0.5: img_b})      # series times
 
         # --- markups across the whole series --------------------------------
         _summary = self.markups.summary()   # counts per type

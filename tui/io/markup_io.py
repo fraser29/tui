@@ -12,7 +12,8 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Dict, List, Optional, Sequence, Tuple
+from collections.abc import Mapping
+from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import vtk
@@ -298,15 +299,102 @@ def load_markup_polydata_series(path: str, image_series: ImageSeries
     return out
 
 
+def _mask_from_array(mask: np.ndarray, image_series: ImageSeries,
+                     label: str) -> np.ndarray:
+    """Validate a numpy volume and return an ``(nx, ny, nz)`` uint8 mask."""
+    arr = np.asarray(mask)
+    dims = tuple(int(d) for d in image_series.dimensions)
+    if tuple(int(d) for d in arr.shape) != dims:
+        raise ValueError(
+            f"{label} shape {tuple(arr.shape)} does not match the image "
+            f"dimensions {dims}")
+    if arr.ndim != 3:
+        raise ValueError(f"{label} must be a scalar volume (got shape {arr.shape})")
+    return np.array(arr, dtype=np.uint8, order="F", copy=True)
+
+
+def _mask_from_image(img: vtk.vtkImageData, image_series: ImageSeries,
+                     label: str) -> np.ndarray:
+    """Read point-data scalars from ``img`` into an ``(nx, ny, nz)`` uint8 mask.
+
+    Voxels are copied by index. The image must share the series dimensions;
+    a spacing or origin mismatch is warned about and otherwise ignored.
+    """
+    dims = tuple(int(d) for d in image_series.dimensions)
+    got = tuple(int(d) for d in img.GetDimensions())
+    if got != dims:
+        raise ValueError(
+            f"{label} dimensions {got} do not match the image dimensions {dims}")
+    ref = image_series.reference
+    if (not np.allclose(img.GetSpacing(), ref.GetSpacing())
+            or not np.allclose(img.GetOrigin(), ref.GetOrigin())):
+        logger.warning(
+            "%s spacing/origin differs from the series; voxels are copied by index",
+            label)
+    if img.GetPointData().GetScalars() is None:
+        raise ValueError(f"{label} has no point-data scalars")
+    mask = vtkfilters.getScalarsAsNumpy(img, RETURN_3D=True)
+    if getattr(mask, "ndim", 0) != 3:
+        raise ValueError(
+            f"{label} must be a scalar volume (got shape {getattr(mask, 'shape', None)})")
+    return np.array(mask, dtype=np.uint8, order="F", copy=True)
+
+
 def _labelmap_to_mask(img: vtk.vtkImageData, image_series: ImageSeries,
                       path: str) -> np.ndarray:
-    dims = tuple(int(d) for d in image_series.dimensions)
-    if tuple(img.GetDimensions()) != dims:
-        raise ValueError(
-            f"Label map dimensions {img.GetDimensions()} do not match the "
-            f"image dimensions {dims} in {path}")
-    mask = vtkfilters.getScalarsAsNumpy(img, RETURN_3D=True)
-    return np.ascontiguousarray(mask.astype(np.uint8))
+    return _mask_from_image(img, image_series, f"Label map {path}")
+
+
+# A single mask, or ``{series time: mask}`` where each mask is an array or image.
+PaintSource = Union[np.ndarray, "vtk.vtkImageData", Mapping]
+
+
+def as_paint_frames(source: PaintSource, image_series: ImageSeries, *,
+                    time: Optional[float] = None
+                    ) -> Dict[Optional[float], np.ndarray]:
+    """Normalise a paint source to ``{series time or None: (nx, ny, nz) mask}``.
+
+    ``source`` may be:
+
+    * a numpy array shaped ``(nx, ny, nz)`` — stored under ``time`` (``None``
+      means the caller chooses the frame, usually the one on screen);
+    * a :class:`vtk.vtkImageData` whose point-data scalars are the labels;
+    * a mapping ``{time: array or vtkImageData}``. Keys are series times (the
+      same numbers used in a ``{time: image}`` dict passed to
+      :func:`~tui.io.as_image_series`), not frame indices. ``time`` must be
+      omitted for a mapping.
+
+    Each mask must match ``image_series.dimensions``. Values are cast to
+    ``uint8``.
+    """
+    if isinstance(source, np.ndarray):
+        return {time: _mask_from_array(source, image_series, "Paint mask")}
+    if isinstance(source, vtk.vtkImageData):
+        return {time: _mask_from_image(source, image_series, "Paint mask")}
+    if isinstance(source, Mapping):
+        if time is not None:
+            raise TypeError("time applies to a single paint mask, not a mapping")
+        out: Dict[Optional[float], np.ndarray] = {}
+        for key, item in source.items():
+            try:
+                t = float(key)
+            except (TypeError, ValueError) as exc:
+                raise TypeError(
+                    f"paint mask time keys must be numeric (got {key!r})"
+                ) from exc
+            label = f"Paint mask at t={t:g}"
+            if isinstance(item, np.ndarray):
+                out[t] = _mask_from_array(item, image_series, label)
+            elif isinstance(item, vtk.vtkImageData):
+                out[t] = _mask_from_image(item, image_series, label)
+            else:
+                raise TypeError(
+                    f"{label} must be a numpy array or vtkImageData "
+                    f"(got {type(item).__name__})")
+        return out
+    raise TypeError(
+        "paint mask must be a numpy array, vtkImageData, or {time: mask} "
+        f"mapping (got {type(source).__name__})")
 
 
 def load_markup_labelmap(path: str, image_series: ImageSeries) -> np.ndarray:

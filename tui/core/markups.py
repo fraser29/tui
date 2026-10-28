@@ -425,6 +425,33 @@ class Markups:
         self._paint[time_id] = np.asfortranarray(mask, dtype=np.uint8)
         self._bump_paint()
 
+    def add_paint(self, time_id: int, mask: np.ndarray, *, merge: bool = True) -> bool:
+        """Install ``mask`` on ``time_id``.
+
+        ``mask`` is ``(nx, ny, nz)`` in the same voxel layout as
+        :attr:`image_shape`. Values are stored as ``uint8`` labels.
+        Non-zero voxels overwrite an existing mask when ``merge`` is true;
+        an all-zero mask is ignored in that case. ``merge=False`` replaces
+        the frame's mask, including with zeros.
+
+        Returns whether a mask was written.
+        """
+        owned = np.array(mask, dtype=np.uint8, order="F", copy=True)
+        if self.image_shape is not None and tuple(owned.shape) != tuple(self.image_shape):
+            raise ValueError(
+                f"paint mask shape {owned.shape} does not match image shape "
+                f"{tuple(self.image_shape)}")
+        if merge:
+            if not owned.any():
+                return False
+            existing = self.paint_mask(time_id, create=True)
+            selected = owned > 0
+            existing[selected] = owned[selected]
+            self.touch_paint()
+            return True
+        self.set_paint_mask(time_id, owned)
+        return True
+
     def clear_paint(self, time_id: int) -> None:
         if self._paint.pop(time_id, None) is not None:
             self._bump_paint()
